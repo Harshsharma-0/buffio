@@ -1,18 +1,10 @@
 #ifndef BUFF_IO
 #define BUFF_IO
 
-#if !defined(BUFFIO_DEBUG)
-#define BUFFIO_LOG(part,msg)
-#endif
-
 #if defined(BUFFIO_DEBUG)
-  #define BUFFIO_LOG(part , msg) \
-          std::cout<<"["<<part<<"] "<<msg<<std::endl; 
+  #include "./buffiolog.hpp"
 #endif
 
-#define BUFFIO_INFO(part , msg) \
-          std::cout<<part<<" : "<<msg<<std::endl; 
- 
 #if defined(BUFFIO_IMPLEMENTATION)
 
 #define MAX_PATH_NAME 50
@@ -77,14 +69,10 @@ class buffsocket{
       case BUFFIO_FAMILY_BLUETOOTH:
       break;
       default:
-       BUFFIO_LOG("SOCKET","UNKNOWN TYPE SOCKET CREATION FAILED");
+       BUFFIO_LOG(ERROR,"UNKNOWN TYPE SOCKET CREATION FAILED");
       return;
       break;
     }; 
-     BUFFIO_LOG("SOCKET","SOCKET CREATED");
-     BUFFIO_INFO("SERVER"," started");
-     BUFFIO_INFO("ADDRESS","");
-     BUFFIO_INFO("PORT","");
      return;
   };
    int createipv4socket(buffioinfo &ioinfo , int *socketfd){
@@ -95,9 +83,10 @@ class buffsocket{
        addr.sin_family = ioinfo.sockfamily;
        addr.sin_port = htons(ioinfo.portnumber);
        addr.sin_addr.s_addr = inet_addr(ioinfo.address);
-
        if(bind(*socketfd, (struct sockaddr *)&addr,sizeof(struct sockaddr_in)) < 0){
-                  BUFFIO_LOG("SOCKET","SOCKET BINDING FAILED");
+                  BUFFIO_LOG(ERROR," SOCKET BINDING FAILED : ", strerror(errno));
+                  BUFFIO_LOG(LOG," PORT : ", ioinfo.portnumber," IP ADDRESS : ", ioinfo.address);
+
                   close(*socketfd);
                   *socketfd = -1;
           return -1;
@@ -112,7 +101,7 @@ class buffsocket{
          addr.sun_family = BUFFIO_FAMILY_LOCAL;
          strncpy(addr.sun_path,ioinfo.address,sizeof(addr.sun_path) - 1);
          if(bind(*socketfd, (struct sockaddr *)&addr,sizeof(struct sockaddr_un)) < 0){
-                  BUFFIO_LOG("SOCKET","SOCKET BINDING FAILED");
+                  BUFFIO_LOG(ERROR,"SOCKET BINDING FAILED : ",strerror(errno));
                   close(*socketfd);
                   *socketfd = -1;
           return -1;
@@ -124,11 +113,10 @@ class buffsocket{
  ~buffsocket(){ 
     if(socketfd > 0){
       if(close(socketfd) < 0){
-        BUFFIO_LOG("SOCKET","SOCKET CLOSE FAILURE");
-       return;
+        BUFFIO_LOG(ERROR,"SOCKET CLOSE FAILURE");
      };
      unlink(linfo.address);
-     BUFFIO_LOG("SOCKET","SOCKET CLOSED SUCCESFULLY");
+     BUFFIO_LOG(LOG,"SOCKET CLOSED SUCCESFULLY");
     }
  };
 

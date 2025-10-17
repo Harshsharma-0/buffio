@@ -1,2 +1,2 @@
-main:main.cpp buffio.hpp
+main:main.cpp buffio.hpp buffiolog.hpp
 	 g++ -std=c++20 main.cpp -o main && ./main
