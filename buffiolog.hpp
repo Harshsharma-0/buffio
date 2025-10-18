@@ -12,7 +12,7 @@ enum LOG_LEVEL{
 };
 
 #if !defined(BUFFIO_DEBUG)
-#define BUFFIO_LOG(part,msg)
+#define BUFFIO_LOG(part ,...)
 #endif
 
 
@@ -77,8 +77,7 @@ namespace Color {
   }
 
   #define BUFFIO_LOG(part ,...) log_msg(part,__VA_ARGS__)       
-#endif
 
-#define BUFFIO_INFO(part,...) log_msg(part , __VA_ARGS__)
+#endif
 
 #endif
