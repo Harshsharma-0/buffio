@@ -3,9 +3,7 @@
 
 //TODO : WRITE QUEUE AND DEFINE SYSTEM TO PROPAGATE THE TASKS TO EXECUTION QUEUE;
 
-#if defined(BUFFIO_DEBUG)
-  #include "./buffiolog.hpp"
-#endif
+#include "./buffiolog.hpp"
 
 #include <sys/socket.h>
 #include <coroutine>
@@ -27,20 +25,42 @@ enum BUFFIO_SOCK_TYPE{
  BUFFIO_SOCK_RAW = SOCK_RAW,
 };
 
+//user can give number between MAX and MINIMUM;
+enum BUFFIO_PRIORITY_VALUE{
+ BUFFIO_QUEUE_PRIORITY_MAX = 10024,
+ BUFFIO_QUEUE_PRIORITY_MIN = -100,
+ BUFFIO_QUEUE_PRIORITY_MEDIUM = 500,
+ BUFFIO_QUEUE_PRIORITY_NORMAL = 1000,
+};
+
+enum BUFFIO_ROUTINE_STATUS{
+  BUFFIO_ROUTINE_WAITING = 1,
+  BUFFIO_ROUTINE_EXECUTING,
+  BUFFIO_ROUTINE_YIELD,
+};
+
 struct buffioinfo{
  const char *address;
  int portnumber;
- size_t maxclient;
+ int listenbacklog;
+ size_t capacity;
+ size_t reserve;
  BUFFIO_SOCK_TYPE socktype;
  BUFFIO_FAMILY_TYPE sockfamily;
 };
 
 
 struct buffiopromise;
+struct buffioqueue;
+struct buffiobuffer;
+struct clientinfo;
+struct acceptreturn;
 using buffiopromise = struct buffiopromise;
 using buffioinfo = struct buffioinfo;
-using BUFFIO_FAMILY_TYPE = enum BUFFIO_FAMILY_TYPE;
-using BUFFIO_SOCK_TYPE = enum BUFFIO_SOCK_TYPE;
+
+#define iowait co_await
+#define ioyeild co_yield
+#define ioreturn co_return
 
 namespace buffio{
  class buffsocket;
@@ -52,43 +72,67 @@ namespace buffio{
 #if defined(BUFFIO_IMPLEMENTATION)
 
 // for public use;
-struct promise_type;
-using buffiohandleroutine = std::coroutine_handle<promise_type>;
+struct buffiopromise;
+using buffiohandleroutine = std::coroutine_handle<buffiopromise>;
+
+struct buffioqueue{
+ buffiohandleroutine handle;
+ buffiohandleroutine complitioncallback;
+ int priority;
+ int priorityexpire; // used to control how much subsiquent call has to be made to this thing
+};
+
+
+struct buffiobuffer{
+ char *data;
+ size_t filled;
+ size_t size;
+};
+
+struct clientinfo{
+ const char *address;
+ int clientfd;
+ int portnumber;
+ buffiobuffer readbuffer;
+ buffiobuffer writebuffer;
+};
+
+
+struct buffioroutine: buffiohandleroutine{
+    using promise_type = ::buffiopromise;
+};
+
+struct acceptreturn{
+ int errorcode;
+ buffioroutine handle;
+};
+
+struct buffioawaiter{
+   bool await_ready() const noexcept{ return false;}
+   static void await_suspend(std::coroutine_handle<>) noexcept{};
+   static void await_resume() noexcept {};
+};
 
 struct buffiopromise{
+    int success = 0;
+    buffiohandleroutine waitfor;
+    buffioroutine self; 
 
-  // declatation to compiler to use
-   struct promise_type;
-   using buffiohandleroutine = std::coroutine_handle<promise_type>;
-
-   //handle for the croutine itself;
-   buffiohandleroutine handle;
-   //handle to track which is waiting for this instance;
-   buffiohandleroutine waiter;
-
-   buffiopromise(buffiohandleroutine handle): handle(handle) {}; 
-
-  struct promise_type{
-    int success = 0; 
-
-    buffiohandleroutine get_return_object(){
-            return buffiohandleroutine(buffiohandleroutine::from_promise(*this));
+    buffioroutine get_return_object(){
+            self = {buffioroutine::from_promise(*this)};
+            return self; 
+            
     };
 
     std::suspend_always initial_suspend() noexcept{ return{};}; 
     std::suspend_always final_suspend() noexcept{ return{};};
+    buffioawaiter await_transform(buffioroutine waitfor){
+     waitfor = waitfor; 
+     return {};
+    };
+
     void unhandled_exception() {};
     void return_value(int state){ success = state;};
-};
-
-    bool await_ready() const noexcept { return false; };
-
-    //handle of the routine that is waiting for completion;
-    void await_suspend(buffiohandleroutine waitfor){
-       handle.resume();
-       waiter = waitfor;
-    };
-    void await_resume() noexcept {};
 
 };
 
@@ -105,7 +149,11 @@ class buffio::buffsocket{
 
  public:
  
-  buffsocket(buffioinfo &ioinfo) : linfo(ioinfo){
+  buffsocket(buffioinfo &ioinfo) : linfo(ioinfo), clienthandler(nullptr){
+     if(ioinfo.capacity < 1){
+       BUFFIO_LOG(ERROR," SOCKET: Field maxclient in buffioinfo structure cannot be less than 1");
+     return;
+     };
      switch(ioinfo.sockfamily){
       case BUFFIO_FAMILY_LOCAL:
         if(createlocalsocket(ioinfo,&socketfd) < 0)
@@ -126,7 +174,7 @@ class buffio::buffsocket{
       case BUFFIO_FAMILY_BLUETOOTH:
       break;
       default:
-       BUFFIO_LOG(ERROR,"UNKNOWN TYPE SOCKET CREATION FAILED");
+       BUFFIO_LOG(ERROR," UNKNOWN TYPE SOCKET CREATION FAILED");
       return;
       break;
     }; 
@@ -141,6 +189,7 @@ class buffio::buffsocket{
        addr.sin_family = ioinfo.sockfamily;
        addr.sin_port = htons(ioinfo.portnumber);
        addr.sin_addr.s_addr = inet_addr(ioinfo.address);
+
        if(bind(*socketfd, (struct sockaddr *)&addr,sizeof(struct sockaddr_in)) < 0){
                   BUFFIO_LOG(ERROR," SOCKET BINDING FAILED : ", strerror(errno));
                   BUFFIO_LOG(LOG," PORT : ", ioinfo.portnumber," IP ADDRESS : ", ioinfo.address);
@@ -164,78 +213,163 @@ class buffio::buffsocket{
                   *socketfd = -1;
           return -1;
          }
-          
+         aacceptedaddress = (char *)ioinfo.address; 
     return 0;
    };
 
  ~buffsocket(){ 
     if(socketfd > 0){
       if(close(socketfd) < 0){
-        BUFFIO_LOG(ERROR,"SOCKET CLOSE FAILURE");
+        BUFFIO_LOG(ERROR," SOCKET CLOSE FAILURE");
      };
      unlink(linfo.address);
-     BUFFIO_LOG(LOG,"SOCKET CLOSED SUCCESFULLY");
+     BUFFIO_LOG(LOG," SOCKET CLOSED SUCCESFULLY");
     }
  };
 
+ int listensock(){
+    linfo.listenbacklog = linfo.listenbacklog < 0 ? 0 : linfo.listenbacklog;
+    if(listen(socketfd,linfo.listenbacklog) < 0){
+        BUFFIO_LOG(ERROR," FAILED TO LISTEN ON SOCKET \n reason : ",strerror(errno));
+        return -1;
+    }
+        BUFFIO_LOG(INFO," listening on socket : \n" 
+                        "              address - ",linfo.address,
+                        "\n              port - ",linfo.portnumber);
+
+    return 0;
+  };
+
+acceptreturn acceptsock(){
+
+      switch(linfo.sockfamily){
+        case BUFFIO_FAMILY_LOCAL:  afd = accept(socketfd,NULL,NULL); break;
+        case BUFFIO_FAMILY_IPV4: { 
+           sockinfolen = sizeof(struct sockaddr_in); 
+           struct sockaddr_in address_in;
+           afd = accept(socketfd,(struct sockaddr*)&address_in,&sockinfolen);
+           portnumber = ntohs(address_in.sin_port);
+           aacceptedaddress  = inet_ntoa((struct in_addr)address_in.sin_addr); 
+         }
+        break;
+        case BUFFIO_FAMILY_IPV6:  break;
+     }; 
+
+
+      if(afd  < 0){
+         BUFFIO_LOG(ERROR," FAILED TO ACCEPT A CONNECTION \n reason : ",strerror(errno));
+         return {.errorcode = -1 , .handle = NULL};
+      }
+      
+      if(!clienthandler) return {.errorcode = 1,.handle = NULL};
+
+      cinfo = {.address = aacceptedaddress , .clientfd = afd,.portnumber = portnumber};
+
+      return {.errorcode = 0 , .handle = clienthandler(cinfo)};
+};
+ 
  int socketfd = -1;
  buffioinfo linfo;
+ buffioroutine (*clienthandler)(clientinfo cinfo);
+
+ private:
+      clientinfo cinfo;
+      socklen_t sockinfolen = 0;
+      char *aacceptedaddress = nullptr;
+      int afd = -1;
+      int portnumber = 0;
 };
 
 
 class buffio::queue{
- 
- public:
+  public:
+    queue(size_t queuesize,size_t reservesize) :  capacity(queuesize), 
+             occupiedcapacity(0), currentidx(0),
+             execqueue(nullptr), emptyplaces(nullptr),
+             reservesize(reservesize)
+   { 
+       if(queuesize < 1){
+         BUFFIO_LOG(ERROR," QUEUE: field queuesize to queue is less than 1," 
+                          " it must have to be 1 or greater than 1");
+        return;
+       }
+       if(reservesize < 10){
+         BUFFIO_LOG(ERROR," QUEUE: field reservesize to queue is less than 10,"
+                          " using no reserve policy");
+        reservesize = 0;
+       } 
+       execqueue = new buffioqueue[queuesize + reservesize];
+       emptyplaces = new buffioqueue*[queuesize + reservesize];
+             
+       if(!execqueue || ! emptyplaces){
+           BUFFIO_LOG(ERROR," QUEUE CREATION FAILED ");
+           BUFFIO_LOG(DEBUG," Allocation of one of the queue failed ");
+           BUFFIO_LOG(TRACE, " EXEC QUEUE : ",execqueue," QUEUE emptytracker",emptyplaces);
+        return; 
+       }
 
- queue(size_t queuesize) : capacity(queuesize){
-   execQueue = new buffiohandleroutine[queuesize];
-   current = execQueue;
-   Next = execQueue;
- };
-
+       reservequeue = reservesize < 10 ? nullptr : (execqueue + (queuesize - 1));
+       current = execqueue;
+       Next = execqueue + 1;
+   };
 
  ~queue(){
-    
+    if(execqueue) delete execqueue;
+    if(emptyplaces) delete emptyplaces;
   };
- int push(){
- 
+
+ int push(buffioroutine routine){
+    if(!(occupiedcapacity < capacity)){
+
+           BUFFIO_LOG(WARN," QUEUE: cannot push instance to queue is full. execution will continue"
+                           " when queue is free");
+     }
+     routine.resume(); 
+    return 0;
  };
- void cycle(){
-  current
- }
- void yield();
-  
+
+  void yield(){
+     currentidx += 1;
+      size_t nidx = (currentidx < capacity) * currentidx;
+      if(!execqueue[currentidx].handle){
+         BUFFIO_LOG(TRACE," NO ROUTINE AVALILABLE TO EXECUTE ");
+         return;
+      }
+    execqueue[currentidx].handle.resume();
+    return;
+  };
+   
  private:
- buffiohandleroutine *execQueue;
+
+ buffioqueue *execqueue;
+ buffioqueue *reservequeue;
+ buffioqueue **emptyplaces;
+ buffioqueue  *current;
+ buffioqueue  *Next;
+
+ size_t emptyptridx;
  size_t capacity;
- size_t *current;
- size_t *Next;
+ size_t occupiedcapacity;
+ size_t reservesize;
+ size_t currentidx;
 };
 
 class buffio::instance{
 
 public:
- buffiopromise hello(){
-     BUFFIO_LOG(TRACE," COROUTINE SPEAKING AWAITING");
-     co_return  0;
- };
+  
 
- buffiopromise test(){
-    BUFFIO_LOG(TRACE," COROUTINE SPEAKING");
-    co_await hello();
-    BUFFIO_LOG(TRACE," COROUTINE SPEAKING");
-    co_return 0;
-  }
-
-  void fireeventloop(){
-    auto ctx = test();
-    ctx.handle.resume();
- 
+  void fireeventloop(buffsocket &sock){
+     buffio::queue queue(sock.linfo.capacity , sock.linfo.reserve);
+     sock.listensock();
+     acceptreturn accepted = sock.acceptsock();
+     queue.push(accepted.handle);
+     queue.yield(); 
     return;
   };
-
-private:
-
+  ~instance(){
+   //clean up-code;
+  };
 };
 
 #endif
