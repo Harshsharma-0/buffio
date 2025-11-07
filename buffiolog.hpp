@@ -11,13 +11,9 @@ enum LOG_LEVEL{
   LOG
 };
 
-#if !defined(BUFFIO_DEBUG)
-#define BUFFIO_LOG(part ,...)
-#endif
 
 
-#if defined(BUFFIO_DEBUG)
- 
+
 #include <string_view>
 
 namespace Color {
@@ -76,8 +72,55 @@ namespace Color {
     (std::cout<<...<<args)<<Color::Reset<<std::endl;
   }
 
-  #define BUFFIO_LOG(part ,...) log_msg(part,__VA_ARGS__)       
+#if defined(BUFFIO_DEBUG_BUILD)
 
+ #if defined(BUFFIO_LOG_ERROR)
+  #define BUFFIO_ERROR(...)  log_msg(ERROR,__VA_ARGS__)       
+ #else
+   #define BUFFIO_ERROR(...)
+ #endif
+
+ #if defined(BUFFIO_LOG_DEBUG)
+  #define BUFFIO_DEBUG(...)  log_msg(DEBUG,__VA_ARGS__)
+ #else
+  #define BUFFIO_DEBUG(...)
+ #endif
+ #if defined(BUFFIO_LOG_FATEL)
+  #define BUFFIO_FATEL(...)  log_msg(FATEL,__VA_ARGS__)       
+ #else
+  #define BUFFIO_FATEL(...)
+ #endif
+ #if defined(BUFFIO_LOG_LOG)
+   #define BUFFIO_LOG(...)    log_msg(LOG,__VA_ARGS__)       
+ #else
+   #define BUFFIO_LOG(...)
 #endif
+
+ #if defined(BUFFIO_LOG_TRACE)
+  #define BUFFIO_TRACE(...)  log_msg(TRACE,__VA_ARGS__)       
+ #else
+  #define BUFFIO_TRACE(...)
+#endif
+ #if defined(BUFFIO_LOG_WARN)
+  #define BUFFIO_WARN(...)   log_msg(WARN,__VA_ARGS__)       
+ #else
+  #define BUFFIO_WARN(...)
+#endif
+
+ 
+#endif
+
+#if !defined(BUFFIO_DEBUG_BUILD)
+  #define BUFFIO_ERROR(...) 
+  #define BUFFIO_DEBUG(...)
+  #define BUFFIO_FATEL(...)
+  #define BUFFIO_LOG(...)
+  #define BUFFIO_TRACE(...)
+  #define BUFFIO_WARN(...)
+#endif
+
+#define BUFFIO_INFO(...)   log_msg(INFO,__VA_ARGS__)       
+
+
 
 #endif

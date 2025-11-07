@@ -1,6 +1,7 @@
 #include <iostream>
 #define BUFFIO_IMPLEMENTATION
-#define BUFFIO_DEBUG
+#define BUFFIO_DEBUG_BUILD
+#define BUFFIO_LOG_ERROR
 #include "./buffio.hpp"
 
 
@@ -23,7 +24,7 @@ int main(){
    .address = "127.0.0.1",
    .portnumber = 8081,
    .listenbacklog = 10,
-   .capacity = 10,
+   .capacity = 0,
    .reserve = 10,
    .socktype = BUFFIO_SOCK_TCP,
    .sockfamily = BUFFIO_FAMILY_IPV4

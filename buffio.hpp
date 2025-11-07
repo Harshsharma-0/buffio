@@ -151,7 +151,7 @@ class buffio::buffsocket{
  
   buffsocket(buffioinfo &ioinfo) : linfo(ioinfo), clienthandler(nullptr){
      if(ioinfo.capacity < 1){
-       BUFFIO_LOG(ERROR," SOCKET: Field maxclient in buffioinfo structure cannot be less than 1");
+       BUFFIO_ERROR(" SOCKET: Field maxclient in buffioinfo structure cannot be less than 1");
      return;
      };
      switch(ioinfo.sockfamily){
@@ -174,7 +174,7 @@ class buffio::buffsocket{
       case BUFFIO_FAMILY_BLUETOOTH:
       break;
       default:
-       BUFFIO_LOG(ERROR," UNKNOWN TYPE SOCKET CREATION FAILED");
+       BUFFIO_ERROR(" UNKNOWN TYPE SOCKET CREATION FAILED");
       return;
       break;
     }; 
@@ -191,8 +191,8 @@ class buffio::buffsocket{
        addr.sin_addr.s_addr = inet_addr(ioinfo.address);
 
        if(bind(*socketfd, (struct sockaddr *)&addr,sizeof(struct sockaddr_in)) < 0){
-                  BUFFIO_LOG(ERROR," SOCKET BINDING FAILED : ", strerror(errno));
-                  BUFFIO_LOG(LOG," PORT : ", ioinfo.portnumber," IP ADDRESS : ", ioinfo.address);
+                  BUFFIO_ERROR(" SOCKET BINDING FAILED : ", strerror(errno));
+                  BUFFIO_LOG(" PORT : ", ioinfo.portnumber," IP ADDRESS : ", ioinfo.address);
                   close(*socketfd);
                   *socketfd = -1;
           return -1;
@@ -208,7 +208,7 @@ class buffio::buffsocket{
          addr.sun_family = BUFFIO_FAMILY_LOCAL;
          strncpy(addr.sun_path,ioinfo.address,sizeof(addr.sun_path) - 1);
          if(bind(*socketfd, (struct sockaddr *)&addr,sizeof(struct sockaddr_un)) < 0){
-                  BUFFIO_LOG(ERROR,"SOCKET BINDING FAILED : ",strerror(errno));
+                  BUFFIO_ERROR("SOCKET BINDING FAILED : ",strerror(errno));
                   close(*socketfd);
                   *socketfd = -1;
           return -1;
@@ -220,20 +220,20 @@ class buffio::buffsocket{
  ~buffsocket(){ 
     if(socketfd > 0){
       if(close(socketfd) < 0){
-        BUFFIO_LOG(ERROR," SOCKET CLOSE FAILURE");
+        BUFFIO_ERROR(" SOCKET CLOSE FAILURE");
      };
      unlink(linfo.address);
-     BUFFIO_LOG(LOG," SOCKET CLOSED SUCCESFULLY");
+     BUFFIO_LOG(" SOCKET CLOSED SUCCESFULLY");
     }
  };
 
  int listensock(){
     linfo.listenbacklog = linfo.listenbacklog < 0 ? 0 : linfo.listenbacklog;
     if(listen(socketfd,linfo.listenbacklog) < 0){
-        BUFFIO_LOG(ERROR," FAILED TO LISTEN ON SOCKET \n reason : ",strerror(errno));
+        BUFFIO_ERROR(" FAILED TO LISTEN ON SOCKET \n reason : ",strerror(errno));
         return -1;
     }
-        BUFFIO_LOG(INFO," listening on socket : \n" 
+        BUFFIO_INFO(" listening on socket : \n" 
                         "              address - ",linfo.address,
                         "\n              port - ",linfo.portnumber);
 
@@ -257,7 +257,7 @@ acceptreturn acceptsock(){
 
 
       if(afd  < 0){
-         BUFFIO_LOG(ERROR," FAILED TO ACCEPT A CONNECTION \n reason : ",strerror(errno));
+         BUFFIO_ERROR(" FAILED TO ACCEPT A CONNECTION \n reason : ",strerror(errno));
          return {.errorcode = -1 , .handle = NULL};
       }
       
@@ -289,12 +289,12 @@ class buffio::queue{
              reservesize(reservesize)
    { 
        if(queuesize < 1){
-         BUFFIO_LOG(ERROR," QUEUE: field queuesize to queue is less than 1," 
+         BUFFIO_ERROR(" QUEUE: field queuesize to queue is less than 1," 
                           " it must have to be 1 or greater than 1");
         return;
        }
        if(reservesize < 10){
-         BUFFIO_LOG(ERROR," QUEUE: field reservesize to queue is less than 10,"
+         BUFFIO_ERROR(" QUEUE: field reservesize to queue is less than 10,"
                           " using no reserve policy");
         reservesize = 0;
        } 
@@ -302,9 +302,9 @@ class buffio::queue{
        emptyplaces = new buffioqueue*[queuesize + reservesize];
              
        if(!execqueue || ! emptyplaces){
-           BUFFIO_LOG(ERROR," QUEUE CREATION FAILED ");
-           BUFFIO_LOG(DEBUG," Allocation of one of the queue failed ");
-           BUFFIO_LOG(TRACE, " EXEC QUEUE : ",execqueue," QUEUE emptytracker",emptyplaces);
+           BUFFIO_ERROR(" QUEUE CREATION FAILED ");
+           BUFFIO_DEBUG(" Allocation of one of the queue failed ");
+           BUFFIO_TRACE(" EXEC QUEUE : ",execqueue," QUEUE emptytracker",emptyplaces);
         return; 
        }
 
@@ -321,7 +321,7 @@ class buffio::queue{
  int push(buffioroutine routine){
     if(!(occupiedcapacity < capacity)){
 
-           BUFFIO_LOG(WARN," QUEUE: cannot push instance to queue is full. execution will continue"
+           BUFFIO_WARN(" QUEUE: cannot push instance to queue is full. execution will continue"
                            " when queue is free");
      }
      routine.resume(); 
@@ -332,7 +332,7 @@ class buffio::queue{
      currentidx += 1;
       size_t nidx = (currentidx < capacity) * currentidx;
       if(!execqueue[currentidx].handle){
-         BUFFIO_LOG(TRACE," NO ROUTINE AVALILABLE TO EXECUTE ");
+         BUFFIO_TRACE(" NO ROUTINE AVALILABLE TO EXECUTE ");
          return;
       }
     execqueue[currentidx].handle.resume();
