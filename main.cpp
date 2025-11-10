@@ -9,14 +9,18 @@
 
 
 buffioroutine clientcall(){
- std::cout<<"hello client2"<<std::endl;
- co_return 0;
+    std::cout<<"hello client2"<<std::endl;
+    //throw std::runtime_error("ayse waise");
+    ioreturn -1;
 };
 
 buffioroutine clienthandler(clientinfo info){
 
   std::cout<<"hello client : "<<info.address<<":"<<info.portnumber<<std::endl;
-  iowait clientcall();
+  buffiocatch(iowait clientcall()) = [](const std::exception &e,int successcode){
+    std::cout<<e.what()<<successcode<<std::endl;
+  };
+
   std::cout<<"hello client exit"<<std::endl;
   ioreturn 0;
 };
@@ -24,7 +28,7 @@ buffioroutine clienthandler(clientinfo info){
 int main(){
   
   buffioinfo serverinfo = {
-   .address = "127.0.0.0",
+   .address = "127.0.0.1",
    .portnumber = 8081,
    .listenbacklog = 10,
    .socktype = BUFFIO_SOCK_TCP,
