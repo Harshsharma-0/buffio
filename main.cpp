@@ -2,6 +2,9 @@
 #define BUFFIO_IMPLEMENTATION
 #define BUFFIO_DEBUG_BUILD
 #define BUFFIO_LOG_ERROR
+#define BUFFIO_LOG_LOG
+#define BUFFIO_LOG_TRACE
+
 #include "./buffio.hpp"
 
 
@@ -21,13 +24,19 @@ buffioroutine clienthandler(clientinfo info){
 int main(){
   
   buffioinfo serverinfo = {
-   .address = "127.0.0.1",
+   .address = "127.0.0.0",
    .portnumber = 8081,
    .listenbacklog = 10,
-   .capacity = 0,
-   .reserve = 10,
    .socktype = BUFFIO_SOCK_TCP,
    .sockfamily = BUFFIO_FAMILY_IPV4
+  };
+
+  buffioqueuepolicy queuepolicy = {
+   .overflowpolicy = OVERFLOWPOLICY_NONE,
+   .threadpolicy = THREAD_POLICY_NONE,
+   .chunkallocationpolicy = CHUNKALLOCATION_POLICY_NONE,
+   .routineerrorpolicy = ROUTINE_ERROR_POLICY_NONE,
+   .queuecapacity = 10
   };
 
   buffio::buffsocket server(serverinfo);
@@ -35,8 +44,7 @@ int main(){
   
   
   buffio::instance runner;
-  runner.fireeventloop(server); 
-  
-
+  runner.fireeventloop(server,queuepolicy,EVENTLOOP_SYNC); 
+ 
   return 0;
  };
