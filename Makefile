@@ -3,3 +3,6 @@ main:main.cpp buffio.hpp buffiolog.hpp
 
 run: main
 	./main
+
+test: main buffioservertest
+	 ./main & ./buffioservertest

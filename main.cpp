@@ -8,18 +8,40 @@
 #include "./buffio.hpp"
 
 
+buffioroutine clientcall2(){
+    std::cout<<"hello client3"<<std::endl;
+    throw std::runtime_error("ayse waise 2");
+    
+   
+  ioreturn -1;
+};
+
 buffioroutine clientcall(){
     std::cout<<"hello client2"<<std::endl;
-    //throw std::runtime_error("ayse waise");
+   
+try{
+   buffiocatch(iowait clientcall2()).throwerror();
+  }catch(const std::exception &e){
+    std::cout<<e.what()<<std::endl;
+  };
+
+     std::cout<<"hello client2 exit"<<std::endl;
+  // throw std::runtime_error("ayse waise");
+
     ioreturn -1;
 };
 
 buffioroutine clienthandler(clientinfo info){
 
   std::cout<<"hello client : "<<info.address<<":"<<info.portnumber<<std::endl;
-  buffiocatch(iowait clientcall()) = [](const std::exception &e,int successcode){
-    std::cout<<e.what()<<successcode<<std::endl;
+ 
+ try{
+   buffiocatch(iowait clientcall()).throwerror();
+  }catch(const std::exception &e){
+    std::cout<<e.what()<<std::endl;
   };
+  for(int i = 0; i < 100 ; i++)
+     ioyeild 0;
 
   std::cout<<"hello client exit"<<std::endl;
   ioreturn 0;
