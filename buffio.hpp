@@ -34,6 +34,11 @@ enum QUEUE_TASK_STATUS{
  TASK_POPPED,
  TASK_NONE,
 };
+enum BUFFIO_QUEUE_POLICY{
+  BUFFIO_QUEUE_POLICY_THREADED,
+  BUFFIO_QUEUE_POLICY_NONE,
+
+};
 
 enum BUFFIO_ROUTINE_STATUS{
   BUFFIO_ROUTINE_STATUS_WAITING = 1,
@@ -84,6 +89,11 @@ namespace buffio{
  class queue;
 };
 
+struct buffioqueuepolicy{
+  size_t queucapacity;
+  enum BUFFIO_QUEUE_POLICY queuepolicy;
+};
+
 struct buffioinfo{
  const char *address;
  int portnumber;
@@ -116,6 +126,7 @@ using buffiohandleroutine = std::coroutine_handle<buffiopromise>;
 using routinestatus = struct routinestatus;
 using clientinfo = struct clientinfo;
 using routinestatus = struct routinestatus;
+using buffioqueuepolicy = struct buffioqueuepolicy;
 
 #define buffiowait co_await
 #define buffioyeild co_yield
@@ -260,9 +271,11 @@ class buffio::queue{
   public:   
     queue(): taskqueue(nullptr),taskcount(0),
              taskqueuetail(nullptr), waitingqueue(nullptr),
-             waitingqueuetail(nullptr)
+             waitingqueuetail(nullptr),recenttaskstatus(TASK_ERASED)
    { 
-            queueerror = BUFFIO_QUEUE_STATUS_EMPTY; 
+            queueerror = BUFFIO_QUEUE_STATUS_EMPTY;
+            queuepolicy.queuepolicy = BUFFIO_QUEUE_POLICY_NONE;
+         
    };
   
  ~queue(){
@@ -310,7 +323,7 @@ class buffio::queue{
       case TASK_REEXECUTE: return taskqueue; break;
       case TASK_ERASED:
       case TASK_POPPED: return taskqueue; break;
-      case TASK_NONE: taskqueue = taskqueue->next; return taskqueue; break;
+      case TASK_NONE:{ taskqueue = taskqueue->next; return taskqueue; }break;
      }
      return nullptr;
   }
@@ -359,9 +372,12 @@ class buffio::queue{
   };
 
   void yield(){ 
-    if(taskqueue == nullptr){ BUFFIO_INFO("NO TASK"); queueerror = BUFFIO_QUEUE_STATUS_EMPTY; return;}
-    
+        
     buffiotaskinfo *taskinfo = getnexttask();
+    if(taskinfo == nullptr){ BUFFIO_INFO("NO TASK");
+      queueerror = BUFFIO_QUEUE_STATUS_EMPTY; 
+      return;
+    }
     buffioroutine taskhandle = taskinfo->handle;
     buffiopromise *promise = &taskhandle.promise();
 
@@ -404,15 +420,17 @@ class buffio::queue{
   }
 
   size_t taskn(){return taskcount;};
+  void setqueuepolicy(buffioqueuepolicy reqpolicy){ }
 
   int queueerror;
-  
+
  private:
 
  buffiotaskinfo *taskqueue , *taskqueuetail;
  buffiotaskinfo *waitingqueue ,*waitingqueuetail;
  std::unordered_map<buffiotaskinfo*,buffiotaskinfo*> waitingmap;
  int recenttaskstatus;
+ buffioqueuepolicy queuepolicy;
  size_t capacity;
  size_t taskcount;
  size_t buffertracker;
@@ -435,10 +453,18 @@ public:
      
   return 0;
   }
- 
+/* 
   int instancepushtask(){
     return 0; 
   };
+  void setqueuepolicy(buffioqueuepolicy reqpolicy){
+    queue.setqueuepolicy(reqpolicy);
+  };
+
+  void operator=(buffioqueuepolicy reqpolicy){
+     queue.setqueuepolicy(reqpolicy);
+  };
+*/
 
   void fireeventloop(enum BUFFIO_EVENTLOOP_TYPE eventlooptype){
      switch(eventlooptype){
