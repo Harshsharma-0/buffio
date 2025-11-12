@@ -1,50 +1,75 @@
 #include <iostream>
 #define BUFFIO_IMPLEMENTATION
-#define BUFFIO_DEBUG_BUILD
-#define BUFFIO_LOG_ERROR
-#define BUFFIO_LOG_LOG
-#define BUFFIO_LOG_TRACE
+//#define BUFFIO_DEBUG_BUILD
+//#define BUFFIO_LOG_ERROR
+//#define BUFFIO_LOG_LOG
+//#define BUFFIO_LOG_TRACE
+//#define BUFFIO_LOG_WARN
 
 #include "./buffio.hpp"
 
 
-buffioroutine clientcall2(){
-    std::cout<<"hello client3"<<std::endl;
-    throw std::runtime_error("ayse waise 2");
-    
-   
-  ioreturn -1;
+buffioroutine clientcall2(int code){
+//    std::cout<<"hello client3"<<std::endl;
+    for(int i = 0; i < 1000 ; i++){
+  //     std::cout<<"hello client3 generating value: "<<code<<std::endl;
+       buffioyeild 0;
+     }
+//    throw std::runtime_error("ayse waise 2");   
+    buffioreturn 0;
+
 };
 
-buffioroutine clientcall(){
-    std::cout<<"hello client2"<<std::endl;
+buffioroutine clientcall(int code){
+//   std::cout<<"i am hiae"<<std::endl;
    
 try{
-   buffiocatch(iowait clientcall2()).throwerror();
+   buffiocatch(buffiowait clientcall2(code)).throwerror();
   }catch(const std::exception &e){
     std::cout<<e.what()<<std::endl;
   };
+  
+  //  std::cout<<"throuwing a exception"<<std::endl;
 
-     std::cout<<"hello client2 exit"<<std::endl;
   // throw std::runtime_error("ayse waise");
 
-    ioreturn -1;
+    buffioreturn 0;
 };
 
-buffioroutine clienthandler(clientinfo info){
+buffioroutine pushedtask(){
+  std::cout<<"pushed task"<<std::endl;
 
-  std::cout<<"hello client : "<<info.address<<":"<<info.portnumber<<std::endl;
- 
- try{
-   buffiocatch(iowait clientcall()).throwerror();
+try{
+   buffiocatch(buffiowait clientcall2(0)).throwerror();
   }catch(const std::exception &e){
     std::cout<<e.what()<<std::endl;
   };
-  for(int i = 0; i < 100 ; i++)
-     ioyeild 0;
 
-  std::cout<<"hello client exit"<<std::endl;
-  ioreturn 0;
+  buffioyeild 0;
+  buffioreturn 0;
+};
+
+buffioroutine clienthandler(int code){
+
+ //std::cout<<"hello client start "<<code<<std::endl;
+
+  buffiopushtaskinfo info;
+  for(int i = 0; i < 10 ; i++){
+   info.task = pushedtask();
+   buffiopush info;
+  }
+
+
+ try{
+    buffiocatch(buffiowait clientcall(code)).throwerror();
+  }catch(const std::exception &e){
+ 
+    std::cout<<e.what()<<std::endl;
+ }
+
+    
+   std::cout<<"hello client exit : "<<code<<std::endl;
+  buffioreturn 0;
 };
 
 int main(){
@@ -57,20 +82,16 @@ int main(){
    .sockfamily = BUFFIO_FAMILY_IPV4
   };
 
-  buffioqueuepolicy queuepolicy = {
-   .overflowpolicy = OVERFLOWPOLICY_NONE,
-   .threadpolicy = THREAD_POLICY_NONE,
-   .chunkallocationpolicy = CHUNKALLOCATION_POLICY_NONE,
-   .routineerrorpolicy = ROUTINE_ERROR_POLICY_NONE,
-   .queuecapacity = 10
-  };
-
-  buffio::buffsocket server(serverinfo);
-  server.clienthandler = clienthandler;
   
   
   buffio::instance runner;
-  runner.fireeventloop(server,queuepolicy,EVENTLOOP_SYNC); 
- 
-  return 0;
+  runner.push(clienthandler(1));
+  runner.push(clienthandler(2));
+  runner.push(clienthandler(3));
+  runner.push(clienthandler(4));
+  runner.push(clienthandler(5));
+  runner.fireeventloop(EVENTLOOP_SYNC);
+
+
+   return 0;
  };

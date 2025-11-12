@@ -1,7 +1,6 @@
 #ifndef BUFF_IO
 #define BUFF_IO
 
-//TODO : WRITE QUEUE AND DEFINE SYSTEM TO PROPAGATE THE TASKS TO EXECUTION QUEUE;
 
 #include "./buffiolog.hpp"
 
@@ -29,6 +28,12 @@ enum BUFFIO_SOCK_TYPE{
  BUFFIO_SOCK_ASYNC = SOCK_NONBLOCK, 
 };
 
+enum QUEUE_TASK_STATUS{
+ TASK_ERASED = 1,
+ TASK_REEXECUTE,
+ TASK_POPPED,
+ TASK_NONE,
+};
 
 enum BUFFIO_ROUTINE_STATUS{
   BUFFIO_ROUTINE_STATUS_WAITING = 1,
@@ -36,35 +41,17 @@ enum BUFFIO_ROUTINE_STATUS{
   BUFFIO_ROUTINE_STATUS_YIELD,
   BUFFIO_ROUTINE_STATUS_ERROR,
   BUFFIO_ROUTINE_STATUS_PAUSED,
-  BUFFIO_ROUTINE_STATUS_DONE,
+  BUFFIO_ROUTINE_STATUS_DONE, 
   BUFFIO_ROUTINE_STATUS_EHANDLER,
   BUFFIO_ROUTINE_STATUS_UNHANDLED_EXCEPTION,
   BUFFIO_ROUTINE_STATUS_UNHANDLED_EXCEPTION_DONE,
 };
 
-enum BUFFIO_QUEUE_OVERFLOW_POLICY{
- OVERFLOWPOLICY_NONE,
- OVERFLOWPOLICY_ALLOCATE_NEW,
- OVERFLOWPOLICY_DISCARD_ROUTINE,
- OVERFLOWPOLICY_EXEC_AFTER_FREE,
-};
-
-enum BUFFIO_QUEUE_CHUNKALLOCATION_POLICY{
- CHUNKALLOCATION_POLICY_NONE,
- CHUNKALLOCATION_POLICY_NEW_CHUNK,
- CHUNKALLOCATION_POLICY_SIZE_DOUBLE,
-};
-
-enum BUFFIO_QUEUE_THREAD_POLICY{
- THREAD_POLICY_PER_CHUNK,
- THREAD_POLICY_NONE,
-};
-
-enum BUFFIO_QUEUE_ROUTINE_ERROR_POLICY{
- ROUTINE_ERROR_POLICY_NONE,
- ROUTINE_ERROR_POLICY_SHUTDOWN,
- ROUTINE_ERROR_POLICY_CONTINUE,
- ROUTINE_ERROR_POLICY_CALLBACK,
+enum BUFFIO_TASK_STATUS{
+ BUFFIO_TASK_SWAPPED = 1,
+ BUFFIO_TASK_WAITER_EXCEPTION_WAITING,
+ BUFFIO_TASK_WAITER_EXCEPTION_DONE,
+ BUFFIO_TASK_WAITER_NONE,
 };
 
 enum BUFFIO_QUEUE_STATUS{
@@ -105,13 +92,6 @@ struct buffioinfo{
  BUFFIO_FAMILY_TYPE sockfamily;
 };
 
-struct buffioqueuepolicy{
- enum BUFFIO_QUEUE_OVERFLOW_POLICY overflowpolicy;
- enum BUFFIO_QUEUE_THREAD_POLICY threadpolicy;
- enum BUFFIO_QUEUE_CHUNKALLOCATION_POLICY chunkallocationpolicy;
- enum BUFFIO_QUEUE_ROUTINE_ERROR_POLICY routineerrorpolicy;
- int queuecapacity;
-};
 
 struct buffiobuffer{
  char *data;
@@ -137,10 +117,10 @@ using routinestatus = struct routinestatus;
 using clientinfo = struct clientinfo;
 using routinestatus = struct routinestatus;
 
-#define iowait co_await
-#define ioyeild co_yield
-#define ioreturn co_return
-
+#define buffiowait co_await
+#define buffioyeild co_yield
+#define buffioreturn co_return
+#define buffiopush co_await
 
 struct buffioroutine: buffiohandleroutine{
     using promise_type = ::buffiopromise;
@@ -163,13 +143,23 @@ struct buffioawaiter{
 
 using buffioawaiter = struct buffioawaiter;
 
+struct buffiopushtaskinfo{
+  buffioroutine task;
+};
+
+using buffiopushtaskinfo = struct buffiopushtaskinfo;
+
 struct buffiopromise{
     enum BUFFIO_ROUTINE_STATUS status;
+    enum BUFFIO_ROUTINE_STATUS childstatus;
     int returncode = 0;
+    int childreturncode = 0;
     buffioroutine waitingfor;
+    buffioroutine pushhandle;
     buffioroutine self;
 
     std::exception_ptr routineexception;
+    std::exception_ptr childroutineexception;
 
     buffioroutine get_return_object(){
             self = {buffioroutine::from_promise(*this)};
@@ -183,21 +173,28 @@ struct buffiopromise{
      status = BUFFIO_ROUTINE_STATUS_YIELD;
      return {};
     };
+
     buffioawaiter await_transform(buffioroutine waitfor){   
      waitingfor = waitfor;
      status = BUFFIO_ROUTINE_STATUS_WAITING;
-     return {.self = waitfor};
+     return {.self = self};
+    };
+
+    buffioawaiter await_transform(buffiopushtaskinfo info){
+     pushhandle = info.task;
+     status = BUFFIO_ROUTINE_STATUS_PAUSED;
+     return {.self = info.task};
     };
 
     void unhandled_exception() {
      status = BUFFIO_ROUTINE_STATUS_UNHANDLED_EXCEPTION;
      returncode = -1;
      routineexception = std::current_exception();
-    };
+     };
 
    int return_value(int state){ 
        returncode = state;
-       status = state < 0 ? BUFFIO_ROUTINE_STATUS_ERROR : BUFFIO_ROUTINE_STATUS_DONE;
+       status = state < 0 ?  BUFFIO_ROUTINE_STATUS_ERROR : BUFFIO_ROUTINE_STATUS_DONE;
        return state;
     };
     bool checkstatus(){
@@ -212,10 +209,9 @@ class buffiocatch{
 public:
    buffiocatch(buffioroutine self) : evalue(self){ }
    void exceptionthrower(){
-       switch(evalue.promise().status){
+       switch(evalue.promise().childstatus){
           case BUFFIO_ROUTINE_STATUS_UNHANDLED_EXCEPTION:
-             evalue.promise().status = BUFFIO_ROUTINE_STATUS_UNHANDLED_EXCEPTION_DONE;
-             std::rethrow_exception(evalue.promise().routineexception);
+            std::rethrow_exception(evalue.promise().childroutineexception);
           break;
           case BUFFIO_ROUTINE_STATUS_ERROR:
             throw std::runtime_error("error in execution of routine return code less than 0");
@@ -235,7 +231,6 @@ public:
         exceptionthrower();
       }
        catch(const std::exception &e){handler(e,evalue.promise().returncode);}
-        evalue.promise().status = BUFFIO_ROUTINE_STATUS_DONE;
      }
    };
 private:
@@ -253,42 +248,174 @@ private:
 #include "./buffiosock.hpp"
 
 
-struct buffiotaskchunk{
-       int priority{0};
-       int busychunk{0};
-       buffioroutine handle;
-       buffioroutine complitioncallback;
+struct buffiotaskinfo{
+  buffioroutine handle;
+  struct buffiotaskinfo *next;
+  struct buffiotaskinfo *prev;
 };
 
-
-using buffioqueuechunk = struct buffiotaskchunk;
+using buffiotaskinfo = struct buffiotaskinfo;
 
 class buffio::queue{
   public:   
-    queue(buffioqueuepolicy &queuepolicy)
+    queue(): taskqueue(nullptr),taskcount(0),
+             taskqueuetail(nullptr), waitingqueue(nullptr),
+             waitingqueuetail(nullptr)
    { 
-       if(queuepolicy.queuecapacity < 1){
-         BUFFIO_ERROR(" QUEUE: field queuecapacity to queue is less than 1," 
-                      " it must have to be 1 or greater than 1");
-         queueerror = BUFFIO_QUEUE_STATUS_ERROR;
-         return;
-       }
-      
+            queueerror = BUFFIO_QUEUE_STATUS_EMPTY; 
+   };
+  
+ ~queue(){
+   };
+   
+   void pushtaskptr(buffiotaskinfo* task){
+     if(taskqueue == nullptr && taskqueuetail == nullptr){
+        task->next = task->prev = task;
+        taskqueue = taskqueuetail = task;
+        return;
+      }
+
+      task->next = taskqueue;
+      task->prev = taskqueuetail;
+      taskqueuetail->next = task;
+      taskqueue->prev = task;
+      taskqueuetail = task;    
+      return;
+    };
+
+   buffiotaskinfo* pushroutine(buffioroutine routine){
+     taskcount += 1;
+     buffiotaskinfo* current = new buffiotaskinfo;
+     current->handle = routine;
+     pushtaskptr(current);
+     return current;
    };
 
- ~queue(){
+   void pushtask(buffiotaskinfo *task){
+     pushtaskptr(task);
+   };
+
+   void esclatetaskerror(buffiotaskinfo *to, buffiotaskinfo *from){
+    if(to == nullptr || from == nullptr){
+      return;
+    }
+    to->handle.promise().childstatus = from->handle.promise().status;
+    to->handle.promise().childreturncode = from->handle.promise().returncode;
+    to->handle.promise().childroutineexception = from->handle.promise().routineexception;
+   };
+
+   buffiotaskinfo* getnexttask() {
+     if (!taskqueue) return nullptr;
+     switch(recenttaskstatus){
+      case TASK_REEXECUTE: return taskqueue; break;
+      case TASK_ERASED:
+      case TASK_POPPED: return taskqueue; break;
+      case TASK_NONE: taskqueue = taskqueue->next; return taskqueue; break;
+     }
+     return nullptr;
+  }
+
+  void settaskwaiter(buffiotaskinfo *task, buffioroutine routine){
+    buffiotaskinfo *taskexec = pushroutine(routine);
+    waitingmap[taskexec] = task;
   };
 
-  int push(buffioroutine routine){return 0;};
-  void yield(){};
+  buffiotaskinfo* pushtaskwaiter(buffiotaskinfo *task){
+
+    auto handle = waitingmap.find(task);
+    if(handle == waitingmap.end()) return nullptr;
+    pushtask(handle->second);
+    buffiotaskinfo* taskhandle = handle->second;
+    taskhandle->handle.promise().status == BUFFIO_ROUTINE_STATUS_EXECUTING;
+    return handle->second;
+ 
+  };
+
+  void poptask(buffiotaskinfo *task){
+    taskcount -= 1;
+    recenttaskstatus = TASK_POPPED;
+    erasetask(task);
+  };
+
+  void erasetask(buffiotaskinfo *task){
+     recenttaskstatus = TASK_POPPED;
+   if(taskqueue == task && taskqueuetail == task){
+      taskqueue = nullptr;
+      taskqueuetail = nullptr;
+      taskcount = 0;
+      return;
+    };
+    
+     task->prev->next = task->next;
+     task->next->prev = task->prev;
+
+
+    if(task == taskqueue){
+       taskqueue = taskqueue->next;
+       return;
+     }
+     if(task == taskqueuetail)
+        taskqueuetail = task->prev;     
+  };
+
+  void yield(){ 
+    if(taskqueue == nullptr){ BUFFIO_INFO("NO TASK"); queueerror = BUFFIO_QUEUE_STATUS_EMPTY; return;}
+    
+    buffiotaskinfo *taskinfo = getnexttask();
+    buffioroutine taskhandle = taskinfo->handle;
+    buffiopromise *promise = &taskhandle.promise();
+
+    if(promise->status == BUFFIO_ROUTINE_STATUS_EXECUTING){
+              taskhandle.resume();
+      }
+
+    switch(taskhandle.promise().status){
+       case BUFFIO_ROUTINE_STATUS_WAITING:{ 
+          settaskwaiter(taskinfo,promise->waitingfor); 
+          erasetask(taskinfo);
+        } break;
+       case BUFFIO_ROUTINE_STATUS_YIELD:{ 
+         promise->status = BUFFIO_ROUTINE_STATUS_EXECUTING;
+         recenttaskstatus = TASK_NONE;
+       } break;
+       case BUFFIO_ROUTINE_STATUS_UNHANDLED_EXCEPTION:
+       case BUFFIO_ROUTINE_STATUS_ERROR:{
+         auto *handle = pushtaskwaiter(taskinfo); 
+         esclatetaskerror(handle, taskinfo);   
+         handle->handle.promise().status = BUFFIO_ROUTINE_STATUS_EXECUTING;
+         poptask(taskinfo); 
+       }break;
+       case BUFFIO_ROUTINE_STATUS_PAUSED:
+        promise->status = BUFFIO_ROUTINE_STATUS_EXECUTING;
+        pushroutine(promise->pushhandle);
+        recenttaskstatus = TASK_REEXECUTE;
+        break;
+       case BUFFIO_ROUTINE_STATUS_DONE:
+         auto *handle = pushtaskwaiter(taskinfo);
+         esclatetaskerror(handle, taskinfo);   
+         if(handle != nullptr) handle->handle.promise().status = BUFFIO_ROUTINE_STATUS_EXECUTING;
+         poptask(taskinfo);
+       break;
+     };   
+  };
+
+  bool empty(){ 
+      return (taskcount == 0); 
+  }
+
+  size_t taskn(){return taskcount;};
 
   int queueerror;
   
  private:
 
- buffioqueuepolicy queuepolicy; 
- 
+ buffiotaskinfo *taskqueue , *taskqueuetail;
+ buffiotaskinfo *waitingqueue ,*waitingqueuetail;
+ std::unordered_map<buffiotaskinfo*,buffiotaskinfo*> waitingmap;
+ int recenttaskstatus;
  size_t capacity;
+ size_t taskcount;
+ size_t buffertracker;
  size_t occupiedcapacity;
 };
 
@@ -299,54 +426,39 @@ public:
   
   static int eventloop(void *data){
       buffio::instance *instance = (buffio::instance *)data;
-      buffio:buffsocket *buffsock = instance->instancesock;
-      buffio::queue queue(instance->instancequeuepolicy);   
-      if(queue.queueerror < 0)
-         return 0;
-
-    bool shutdown = false;
-      while(shutdown != true){
-  
-       acceptreturn accepted = buffsock->acceptsock();
-       switch(accepted.errorcode){
-        case  BUFFIO_ACCEPT_STATUS_ERROR: BUFFIO_LOG(" Error while accepting a connection");
-        case  BUFFFIO_ACCEPT_STATUS_NO_HANDLER: queue.yield(); break;
-        case  BUFFIO_ACCEPT_STATUS_SUCCESS: queue.push(accepted.handle);
-        case  BUFFIO_ACCEPT_STATUS_NA:
-        default: queue.yield();
+          
+      bool shutdown = false;
+      while(instance->queue.empty() == false){
+          instance->queue.yield();
       };
-
-      switch(queue.queueerror){
-        case BUFFIO_QUEUE_STATUS_YIELD: if(buffsock->sockfdblocking) buffsock->setfdnonblocking(); break;
-        case BUFFIO_QUEUE_STATUS_EMPTY: if(!buffsock->sockfdblocking) buffsock->setfdblocking(); break;
-        case BUFFIO_QUEUE_STATUS_SHUTDOWN: shutdown = true; break;
-        case BUFFIO_QUEUE_STATUS_CONTINUE: break;
-      };
-     }
+       BUFFIO_INFO(" Queue empty: no task to execute ");
+     
   return 0;
   }
-  
-  void fireeventloop(buffsocket &sock,buffioqueuepolicy &queuepolicy
-                     ,enum BUFFIO_EVENTLOOP_TYPE eventlooptype){
+ 
+  int instancepushtask(){
+    return 0; 
+  };
 
-     instancequeuepolicy = queuepolicy;
-     instancesock = &sock;
-     sock.listensock();
+  void fireeventloop(enum BUFFIO_EVENTLOOP_TYPE eventlooptype){
      switch(eventlooptype){
      case EVENTLOOP_SYNC: eventloop(this); break; 
      case EVENTLOOP_ASYNC: break;
      }
-
      return;
   };
 
   ~instance(){
    //clean up-code;
   };
+  
+  int push(buffioroutine routine){
+    queue.pushroutine(routine);
+    return 0;
+  };
 
 private:
-  buffsocket *instancesock;
-  buffioqueuepolicy instancequeuepolicy;
+  buffio::queue queue; 
 };
 
 #endif
