@@ -11,22 +11,18 @@
 #include <unordered_map>
 #include <fcntl.h>
 
-enum BUFFIO_FAMILY_TYPE{
- BUFFIO_FAMILY_LOCAL = AF_UNIX,
- BUFFIO_FAMILY_IPV4 = AF_INET,
- BUFFIO_FAMILY_IPV6 = AF_INET6,
- BUFFIO_FAMILY_CAN  = AF_CAN,
- BUFFIO_FAMILY_NETLINK = AF_NETLINK,
- BUFFIO_FAMILY_LLC = AF_LLC,
- BUFFIO_FAMILY_BLUETOOTH = AF_BLUETOOTH,
-};
+constexpr int BUFFIO_FAMILY_LOCAL = AF_UNIX;
+constexpr int BUFFIO_FAMILY_IPV4 = AF_INET;
+constexpr int BUFFIO_FAMILY_IPV6 = AF_INET6;
+constexpr int BUFFIO_FAMILY_CAN  = AF_CAN;
+constexpr int BUFFIO_FAMILY_NETLINK = AF_NETLINK;
+constexpr int BUFFIO_FAMILY_LLC = AF_LLC;
+constexpr int BUFFIO_FAMILY_BLUETOOTH = AF_BLUETOOTH;
 
-enum BUFFIO_SOCK_TYPE{
- BUFFIO_SOCK_TCP = SOCK_STREAM,
- BUFFIO_SOCK_UDP = SOCK_DGRAM,
- BUFFIO_SOCK_RAW = SOCK_RAW,
- BUFFIO_SOCK_ASYNC = SOCK_NONBLOCK, 
-};
+constexpr int BUFFIO_SOCK_TCP = SOCK_STREAM;
+constexpr int BUFFIO_SOCK_UDP = SOCK_DGRAM;
+constexpr int BUFFIO_SOCK_RAW = SOCK_RAW;
+constexpr int BUFFIO_SOCK_ASYNC = SOCK_NONBLOCK; 
 
 enum QUEUE_TASK_STATUS{
  TASK_ERASED = 1,
@@ -35,13 +31,12 @@ enum QUEUE_TASK_STATUS{
  TASK_NONE,
 };
 enum BUFFIO_QUEUE_POLICY{
-  BUFFIO_QUEUE_POLICY_THREADED,
+  BUFFIO_QUEUE_POLICY_THREADED = 11,
   BUFFIO_QUEUE_POLICY_NONE,
-
 };
 
 enum BUFFIO_ROUTINE_STATUS{
-  BUFFIO_ROUTINE_STATUS_WAITING = 1,
+  BUFFIO_ROUTINE_STATUS_WAITING = 21,
   BUFFIO_ROUTINE_STATUS_EXECUTING,
   BUFFIO_ROUTINE_STATUS_YIELD,
   BUFFIO_ROUTINE_STATUS_ERROR,
@@ -53,7 +48,7 @@ enum BUFFIO_ROUTINE_STATUS{
 };
 
 enum BUFFIO_TASK_STATUS{
- BUFFIO_TASK_SWAPPED = 1,
+ BUFFIO_TASK_SWAPPED = 31,
  BUFFIO_TASK_WAITER_EXCEPTION_WAITING,
  BUFFIO_TASK_WAITER_EXCEPTION_DONE,
  BUFFIO_TASK_WAITER_NONE,
@@ -61,21 +56,21 @@ enum BUFFIO_TASK_STATUS{
 
 enum BUFFIO_QUEUE_STATUS{
   BUFFIO_QUEUE_STATUS_ERROR = -1,
-  BUFFIO_QUEUE_STATUS_SUCCESS = 0,
-  BUFFIO_QUEUE_STATUS_YIELD = 1,
+  BUFFIO_QUEUE_STATUS_SUCCESS = 41,
+  BUFFIO_QUEUE_STATUS_YIELD ,
   BUFFIO_QUEUE_STATUS_EMPTY,
   BUFFIO_QUEUE_STATUS_SHUTDOWN,
   BUFFIO_QUEUE_STATUS_CONTINUE,
 };
 
 enum BUFFIO_EVENTLOOP_TYPE{
-  EVENTLOOP_SYNC,
+  EVENTLOOP_SYNC = 50,
   EVENTLOOP_ASYNC,
 };
 
 enum BUFFIO_ACCEPT_STATUS{
   BUFFIO_ACCEPT_STATUS_ERROR = -1,
-  BUFFIO_ACCEPT_STATUS_SUCCESS,
+  BUFFIO_ACCEPT_STATUS_SUCCESS = 61,
   BUFFIO_ACCEPT_STATUS_NA,
   BUFFFIO_ACCEPT_STATUS_NO_HANDLER,
 };
@@ -84,7 +79,6 @@ enum BUFFIO_ACCEPT_STATUS{
 
 namespace buffio{
  class buffsocket;
- class sockbroker;
  class instance;
  class queue;
 };
@@ -99,7 +93,7 @@ struct buffioinfo{
  int portnumber;
  int listenbacklog;
  int socktype;
- BUFFIO_FAMILY_TYPE sockfamily;
+ int sockfamily;
 };
 
 
@@ -119,15 +113,7 @@ struct clientinfo{
 
 
 struct buffiopromise;
-using buffiopromise = struct buffiopromise;
-using buffioinfo = struct buffioinfo;
-using buffioqueuepolicy = struct buffioqueuepolicy;
 using buffiohandleroutine = std::coroutine_handle<buffiopromise>;
-using routinestatus = struct routinestatus;
-using clientinfo = struct clientinfo;
-using routinestatus = struct routinestatus;
-using buffioqueuepolicy = struct buffioqueuepolicy;
-
 #define buffiowait co_await
 #define buffioyeild co_yield
 #define buffioreturn co_return
@@ -136,14 +122,12 @@ using buffioqueuepolicy = struct buffioqueuepolicy;
 struct buffioroutine: buffiohandleroutine{
     using promise_type = ::buffiopromise;
 };
-using buffioroutine = struct buffioroutine;
 
 struct acceptreturn{
  int errorcode;
  buffioroutine handle;
 };
 
-using buffiowaitreturn = struct buffiowaitreturn;
 
 struct buffioawaiter{
    bool await_ready() const noexcept{ return false;}
@@ -152,13 +136,11 @@ struct buffioawaiter{
    buffioroutine self;
 };
 
-using buffioawaiter = struct buffioawaiter;
 
 struct buffiopushtaskinfo{
   buffioroutine task;
 };
 
-using buffiopushtaskinfo = struct buffiopushtaskinfo;
 
 struct buffiopromise{
     enum BUFFIO_ROUTINE_STATUS status;
@@ -271,7 +253,9 @@ class buffio::queue{
   public:   
     queue(): taskqueue(nullptr),taskcount(0),
              taskqueuetail(nullptr), waitingqueue(nullptr),
-             waitingqueuetail(nullptr),recenttaskstatus(TASK_ERASED)
+             waitingqueuetail(nullptr),recenttaskstatus(TASK_ERASED),
+             tasknext(nullptr),activetask(0), waitingtask(0)
+
    { 
             queueerror = BUFFIO_QUEUE_STATUS_EMPTY;
             queuepolicy.queuepolicy = BUFFIO_QUEUE_POLICY_NONE;
@@ -281,34 +265,26 @@ class buffio::queue{
  ~queue(){
    };
    
-   void pushtaskptr(buffiotaskinfo* task){
-     if(taskqueue == nullptr && taskqueuetail == nullptr){
-        task->next = task->prev = task;
-        taskqueue = taskqueuetail = task;
-        return;
-      }
-
-      task->next = taskqueue;
-      task->prev = taskqueuetail;
-      taskqueuetail->next = task;
-      taskqueue->prev = task;
-      taskqueuetail = task;    
-      return;
-    };
 
    buffiotaskinfo* pushroutine(buffioroutine routine){
      taskcount += 1;
+     activetask++;
      buffiotaskinfo* current = new buffiotaskinfo;
+     current->next = current->prev = nullptr;
      current->handle = routine;
-     pushtaskptr(current);
+     pushtaskptr(current,&taskqueue,&taskqueuetail);
      return current;
    };
 
    void pushtask(buffiotaskinfo *task){
-     pushtaskptr(task);
+     if (task == nullptr) return;
+     if (task->next || task->prev) return;
+     taskcount++; activetask++;
+
+     pushtaskptr(task,&taskqueue,&taskqueuetail);
    };
 
-   void esclatetaskerror(buffiotaskinfo *to, buffiotaskinfo *from){
+   void escalatetaskerror(buffiotaskinfo *to, buffiotaskinfo *from){
     if(to == nullptr || from == nullptr){
       return;
     }
@@ -318,69 +294,78 @@ class buffio::queue{
    };
 
    buffiotaskinfo* getnexttask() {
-     if (!taskqueue) return nullptr;
-     switch(recenttaskstatus){
-      case TASK_REEXECUTE: return taskqueue; break;
-      case TASK_ERASED:
-      case TASK_POPPED: return taskqueue; break;
-      case TASK_NONE:{ taskqueue = taskqueue->next; return taskqueue; }break;
-     }
-     return nullptr;
-  }
-
+     if (!taskqueue){ return nullptr;} 
+     if (tasknext == nullptr) tasknext = taskqueue;
+     return tasknext;
+   }
+  
   void settaskwaiter(buffiotaskinfo *task, buffioroutine routine){
     buffiotaskinfo *taskexec = pushroutine(routine);
     waitingmap[taskexec] = task;
+    waitingtask++;
+    activetask--;
   };
 
   buffiotaskinfo* pushtaskwaiter(buffiotaskinfo *task){
+    if (task == nullptr) return nullptr;
+    if(waitingtask == 0) return nullptr;
 
     auto handle = waitingmap.find(task);
     if(handle == waitingmap.end()) return nullptr;
     pushtask(handle->second);
+    waitingmap.erase(task);
     buffiotaskinfo* taskhandle = handle->second;
-    taskhandle->handle.promise().status == BUFFIO_ROUTINE_STATUS_EXECUTING;
+    taskhandle->handle.promise().status = BUFFIO_ROUTINE_STATUS_EXECUTING;
+    activetask++;
+    --waitingtask;
     return handle->second;
  
   };
 
   void poptask(buffiotaskinfo *task){
+    if(task == nullptr) return;
     taskcount -= 1;
     recenttaskstatus = TASK_POPPED;
     erasetask(task);
   };
 
   void erasetask(buffiotaskinfo *task){
+     marktasknext();
+     if(!task) return;
      recenttaskstatus = TASK_POPPED;
-   if(taskqueue == task && taskqueuetail == task){
-      taskqueue = nullptr;
-      taskqueuetail = nullptr;
-      taskcount = 0;
-      return;
-    };
+     if(taskqueue == task && taskqueuetail == task){
+        taskqueue = nullptr;
+        taskqueuetail = nullptr;
+        tasknext = nullptr;
+        task->next = task->prev = nullptr;
+        taskcount = 0;
+        return;
+       };
     
-     task->prev->next = task->next;
-     task->next->prev = task->prev;
+      task->prev->next = task->next;
+      task->next->prev = task->prev;
 
+     if(task == taskqueue) taskqueue = taskqueue->next;
+     if(task == taskqueuetail) taskqueuetail = task->prev;
 
-    if(task == taskqueue){
-       taskqueue = taskqueue->next;
-       return;
-     }
-     if(task == taskqueuetail)
-        taskqueuetail = task->prev;     
+     task->next = task->prev = nullptr;
+     activetask--;
+
+     return;
+
   };
 
   void yield(){ 
         
     buffiotaskinfo *taskinfo = getnexttask();
-    if(taskinfo == nullptr){ BUFFIO_INFO("NO TASK");
+    if(taskinfo == nullptr){
+      BUFFIO_INFO("NO TASK");
+      taskcount = 0;
       queueerror = BUFFIO_QUEUE_STATUS_EMPTY; 
       return;
     }
     buffioroutine taskhandle = taskinfo->handle;
     buffiopromise *promise = &taskhandle.promise();
-
     if(promise->status == BUFFIO_ROUTINE_STATUS_EXECUTING){
               taskhandle.resume();
       }
@@ -393,23 +378,26 @@ class buffio::queue{
        case BUFFIO_ROUTINE_STATUS_YIELD:{ 
          promise->status = BUFFIO_ROUTINE_STATUS_EXECUTING;
          recenttaskstatus = TASK_NONE;
+         marktasknext();
        } break;
        case BUFFIO_ROUTINE_STATUS_UNHANDLED_EXCEPTION:
        case BUFFIO_ROUTINE_STATUS_ERROR:{
-         auto *handle = pushtaskwaiter(taskinfo); 
-         esclatetaskerror(handle, taskinfo);   
+         auto *handle = pushtaskwaiter(taskinfo);
+         if(handle == nullptr) break;
+         escalatetaskerror(handle, taskinfo);   
          handle->handle.promise().status = BUFFIO_ROUTINE_STATUS_EXECUTING;
          poptask(taskinfo); 
        }break;
        case BUFFIO_ROUTINE_STATUS_PAUSED:
         promise->status = BUFFIO_ROUTINE_STATUS_EXECUTING;
         pushroutine(promise->pushhandle);
-        recenttaskstatus = TASK_REEXECUTE;
-        break;
+       break;
        case BUFFIO_ROUTINE_STATUS_DONE:
          auto *handle = pushtaskwaiter(taskinfo);
-         esclatetaskerror(handle, taskinfo);   
-         if(handle != nullptr) handle->handle.promise().status = BUFFIO_ROUTINE_STATUS_EXECUTING;
+         if(handle != nullptr){
+          handle->handle.promise().status = BUFFIO_ROUTINE_STATUS_EXECUTING;
+          escalatetaskerror(handle, taskinfo);
+        }
          poptask(taskinfo);
        break;
      };   
@@ -426,13 +414,44 @@ class buffio::queue{
 
  private:
 
+  void pushtaskptr(buffiotaskinfo *task , buffiotaskinfo **head , buffiotaskinfo **tail){
+     
+      if(*head == nullptr || *tail == nullptr){
+        task->next = task->prev = task;
+        *head = *tail = task;
+        return;
+      }
+
+      task->next = *head;
+      task->prev = *tail;
+      (*tail)->next = task;
+      (*head)->prev = task;
+      *tail = task;
+  };
+
+
+  void pushtofreequeue(buffiotaskinfo *task){
+    if(task == nullptr) return;
+    pushtaskptr(task,&freehead,&freetail);
+  };
+
+  void marktasknext(){
+   if(!tasknext || !tasknext->next){
+      tasknext = taskqueue;
+      return;
+    } 
+    tasknext = tasknext->next;
+  };
+
+ buffiotaskinfo *tasknext;
  buffiotaskinfo *taskqueue , *taskqueuetail;
+ buffiotaskinfo *freehead , *freetail;
  buffiotaskinfo *waitingqueue ,*waitingqueuetail;
  std::unordered_map<buffiotaskinfo*,buffiotaskinfo*> waitingmap;
  int recenttaskstatus;
  buffioqueuepolicy queuepolicy;
  size_t capacity;
- size_t taskcount;
+ size_t taskcount , activetask , waitingtask;
  size_t buffertracker;
  size_t occupiedcapacity;
 };

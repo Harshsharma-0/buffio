@@ -15,7 +15,7 @@ buffioroutine clientcall2(int code){
   //     std::cout<<"hello client3 generating value: "<<code<<std::endl;
        buffioyeild 0;
      }
-//    throw std::runtime_error("ayse waise 2");   
+    throw std::runtime_error("ayse waise 2");   
     buffioreturn 0;
 
 };
@@ -31,13 +31,13 @@ try{
   
   //  std::cout<<"throuwing a exception"<<std::endl;
 
-  // throw std::runtime_error("ayse waise");
+   throw std::runtime_error("ayse waise");
 
     buffioreturn 0;
 };
 
 buffioroutine pushedtask(){
-  std::cout<<"pushed task"<<std::endl;
+  //std::cout<<"pushed task"<<std::endl;
 
 try{
    buffiocatch(buffiowait clientcall2(0)).throwerror();
@@ -45,7 +45,6 @@ try{
     std::cout<<e.what()<<std::endl;
   };
 
-  buffioyeild 0;
   buffioreturn 0;
 };
 
@@ -53,11 +52,13 @@ buffioroutine clienthandler(int code){
 
  //std::cout<<"hello client start "<<code<<std::endl;
 
+  
   buffiopushtaskinfo info;
   for(int i = 0; i < 10 ; i++){
+   buffioyeild 0; 
    info.task = pushedtask();
    buffiopush info;
-  }
+ }
 
 
  try{
@@ -67,8 +68,8 @@ buffioroutine clienthandler(int code){
     std::cout<<e.what()<<std::endl;
  }
 
-    
-   std::cout<<"hello client exit : "<<code<<std::endl;
+  buffioyeild 0;
+  std::cout<<"hello client exit : "<<code<<std::endl;
   buffioreturn 0;
 };
 
