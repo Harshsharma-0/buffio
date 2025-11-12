@@ -131,7 +131,7 @@ struct acceptreturn{
 
 struct buffioawaiter{
    bool await_ready() const noexcept{ return false;}
-   static void await_suspend(std::coroutine_handle<>) noexcept{};
+   void await_suspend(std::coroutine_handle<> h) noexcept{};
    buffioroutine await_resume() noexcept { return self;};
    buffioroutine self;
 };
@@ -141,57 +141,60 @@ struct buffiopushtaskinfo{
   buffioroutine task;
 };
 
+struct buffiopromisestatus{
+   enum BUFFIO_ROUTINE_STATUS status;
+   int returncode = 0;
+   std::exception_ptr routineexception;
+};
 
 struct buffiopromise{
-    enum BUFFIO_ROUTINE_STATUS status;
-    enum BUFFIO_ROUTINE_STATUS childstatus;
-    int returncode = 0;
-    int childreturncode = 0;
     buffioroutine waitingfor;
     buffioroutine pushhandle;
     buffioroutine self;
-
+    buffiopromisestatus childstatus;
+    buffiopromisestatus selfstatus;
+ 
     std::exception_ptr routineexception;
-    std::exception_ptr childroutineexception;
-
+   
     buffioroutine get_return_object(){
             self = {buffioroutine::from_promise(*this)};
-            status = BUFFIO_ROUTINE_STATUS_EXECUTING;
+            selfstatus.status = BUFFIO_ROUTINE_STATUS_EXECUTING;
             return self;          
     };
 
     std::suspend_always initial_suspend() noexcept{ return{};}; 
     std::suspend_always final_suspend() noexcept{ return{};};
     std::suspend_always yield_value(int value){
-     status = BUFFIO_ROUTINE_STATUS_YIELD;
+     selfstatus.status = BUFFIO_ROUTINE_STATUS_YIELD;
      return {};
     };
 
     buffioawaiter await_transform(buffioroutine waitfor){   
      waitingfor = waitfor;
-     status = BUFFIO_ROUTINE_STATUS_WAITING;
+     selfstatus.status = BUFFIO_ROUTINE_STATUS_WAITING;
      return {.self = self};
     };
 
     buffioawaiter await_transform(buffiopushtaskinfo info){
      pushhandle = info.task;
-     status = BUFFIO_ROUTINE_STATUS_PAUSED;
+     selfstatus.status = BUFFIO_ROUTINE_STATUS_PAUSED;
      return {.self = info.task};
     };
 
     void unhandled_exception() {
-     status = BUFFIO_ROUTINE_STATUS_UNHANDLED_EXCEPTION;
-     returncode = -1;
-     routineexception = std::current_exception();
+     selfstatus.status = BUFFIO_ROUTINE_STATUS_UNHANDLED_EXCEPTION;
+     selfstatus.returncode = -1;
+     selfstatus.routineexception = std::current_exception();
      };
 
-   int return_value(int state){ 
-       returncode = state;
-       status = state < 0 ?  BUFFIO_ROUTINE_STATUS_ERROR : BUFFIO_ROUTINE_STATUS_DONE;
-       return state;
+   void return_value(int state){ 
+       selfstatus.returncode = state;
+       selfstatus.status = state < 0 ?  BUFFIO_ROUTINE_STATUS_ERROR : BUFFIO_ROUTINE_STATUS_DONE;
+       return;
     };
     bool checkstatus(){
-      return status == BUFFIO_ROUTINE_STATUS_ERROR || returncode < 0 ? true : false;
+      return selfstatus.status == BUFFIO_ROUTINE_STATUS_ERROR 
+               || selfstatus.returncode < 0 ? true : false;
     };
 
 
@@ -200,11 +203,13 @@ struct buffiopromise{
 class buffiocatch{
 
 public:
-   buffiocatch(buffioroutine self) : evalue(self){ }
+   buffiocatch(buffioroutine self) : evalue(self){ 
+    status = self.promise().childstatus;
+   };
    void exceptionthrower(){
-       switch(evalue.promise().childstatus){
+       switch(status.status){
           case BUFFIO_ROUTINE_STATUS_UNHANDLED_EXCEPTION:
-            std::rethrow_exception(evalue.promise().childroutineexception);
+            std::rethrow_exception(status.routineexception);
           break;
           case BUFFIO_ROUTINE_STATUS_ERROR:
             throw std::runtime_error("error in execution of routine return code less than 0");
@@ -223,11 +228,12 @@ public:
     try{
         exceptionthrower();
       }
-       catch(const std::exception &e){handler(e,evalue.promise().returncode);}
+       catch(const std::exception &e){handler(e,status.returncode);}
      }
    };
 private:
   buffioroutine evalue;
+  buffiopromisestatus status;
 };
 
 
@@ -247,14 +253,13 @@ struct buffiotaskinfo{
   struct buffiotaskinfo *prev;
 };
 
-using buffiotaskinfo = struct buffiotaskinfo;
 
 class buffio::queue{
   public:   
     queue(): taskqueue(nullptr),taskcount(0),
              taskqueuetail(nullptr), waitingqueue(nullptr),
              waitingqueuetail(nullptr),recenttaskstatus(TASK_ERASED),
-             tasknext(nullptr),activetask(0), waitingtask(0)
+             tasknext(nullptr),activetaskcount(0), waitingtaskcount(0)
 
    { 
             queueerror = BUFFIO_QUEUE_STATUS_EMPTY;
@@ -267,8 +272,7 @@ class buffio::queue{
    
 
    buffiotaskinfo* pushroutine(buffioroutine routine){
-     taskcount += 1;
-     activetask++;
+     taskcount += 1;activetaskcount++;
      buffiotaskinfo* current = new buffiotaskinfo;
      current->next = current->prev = nullptr;
      current->handle = routine;
@@ -279,22 +283,17 @@ class buffio::queue{
    void pushtask(buffiotaskinfo *task){
      if (task == nullptr) return;
      if (task->next || task->prev) return;
-     taskcount++; activetask++;
-
+     taskcount++; activetaskcount++;
      pushtaskptr(task,&taskqueue,&taskqueuetail);
    };
 
    void escalatetaskerror(buffiotaskinfo *to, buffiotaskinfo *from){
-    if(to == nullptr || from == nullptr){
-      return;
-    }
-    to->handle.promise().childstatus = from->handle.promise().status;
-    to->handle.promise().childreturncode = from->handle.promise().returncode;
-    to->handle.promise().childroutineexception = from->handle.promise().routineexception;
+    if(to == nullptr || from == nullptr) return;
+    to->handle.promise().childstatus = from->handle.promise().selfstatus;
    };
 
    buffiotaskinfo* getnexttask() {
-     if (!taskqueue){ return nullptr;} 
+     if (!taskqueue) return nullptr; 
      if (tasknext == nullptr) tasknext = taskqueue;
      return tasknext;
    }
@@ -302,24 +301,24 @@ class buffio::queue{
   void settaskwaiter(buffiotaskinfo *task, buffioroutine routine){
     buffiotaskinfo *taskexec = pushroutine(routine);
     waitingmap[taskexec] = task;
-    waitingtask++;
-    activetask--;
+    waitingtaskcount++; activetaskcount--;
   };
 
   buffiotaskinfo* pushtaskwaiter(buffiotaskinfo *task){
     if (task == nullptr) return nullptr;
-    if(waitingtask == 0) return nullptr;
+    if(waitingtaskcount == 0) return nullptr;
 
     auto handle = waitingmap.find(task);
     if(handle == waitingmap.end()) return nullptr;
-    pushtask(handle->second);
     waitingmap.erase(task);
-    buffiotaskinfo* taskhandle = handle->second;
-    taskhandle->handle.promise().status = BUFFIO_ROUTINE_STATUS_EXECUTING;
-    activetask++;
-    --waitingtask;
-    return handle->second;
- 
+
+    pushtask(handle->second);
+    buffiopromise *promise = &handle->second->handle.promise();
+    promise->selfstatus.status = BUFFIO_ROUTINE_STATUS_EXECUTING;
+
+    activetaskcount++;
+    --waitingtaskcount;
+    return handle->second; 
   };
 
   void poptask(buffiotaskinfo *task){
@@ -349,7 +348,7 @@ class buffio::queue{
      if(task == taskqueuetail) taskqueuetail = task->prev;
 
      task->next = task->prev = nullptr;
-     activetask--;
+     activetaskcount--;
 
      return;
 
@@ -366,47 +365,36 @@ class buffio::queue{
     }
     buffioroutine taskhandle = taskinfo->handle;
     buffiopromise *promise = &taskhandle.promise();
-    if(promise->status == BUFFIO_ROUTINE_STATUS_EXECUTING){
-              taskhandle.resume();
-      }
+    if(promise->selfstatus.status == BUFFIO_ROUTINE_STATUS_EXECUTING){taskhandle.resume();}
 
-    switch(taskhandle.promise().status){
+    switch(taskhandle.promise().selfstatus.status){
        case BUFFIO_ROUTINE_STATUS_WAITING:{ 
           settaskwaiter(taskinfo,promise->waitingfor); 
           erasetask(taskinfo);
         } break;
        case BUFFIO_ROUTINE_STATUS_YIELD:{ 
-         promise->status = BUFFIO_ROUTINE_STATUS_EXECUTING;
+         promise->selfstatus.status = BUFFIO_ROUTINE_STATUS_EXECUTING;
          recenttaskstatus = TASK_NONE;
          marktasknext();
        } break;
-       case BUFFIO_ROUTINE_STATUS_UNHANDLED_EXCEPTION:
-       case BUFFIO_ROUTINE_STATUS_ERROR:{
-         auto *handle = pushtaskwaiter(taskinfo);
-         if(handle == nullptr) break;
-         escalatetaskerror(handle, taskinfo);   
-         handle->handle.promise().status = BUFFIO_ROUTINE_STATUS_EXECUTING;
-         poptask(taskinfo); 
-       }break;
        case BUFFIO_ROUTINE_STATUS_PAUSED:
-        promise->status = BUFFIO_ROUTINE_STATUS_EXECUTING;
+        promise->selfstatus.status = BUFFIO_ROUTINE_STATUS_EXECUTING;
         pushroutine(promise->pushhandle);
        break;
+       case BUFFIO_ROUTINE_STATUS_UNHANDLED_EXCEPTION:
+       case BUFFIO_ROUTINE_STATUS_ERROR:
        case BUFFIO_ROUTINE_STATUS_DONE:
          auto *handle = pushtaskwaiter(taskinfo);
          if(handle != nullptr){
-          handle->handle.promise().status = BUFFIO_ROUTINE_STATUS_EXECUTING;
+          handle->handle.promise().selfstatus.status = BUFFIO_ROUTINE_STATUS_EXECUTING;
           escalatetaskerror(handle, taskinfo);
-        }
+         }
          poptask(taskinfo);
        break;
      };   
   };
 
-  bool empty(){ 
-      return (taskcount == 0); 
-  }
-
+  bool empty(){return (taskcount == 0);}
   size_t taskn(){return taskcount;};
   void setqueuepolicy(buffioqueuepolicy reqpolicy){ }
 
@@ -450,9 +438,8 @@ class buffio::queue{
  std::unordered_map<buffiotaskinfo*,buffiotaskinfo*> waitingmap;
  int recenttaskstatus;
  buffioqueuepolicy queuepolicy;
- size_t capacity;
- size_t taskcount , activetask , waitingtask;
- size_t buffertracker;
+ size_t capacity, taskcount;
+ size_t activetaskcount , waitingtaskcount;
  size_t occupiedcapacity;
 };
 
