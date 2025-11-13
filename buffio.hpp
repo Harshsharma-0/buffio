@@ -3,7 +3,6 @@
 
 #include "./buffiolog.hpp"
 
-
 #include <coroutine>
 #include <cstdint>
 #include <exception>
@@ -75,10 +74,6 @@ class buffsocket;
 class instance;
 }; // namespace buffio
 
-struct buffioqueuepolicy {
-  size_t queucapacity;
-  enum BUFFIO_QUEUE_POLICY queuepolicy;
-};
 
 struct buffioinfo {
   const char *address;
@@ -249,8 +244,8 @@ public:
   buffioqueue()
       :  taskqueue(nullptr), taskqueuetail(nullptr),
          freehead(nullptr),freetail(nullptr), tasknext(nullptr), 
-         activetaskcount(0), waitingtaskcount(0),
-         executingtaskcount(0), totaltaskcount(0),freetaskcount(0)
+         waitingtaskcount(0),waitingtaskhead(nullptr),waitingtasktail(nullptr),
+         executingtaskcount(0), totaltaskcount(0),freetaskcount(0),activetaskcount(0) 
 
 
   {
@@ -259,187 +254,164 @@ public:
   };
 
   ~buffioqueue(){
-    if(executingtaskcount != (activetaskcount + waitingtaskcount)) 
+    if(executingtaskcount != (activetaskcount + waitingtaskcount))
        BUFFIO_INFO("QUEUE : memory leaked. or entry lost: ",executingtaskcount,
-                   " : active - ",activetaskcount,": waiting - ",waitingtaskcount);
-    if(executingtaskcount > 0) buffioclean(taskqueue,taskqueuetail);
-    if(freetaskcount > 0) buffioclean(freehead,freetail);
+                   " : active - ",activetaskcount,": waiting - ",waitingtaskcount 
+                   ," : freecount - ",freetaskcount);
+     
+      buffioclean(taskqueue);
+      buffioclean(freehead);
 
    };
+   
+  void inctotaltask(){
+     totaltaskcount++;
+     activetaskcount++;
+     executingtaskcount++;
+  }
 
   T *pushroutine(Y routine) {
-    
-    T *current = popfreequeue();
-    current->next = current->prev = nullptr;
-    current->handle = routine;
-    pushtaskptr(current, &taskqueue, &taskqueuetail);
-    executingtaskcount++;
-    activetaskcount++;
-    totaltaskcount++;
-   
-    return current;
+     T *tmproutine = popfreequeue();
+     tmproutine->handle = routine;
+     pushtaskptr(tmproutine , &taskqueue ,&taskqueuetail);
+     inctotaltask();      
+     return tmproutine;
   };
 
- void reschedule(T *task){
-    if(task == nullptr) return;
-    erasetask(task);
-    pushtask(task);
-  };
+  void reschedule(T *task){
+    pushtaskptr(task, &taskqueue ,&taskqueuetail); 
+   };
 
-  void pushtask(T *task) {
-    if (task == nullptr)
-      return;
-    if (task->next || task->prev)
-      return;
-
-    pushtaskptr(task, &taskqueue, &taskqueuetail);
-    executingtaskcount++;
-
-  };
 
 
   T *getnextwork() {
-    if (!taskqueue){
-        BUFFIO_INFO("NO TASK");
-        executingtaskcount = 0;
-        queueerror = BUFFIO_QUEUE_STATUS_EMPTY;
-        return nullptr;
-    }
-    if (tasknext == nullptr)
-      tasknext = taskqueue;
-      tasknext = taskqueue;
-   return tasknext;
+     T* t = taskqueue;
+     erasetaskptr(t, &taskqueue ,&taskqueuetail);
+     return t;
   }
 
   void settaskwaiter(T *task, Y routine) {
-    T *taskexec = pushroutine(routine);
-    waitingmap[taskexec] = task;
-    waitingtaskcount++;
-    activetaskcount--;
-    erasetask(task); // erasing task from execution queue
+   if(task == nullptr) return;
+   waitingmap[task] = pushroutine(routine);
+//   erasetask(task);
+ 
+   waitingtaskcount++;
+   activetaskcount--;
+   executingtaskcount--;
+   return;
   };
 
   T *poptaskwaiter(T *task) {
-    if (task == nullptr)
-      return nullptr;
-    if (waitingtaskcount == 0)
-      return nullptr;
-
-    auto handle = waitingmap.find(task);
-    if (handle == waitingmap.end())
-      return nullptr;
-    waitingmap.erase(task);
-
-    pushtask(handle->second);
-
-     activetaskcount++;
-    --waitingtaskcount;
-    return handle->second;
+     if(task == nullptr) return nullptr;
+     auto handle = waitingmap.find(task);
+     if(handle == waitingmap.end()) return nullptr;
+     reschedule(handle->second);
+     waitingtaskcount--;
+     return handle->second;
   };
 
-  void poptask(T *task) {
-    if (task == nullptr)
-      return;
-     executingtaskcount++;
-    --activetaskcount;
-
-    erasetask(task);
-    pushtofreequeue(task);
+  void poptask(T *task){
+    pushtaskptr(task, &freehead ,&freetail);
+    activetaskcount--;
+    executingtaskcount--;
   };
-
-  void erasetask(T *task) {
-    if (!task)
-      return;
 
   
-    if (taskqueue == task && taskqueuetail == task) {
-      taskqueue = nullptr;
-      taskqueuetail = nullptr;
-      tasknext = nullptr;
-      task->next = task->prev = nullptr;
-      executingtaskcount = 0;
-      return;
-    };
-
-    task->prev->next = task->next;
-    task->next->prev = task->prev;
-
-    if (task == taskqueue)
-      taskqueue = taskqueue->next;
-    if (task == taskqueuetail)
-      taskqueuetail = task->prev;
-
-    task->next = task->prev = nullptr;
-    
-    return;
-  };
-
   bool empty() { return (executingtaskcount == 0); }
   size_t taskn() { return totaltaskcount;};
   int getqueuerrror(){return queueerror;}
 
 private:
 
-  void buffioclean(T *head , T *tail){
-       if(head == nullptr || tail == nullptr) return;
-
+  void buffioclean(T *head){
+      if(head == nullptr) return;
       T *tmp = head;
-      while(tmp != tail && tmp != nullptr){
+      while(tmp != nullptr){
         tmp = head->next;
         delete head;
         head = tmp; 
       }
+   };
 
-     if(tail != nullptr)
-        delete tail;
-   }
-
-  void pushtaskptr(T *task, T **head,
-                   T **tail) {
-
-    if (*head == nullptr || *tail == nullptr) {
-      task->next = task->prev = task;
-      *head = *tail = task;
+  //checkfor nullptr task before entering this function;
+  void pushtaskptr(T *task, T **head,T **tail){
+    //indicates a empty list; insertion in empty list:
+    if(*head == nullptr && *tail == nullptr){
+      *head = task;
+      *tail = task;  
       return;
-    }
-
-    task->next = *head;
-    task->prev = *tail;
-    (*tail)->next = task;
-    (*head)->prev = task;
-    *tail = task;
-  };
-
-  void pushtofreequeue(T *task) {
-    if (task == nullptr)
+    };
+    //insertion in list of one element;
+    if(*head == *tail){
+      (*head)->next = task;
+       task->prev = *head;
+       *tail = task;
       return;
-
-    pushtaskptr(task, &freehead, &freetail);
-    freetaskcount++;
-  };
-
-  T *popfreequeue() {
-      T *toreturn = nullptr;
-    if (freehead == nullptr || freetail == nullptr) {
-      toreturn = new T;
-      return toreturn;
     };
 
-    freetaskcount--;
-    if (freehead == freetail) {
-      toreturn = freehead;
-      freehead = freetail = nullptr;
-      return toreturn;
-    }
-    toreturn = freehead;
-    toreturn->next = toreturn->prev = nullptr;
-    if (freehead->next)
-      freehead = freehead->next;
-    return toreturn;
+    //insertion in a list of element greater than 1;
+    (*tail)->next = task;
+    task->prev = *tail;
+    *tail = task;
+
+    return;
   };
+
+  void erasetask(T *task){
+     erasetaskptr(task,&taskqueue,&taskqueuetail);
+  }
+
+void erasetaskptr(T *task, T **head, T **tail) {
+    if (task == nullptr || *head == nullptr)
+        return;
+
+    // only element
+    if (*head == *tail) {
+        *head = *tail = nullptr;
+        task->next = task->prev = nullptr;
+        return;
+    }
+
+    // removing head
+    if (task == *head) {
+        *head = task->next;
+        (*head)->prev = nullptr;
+        task->next = task->prev = nullptr;
+        return;
+    }
+
+    // removing tail
+    if (task == *tail) {
+        *tail = task->prev;
+        (*tail)->next = nullptr;
+        task->next = task->prev = nullptr;
+        return;
+    }
+
+    // removing middle
+    task->prev->next = task->next;
+    task->next->prev = task->prev;
+    task->next = task->prev = nullptr;
+}
+
+
+
+T* popfreequeue(){
+    if(freehead == nullptr){
+       T* t = new T;
+       t->next = nullptr;
+       t->prev = nullptr;
+       return t;
+    };
+    T *ret = freehead;
+    erasetaskptr(ret,&freehead,&freetail);
+
+    return ret;
+}
 
   T *tasknext;
   T *taskqueue, *taskqueuetail;
+  T *waitingtaskhead, *waitingtasktail;
   T *freehead, *freetail;
   int queueerror;
   size_t executingtaskcount, totaltaskcount;
@@ -454,6 +426,7 @@ class buffio::socketbroker{
 
 };
 */
+
 void buffioescalatetaskerror(buffiotaskinfo *to, buffiotaskinfo *from) {
     if (to == nullptr || from == nullptr)
       return;
@@ -480,30 +453,63 @@ public:
       }
 
       switch (taskhandle.promise().selfstatus.status) {
+        /* This case is true when the task want to push some 
+         * task to the queue and reschedule the current task
+         * we can aslo push task buy passing the eventloop 
+         * instance to the task and the push from there
+         * and must be done via eventloop instance that directly
+         * associating with queue;
+         */
       case BUFFIO_ROUTINE_STATUS_PAUSED:
-        queue->pushroutine(promise->pushhandle); // pushing a routine provided by the
-                                          // task and rescheduling the task
+        queue->pushroutine(promise->pushhandle);
+                                          
+        /* This case is true when the task want to give control
+         * back to the eventloop and we reschedule the task to 
+         * execute the next task in the queue.
+         *
+         */
+
       case BUFFIO_ROUTINE_STATUS_YIELD:
         promise->selfstatus.status = BUFFIO_ROUTINE_STATUS_EXECUTING;
         queue->reschedule(taskinfo);
         break;
-      case BUFFIO_ROUTINE_STATUS_WAITING:
-        queue->settaskwaiter(taskinfo,
+        /* This case is true when the task wants to
+         *  wait for certain other operations;
+         */
+       case BUFFIO_ROUTINE_STATUS_WAITING:
+            queue->settaskwaiter(taskinfo,
                       promise->waitingfor); // pushing task to waiting map
         break;
+         /* These cases follow the same handling process -
+          *
+          *  1) BUFFIO_ROUTINE_STATUS_UNHANDLED_EXCEPTION:
+          *  2) BUFFIO_ROUTINE_STATUS_ERROR:
+          *  3) BUFFIO_ROUTINE_STATUS_DONE:
+          *
+          */
       case BUFFIO_ROUTINE_STATUS_UNHANDLED_EXCEPTION:
       case BUFFIO_ROUTINE_STATUS_ERROR:
       case BUFFIO_ROUTINE_STATUS_DONE:
         auto *handle =
             queue->poptaskwaiter(taskinfo); // pulling out any task awaiter in case of
-                                     // taskdone or taskerror
+                                           // taskdone or taskerror
         if (handle != nullptr) {
+            // setting the waiter status to executing;
           handle->handle.promise().selfstatus.status =
               BUFFIO_ROUTINE_STATUS_EXECUTING;
+              // escalating the task error to the parent if there any error;
               buffioescalatetaskerror(handle, taskinfo);
           }
-          queue->poptask(taskinfo);    
-        break;
+          
+          //destroying task handle if task errored out and task done
+          taskhandle.destroy(); 
+          /*
+           * removing the task from execqueue and putting in freequeuelist
+           * to reuse the task allocated chunk later and prevent allocation 
+           * of newer chunk every time.
+          */
+          queue->poptask(taskinfo);
+          break;
       };
     };
     BUFFIO_INFO(" Queue empty: no task to execute ");
