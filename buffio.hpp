@@ -292,7 +292,7 @@ public:
 
   void settaskwaiter(T *task, Y routine) {
    if(task == nullptr) return;
-   waitingmap[task] = pushroutine(routine);
+   waitingmap[pushroutine(routine)] = task;
 //   erasetask(task);
  
    waitingtaskcount++;
@@ -302,10 +302,14 @@ public:
   };
 
   T *poptaskwaiter(T *task) {
+
      if(task == nullptr) return nullptr;
      auto handle = waitingmap.find(task);
      if(handle == waitingmap.end()) return nullptr;
      reschedule(handle->second);
+
+     activetaskcount++;
+     executingtaskcount++;
      waitingtaskcount--;
      return handle->second;
   };
@@ -493,6 +497,7 @@ public:
         auto *handle =
             queue->poptaskwaiter(taskinfo); // pulling out any task awaiter in case of
                                            // taskdone or taskerror
+         
         if (handle != nullptr) {
             // setting the waiter status to executing;
           handle->handle.promise().selfstatus.status =
