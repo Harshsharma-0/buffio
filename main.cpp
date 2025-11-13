@@ -41,7 +41,7 @@ buffioroutine pushedtask(){
 
   buffiowait clientcall(0);
   buffioreturn 0;
-};
+}
 
 buffioroutine clienthandler(int code){
 
@@ -68,9 +68,20 @@ int main(){
   
   buffio::instance runner;
   runner.push(clienthandler(1));
-  runner.push(pushedtask());
- // runner.push(clienthandler(3));
-  runner.fireeventloop(EVENTLOOP_SYNC);
+  runner.push(clienthandler(2));
+  runner.push(clienthandler(3));
+  runner.push(clienthandler(4));
+  runner.push(clienthandler(5));
+  runner.push(clienthandler(6));
+  runner.push(clienthandler(7));
+  runner.push(clienthandler(8));
+  runner.push(clienthandler(9));
+  runner.push(clienthandler(10));
+  runner.push(clienthandler(11));
+  runner.push(clienthandler(12));
+  runner.push(clienthandler(13));
+
+  runner.fireeventloop(BUFFIO_EVENTLOOP_SYNC);
 
 
    return 0;
