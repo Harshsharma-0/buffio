@@ -318,6 +318,8 @@ private:
   void buffioclean(T *head) {
     if (head == nullptr)
       return;
+    if(head = head->next){ delete head; return;}
+
     T *tmp = head;
     while (tmp != nullptr) {
       tmp = head->next;
@@ -335,6 +337,7 @@ private:
       task->next = task->prev = task;
       return;
     };
+
     /*
     // insertion in list of one element;
     if (*head == *tail) {
@@ -346,6 +349,7 @@ private:
     */
 
     // insertion in a list of element greater than 1;
+    task->next = nullptr;
     (*tail)->next = task;
     task->prev = *tail;
     *tail = task;
