@@ -1,12 +1,12 @@
 #ifndef __BUFFIO_SOCK_IMPLEMENTATION__
 #define __BUFFIO_SOCK_IMPLEMENTATION__
 
-class buffio::buffsocket{
+class buffiosocket{
 
  public:
  
-  buffsocket(buffioinfo &ioinfo) : linfo(ioinfo), clienthandler(nullptr),
-                                  socketfd(-1) , sockfdblocking(true){
+  buffiosocket(buffioinfo &ioinfo) : linfo(ioinfo), clienthandler(nullptr),
+                                    socketfd(-1) , sockfdblocking(true){
 
     if(!(ioinfo.socktype & BUFFIO_SOCK_ASYNC)) sockfdblocking = true;
 
@@ -69,7 +69,7 @@ class buffio::buffsocket{
     return 0;
    };
 
- ~buffsocket(){ 
+ ~buffiosocket(){ 
     if(socketfd > 0){
       if(close(socketfd) < 0){
         BUFFIO_ERROR(" SOCKET CLOSE FAILURE");
