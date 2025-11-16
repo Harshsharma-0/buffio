@@ -335,6 +335,7 @@ private:
       task->next = task->prev = task;
       return;
     };
+    /*
     // insertion in list of one element;
     if (*head == *tail) {
       (*head)->next = task;
@@ -342,6 +343,7 @@ private:
       *tail = task;
       return;
     };
+    */
 
     // insertion in a list of element greater than 1;
     (*tail)->next = task;
