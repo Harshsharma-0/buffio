@@ -338,7 +338,7 @@ private:
       return;
     };
 
-    /*
+    
     // insertion in list of one element;
     if (*head == *tail) {
       (*head)->next = task;
@@ -346,10 +346,10 @@ private:
       *tail = task;
       return;
     };
-    */
+    
 
     // insertion in a list of element greater than 1;
-    task->next = nullptr;
+ 
     (*tail)->next = task;
     task->prev = *tail;
     *tail = task;
@@ -370,7 +370,7 @@ private:
       return;
     }
 
-  /*
+  
     // removing head
     if (task == *head) {
       *head = task->next;
@@ -386,9 +386,9 @@ private:
       task->next = task->prev = nullptr;
       return;
     }
-    */
+    
 
-    // removing if entry is greater than 1
+    // removing from middle of the queue
     task->prev->next = task->next;
     task->next->prev = task->prev;
     task->next = task->prev = nullptr;
