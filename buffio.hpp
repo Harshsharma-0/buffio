@@ -416,28 +416,7 @@ private:
   std::unordered_map<T *, T *> waitingmap;
 };
 
-#include <sys/epoll.h>
-// socket broker used to listen for events in socket;
-// internally uses epoll for all work;
-constexpr int BUFFIO_POLL_READ = EPOLLIN;
-constexpr int BUFFIO_POLL_WRITE = EPOLLOUT;
-constexpr int BUFFIO_POLL_ETRIG = EPOLLET;
 
-#define BUFFIO_EPOLL_MAX_THRESHOLD 100
-
-enum BUFFIO_SOCKBROKER_STATE {
-  BUFFIO_SOCKBROKER_ACTIVE = 71,
-  BUFFIO_SOCKBROKER_INACTIVE,
-  BUFFIO_SOCKBROKER_BUSY,
-  BUFFIO_SOCKBROKER_ERROR,
-  BUFFIO_SOCKBROKER_SUCCESS,
-};
-
-struct buffiosbrokerinfo {
-  int fd;
-  int event;
-  buffiotaskinfo *task;
-};
 
 #include <sched.h>
 #include <signal.h>
@@ -460,7 +439,8 @@ class buffiothread {
 public:
   buffiothread()
       : stack(nullptr), stacktop(nullptr), callfunc(nullptr), dataptr(nullptr),
-        stacksize(0), threadstatus(BUFFIO_THREAD_NOT) {}
+        stacksize(0), threadstatus(BUFFIO_THREAD_NOT),threadname(nullptr) {}
+    
 
   ~buffiothread() { reset(); };
 
@@ -477,6 +457,7 @@ public:
     case BUFFIO_THREAD_ERROR_MAP:
       stacksize = 0;
       stack = stacktop = nullptr;
+      threadname = nullptr; 
     };
     threadstatus = BUFFIO_THREAD_NOT;
   }
@@ -499,7 +480,7 @@ public:
     return;
   }
 
-  buffiothread &operator=(void (*func)(void *data)) {
+  buffiothread &operator=(int (*func)(void *data)) {
     callfunc = func;
     return *this;
   }
@@ -510,22 +491,39 @@ public:
     return *this;
   };
 
+  buffiothread &operator[](const char *name){
+  if(threadname == nullptr) threadname = (char *)name; 
+    return *this;
+  };
+
   buffiothread &operator()(void *data) {
     dataptr = data;
     return *this;
   };
-  buffiothread &run() {
+  buffiothread &run(){
     call();
     return *this;
   };
+  bool running(){ return (threadstatus == BUFFIO_THREAD_RUNNING);}
+  bool done(){ return (threadstatus == BUFFIO_THREAD_DONE);}
+
   static int setname(const char *name) {
     return prctl(PR_SET_NAME, name, 0, 0, 0);
-  }
+  };
 
+  static constexpr size_t S1MB = 1024 * 1024;
+  static constexpr size_t S4MB = 4 * (1024 * 1024);
+  static constexpr size_t S9MB = 9 * (1024 * 1024);
+  static constexpr size_t S10MB = 10 * (1024 * 1024);
+  static constexpr size_t SD = buffiothread::S9MB;
+  static constexpr size_t S1KB = 1024;
+
+  
 private:
   static int buffiofunc(void *data) {
     buffiothread *instance = (buffiothread *)data;
-    instance->callfunc(nullptr);
+    if(instance->threadname) buffiothread::setname(instance->threadname);
+    instance->callfunc(instance->dataptr);
     return 0;
   };
 
@@ -538,6 +536,9 @@ private:
 
     if (stack == (void *)-1) {
       threadstatus = BUFFIO_THREAD_ERROR_MAP;
+      BUFFIO_ERROR("Failed to allocate thread stack, aborting thread creation, reason -> "
+                   ,strerror(errno));
+
       reset();
       return;
     }
@@ -547,6 +548,10 @@ private:
 
     if (pid < 0) {
       threadstatus = BUFFIO_THREAD_ERROR;
+      BUFFIO_ERROR("Failed to create thread , reason -> "
+                  ,strerror(errno),
+                  threadname == nullptr ? "error","thread name ->",threadname);
+      
       reset();
       return;
     }
@@ -555,22 +560,41 @@ private:
   };
 
   char *stack;
+  char *threadname;
   char *stacktop;
   void *dataptr;
   int threadstatus;
   pid_t pid;
   size_t stacksize;
-  void (*callfunc)(void *);
+  int (*callfunc)(void *);
+};
+
+#include <sys/epoll.h>
+// socket broker used to listen for events in socket;
+// internally uses epoll for all work;
+constexpr int BUFFIO_POLL_READ = EPOLLIN;
+constexpr int BUFFIO_POLL_WRITE = EPOLLOUT;
+constexpr int BUFFIO_POLL_ETRIG = EPOLLET;
+
+#define BUFFIO_EPOLL_MAX_THRESHOLD 100
+
+enum BUFFIO_SOCKBROKER_STATE {
+  BUFFIO_SOCKBROKER_ACTIVE = 71,
+  BUFFIO_SOCKBROKER_INACTIVE,
+  BUFFIO_SOCKBROKER_BUSY,
+  BUFFIO_SOCKBROKER_ERROR,
+  BUFFIO_SOCKBROKER_SUCCESS,
+};
+
+struct buffiosbrokerinfo {
+  int fd;
+  int event;
+  void *task;
 };
 
 class buffiosockbroker {
 public:
-  buffiosockbroker()
-      : sbrokerstate(BUFFIO_SOCKBROKER_INACTIVE), fdcount(0), eventcount(0) {
-    memset(&events, '\0', sizeof(epoll_event) * BUFFIO_EPOLL_MAX_THRESHOLD);
-    consumed = -1;
-  };
-
+  
   int start() {
     switch (sbrokerstate) {
     case BUFFIO_SOCKBROKER_INACTIVE:
@@ -592,7 +616,7 @@ public:
     struct epoll_event event;
     event.events = broker->event;
     event.data.fd = broker->fd;
-    event.data.ptr = static_cast<void *>(broker->task);
+    event.data.ptr = broker->task;
 
     switch (sbrokerstate) {
     case BUFFIO_SOCKBROKER_ACTIVE:
@@ -608,18 +632,31 @@ public:
     return BUFFIO_SOCKBROKER_ERROR;
   };
 
-  static int epolllistener(buffiosockbroker *selfinstance) { return 0; };
+  static int epolllistener(void *data) { 
+    buffiosockbroker *instance = (buffiosockbroker*)data;
+    
+    std::cout<<"hello epoll"<<std::endl;
+    return 0; 
+  };
 
   ~buffiosockbroker() {
     switch (sbrokerstate) {
-    case BUFFIO_SOCKBROKER_INACTIVE:
+    case BUFFIO_SOCKBROKER_INACTIVE: return;
     case BUFFIO_SOCKBROKER_ACTIVE:
     case BUFFIO_SOCKBROKER_BUSY:
       break;
     }
   };
 
+  buffiosockbroker()
+      : sbrokerstate(BUFFIO_SOCKBROKER_INACTIVE), fdcount(0), eventcount(0) {
+    memset(&events, '\0', sizeof(epoll_event) * BUFFIO_EPOLL_MAX_THRESHOLD);
+    consumed = -1; 
+    thread[buffiothread::SD]["buffiosocketbroker"](this) = epolllistener;
+  };
+
 private:
+  buffiothread thread;
   int sbrokerstate;
   int epollfd;
   size_t fdcount;
@@ -627,14 +664,7 @@ private:
   std::atomic<int> consumed;
   struct epoll_event events[BUFFIO_EPOLL_MAX_THRESHOLD];
 };
-/*
- */
 
-void buffioescalatetaskerror(buffiotaskinfo *to, buffiotaskinfo *from) {
-  if (to == nullptr || from == nullptr)
-    return;
-  to->handle.promise().childstatus = from->handle.promise().selfstatus;
-};
 
 class buffioinstance {
 
@@ -702,7 +732,7 @@ public:
           handle->handle.promise().selfstatus.status =
               BUFFIO_ROUTINE_STATUS_EXECUTING;
           // escalating the task error to the parent if there any error;
-          buffioescalatetaskerror(handle, taskinfo);
+          instance->buffioescalatetaskerror(handle, taskinfo);
         }
 
         // destroying task handle if task errored out and task done
@@ -750,7 +780,13 @@ public:
   };
 
 private:
+ void buffioescalatetaskerror(buffiotaskinfo *to, buffiotaskinfo *from) {
+    if (to == nullptr || from == nullptr)
+      return;
+     to->handle.promise().childstatus = from->handle.promise().selfstatus;
+  };
   buffioqueue<buffiotaskinfo, buffioroutine> iqueue;
+  buffiosockbroker iobroker; 
   enum BUFFIO_EVENTLOOP_TYPE ieventlooptype;
 };
 
