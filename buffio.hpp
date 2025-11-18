@@ -23,7 +23,6 @@ constexpr int BUFFIO_SOCK_UDP = SOCK_DGRAM;
 constexpr int BUFFIO_SOCK_RAW = SOCK_RAW;
 constexpr int BUFFIO_SOCK_ASYNC = SOCK_NONBLOCK;
 
-
 enum BUFFIO_ROUTINE_STATUS {
   BUFFIO_ROUTINE_STATUS_WAITING = 21,
   BUFFIO_ROUTINE_STATUS_EXECUTING,
@@ -219,12 +218,12 @@ private:
 };
 
 #include <arpa/inet.h>
+#include <atomic>
 #include <cstring>
 #include <errno.h>
 #include <netinet/in.h>
 #include <sys/un.h>
 #include <unistd.h>
-#include <atomic>
 #include "./buffiosock.hpp"
 
 struct buffiotaskinfo {
@@ -318,7 +317,10 @@ private:
   void buffioclean(T *head) {
     if (head == nullptr)
       return;
-    if(head = head->next){ delete head; return;}
+    if (head = head->next) {
+      delete head;
+      return;
+    }
 
     T *tmp = head;
     while (tmp != nullptr) {
@@ -338,7 +340,6 @@ private:
       return;
     };
 
-    
     // insertion in list of one element;
     if (*head == *tail) {
       (*head)->next = task;
@@ -346,10 +347,9 @@ private:
       *tail = task;
       return;
     };
-    
 
     // insertion in a list of element greater than 1;
- 
+    task->next = nullptr;
     (*tail)->next = task;
     task->prev = *tail;
     *tail = task;
@@ -370,7 +370,6 @@ private:
       return;
     }
 
-  
     // removing head
     if (task == *head) {
       *head = task->next;
@@ -386,9 +385,8 @@ private:
       task->next = task->prev = nullptr;
       return;
     }
-    
 
-    // removing from middle of the queue
+    // removing if entry is greater than 1
     task->prev->next = task->next;
     task->next->prev = task->prev;
     task->next = task->prev = nullptr;
@@ -441,14 +439,136 @@ struct buffiosbrokerinfo {
   buffiotaskinfo *task;
 };
 
+#include <sched.h>
+#include <signal.h>
+#include <sys/mman.h>
+#include <sys/prctl.h>
+#include <sys/types.h>
+#include <sys/utsname.h>
+#include <sys/wait.h>
 
+enum BUFFIO_THREAD_STATUS {
+  BUFFIO_THREAD_NOT = 81,
+  BUFFIO_THREAD_RUNNING,
+  BUFFIO_THREAD_DONE,
+  BUFFIO_THREAD_ERROR,
+  BUFFIO_THREAD_ERROR_MAP,
+};
+
+class buffiothread {
+
+public:
+  buffiothread()
+      : stack(nullptr), stacktop(nullptr), callfunc(nullptr), dataptr(nullptr),
+        stacksize(0), threadstatus(BUFFIO_THREAD_NOT) {}
+
+  ~buffiothread() { reset(); };
+
+  void reset() {
+    switch (threadstatus) {
+    case BUFFIO_THREAD_NOT:
+      return;
+      break;
+    case BUFFIO_THREAD_RUNNING:
+      killthread();
+    case BUFFIO_THREAD_DONE:
+    case BUFFIO_THREAD_ERROR:
+      munmap(stack, stacksize);
+    case BUFFIO_THREAD_ERROR_MAP:
+      stacksize = 0;
+      stack = stacktop = nullptr;
+    };
+    threadstatus = BUFFIO_THREAD_NOT;
+  }
+
+  void killthread() {
+    if (pid < 0)
+      return;
+    switch (threadstatus) {
+    case BUFFIO_THREAD_RUNNING:
+      kill(pid, SIGKILL);
+      break;
+    }
+    return;
+  };
+
+  void wait() {
+    if (pid < 0)
+      return;
+    waitpid(pid, NULL, 0);
+    return;
+  }
+
+  buffiothread &operator=(void (*func)(void *data)) {
+    callfunc = func;
+    return *this;
+  }
+
+  buffiothread &operator[](size_t stack) {
+    if (stacksize == 0)
+      stacksize = stack;
+    return *this;
+  };
+
+  buffiothread &operator()(void *data) {
+    dataptr = data;
+    return *this;
+  };
+  buffiothread &run() {
+    call();
+    return *this;
+  };
+  static int setname(const char *name) {
+    return prctl(PR_SET_NAME, name, 0, 0, 0);
+  }
+
+private:
+  static int buffiofunc(void *data) {
+    buffiothread *instance = (buffiothread *)data;
+    instance->callfunc(nullptr);
+    return 0;
+  };
+
+  void call() {
+    if (stacksize < 0 || callfunc == nullptr)
+      return;
+    stack = (char *)mmap(NULL, stacksize, PROT_READ | PROT_WRITE,
+                         MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0);
+    stacktop = stack + stacksize;
+
+    if (stack == (void *)-1) {
+      threadstatus = BUFFIO_THREAD_ERROR_MAP;
+      reset();
+      return;
+    }
+
+    pid = clone(buffiofunc, stacktop,
+                CLONE_FILES | CLONE_FS | CLONE_IO | SIGCHLD, this);
+
+    if (pid < 0) {
+      threadstatus = BUFFIO_THREAD_ERROR;
+      reset();
+      return;
+    }
+    threadstatus = BUFFIO_THREAD_RUNNING;
+    return;
+  };
+
+  char *stack;
+  char *stacktop;
+  void *dataptr;
+  int threadstatus;
+  pid_t pid;
+  size_t stacksize;
+  void (*callfunc)(void *);
+};
 
 class buffiosockbroker {
 public:
-  buffiosockbroker() : sbrokerstate(BUFFIO_SOCKBROKER_INACTIVE), fdcount(0),
-                       eventcount(0){
-    memset(&events,'\0',sizeof(epoll_event) * BUFFIO_EPOLL_MAX_THRESHOLD);
-    consumed = 0;
+  buffiosockbroker()
+      : sbrokerstate(BUFFIO_SOCKBROKER_INACTIVE), fdcount(0), eventcount(0) {
+    memset(&events, '\0', sizeof(epoll_event) * BUFFIO_EPOLL_MAX_THRESHOLD);
+    consumed = -1;
   };
 
   int start() {
@@ -473,22 +593,22 @@ public:
     event.events = broker->event;
     event.data.fd = broker->fd;
     event.data.ptr = static_cast<void *>(broker->task);
+
     switch (sbrokerstate) {
     case BUFFIO_SOCKBROKER_ACTIVE:
-        int ret = epoll_ctl(epollfd,EPOLL_CTL_ADD,broker->fd,&event);
-        if(ret < 0){
-          BUFFIO_ERROR("Failed to add file descriptor in epoll, reason : ",strerrno(errno));
-          break;
-        } 
-        return BUFFIO_SOCKBROKER_SUCCESS;
+      int ret = epoll_ctl(epollfd, EPOLL_CTL_ADD, broker->fd, &event);
+      if (ret < 0) {
+        BUFFIO_ERROR("Failed to add file descriptor in epoll, reason : ",
+                     strerrno(errno));
+        break;
+      }
+      return BUFFIO_SOCKBROKER_SUCCESS;
       break;
-    } 
+    }
     return BUFFIO_SOCKBROKER_ERROR;
   };
-  
-  static int epolllistener(buffiosockbroker *selfinstance){
-    return 0; 
-  };
+
+  static int epolllistener(buffiosockbroker *selfinstance) { return 0; };
 
   ~buffiosockbroker() {
     switch (sbrokerstate) {
@@ -504,7 +624,7 @@ private:
   int epollfd;
   size_t fdcount;
   size_t eventcount;
-  std::atomic <int>consumed;
+  std::atomic<int> consumed;
   struct epoll_event events[BUFFIO_EPOLL_MAX_THRESHOLD];
 };
 /*
