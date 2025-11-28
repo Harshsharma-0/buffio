@@ -1,6 +1,29 @@
 #ifndef __BUFFIO_SOCK_IMPLEMENTATION__
 #define __BUFFIO_SOCK_IMPLEMENTATION__
 
+#include <fcntl.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <atomic>
+#include <cstring>
+#include <errno.h>
+#include <netinet/in.h>
+#include <sys/un.h>
+#include <unistd.h>
+
+constexpr int BUFFIO_FAMILY_LOCAL = AF_UNIX;
+constexpr int BUFFIO_FAMILY_IPV4 = AF_INET;
+constexpr int BUFFIO_FAMILY_IPV6 = AF_INET6;
+constexpr int BUFFIO_FAMILY_CAN = AF_CAN;
+constexpr int BUFFIO_FAMILY_NETLINK = AF_NETLINK;
+constexpr int BUFFIO_FAMILY_LLC = AF_LLC;
+constexpr int BUFFIO_FAMILY_BLUETOOTH = AF_BLUETOOTH;
+
+constexpr int BUFFIO_SOCK_TCP = SOCK_STREAM;
+constexpr int BUFFIO_SOCK_UDP = SOCK_DGRAM;
+constexpr int BUFFIO_SOCK_RAW = SOCK_RAW;
+constexpr int BUFFIO_SOCK_ASYNC = SOCK_NONBLOCK;
+
 class buffiosocket{
 
  public:
