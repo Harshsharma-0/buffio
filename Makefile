@@ -1,4 +1,4 @@
-main:main.cpp buffio.hpp buffiolog.hpp
+main:main.cpp *.hpp
 	 g++ -std=c++20 main.cpp -o main
 
 run: main

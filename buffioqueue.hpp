@@ -3,90 +3,97 @@
 
 #include <unordered_map>
 
-template <typename T, typename Y> class buffioqueue {
+
+template<typename X, typename Y>
+  class waitingmap{
+   private:
+   std::unordered_map<X,Y> waitingmap;
+   public:
+   void push(X id , Y thing){waitingmap[id] = thing;};
+   Y pop(X id){
+     auto res = waitingmap.find(id);
+     if(res != waitingmap.end()) return res->second; 
+     return {0};
+   };
+};
+
+
+template <typename T> class buffioqueue {
+  struct buffiochain{
+    T data;
+    struct buffiochain *next;
+    struct buffiochain *prev;
+   };
+
 public:
   buffioqueue()
-      : taskqueue(nullptr), taskqueuetail(nullptr), freehead(nullptr),
-        freetail(nullptr), tasknext(nullptr), waitingtaskcount(0),
-        waitingtaskhead(nullptr), waitingtasktail(nullptr),
-        executingtaskcount(0), totaltaskcount(0), freetaskcount(0),
-        activetaskcount(0)
+      : queuehead(nullptr), queuetail(nullptr), freehead(nullptr),
+        freetail(nullptr),tmpcount(0),totalcount(0)
 
   {
     queueerror = BUFFIO_QUEUE_STATUS_EMPTY;
-  };
-
+   };
+  void setdefault(T def){defaultvalue = def;}
   ~buffioqueue() {
-    if (executingtaskcount != (activetaskcount + waitingtaskcount))
-      BUFFIO_INFO("QUEUE : memory leaked. or entry lost: ", executingtaskcount,
-                  " : active - ", activetaskcount, ": waiting - ",
-                  waitingtaskcount, " : freecount - ", freetaskcount);
-
-    buffioclean(taskqueue);
+    buffioclean(queuehead);
     buffioclean(freehead);
   };
 
-  void inctotaltask() {
-    totaltaskcount++;
-    activetaskcount++;
-    executingtaskcount++;
+  void reserve(size_t value){
+   if(value != 0)
+      for(size_t i = 0; i < value; i++){
+        buffiochain *tmp = new buffiochain;
+        tmp->data = defaultvalue;
+        pushptr(tmp,&freehead,&freetail);
+      }
+
+  };
+  void push(T data) {
+    struct buffiochain *tmproutine = popfreequeue();
+    tmproutine->data = data;
+    pushptr(tmproutine, &queuehead, &queuetail);
+    tmpcount += 1;
+    totalcount++;
+    };
+
+ T *pushandget(T data){
+    struct buffiochain *tmproutine = popfreequeue();
+    tmproutine->data = data;
+    pushptr(tmproutine, &queuehead, &queuetail);
+    tmpcount += 1;
+    totalcount++;
+    return &tmproutine->data;
+   }
+
+  // only to use to mark a ptr get by pushandget() to free queue
+  void popget(void *ptr){
+   if(ptr == nullptr) return;
+   struct buffiochain *tmp = (struct buffiochain*)ptr;
+   eraseptr(tmp, &queuehead, &queuetail);
+   pushptr(tmp, &freehead, &freetail);
+   tmp->data = defaultvalue;
+    std::cout<<"pushing back"<<std::endl;
+  };
+
+  T pop(){
+    struct buffiochain *t = queuehead; 
+    if(t == nullptr) return NULL;
+    eraseptr(t, &queuehead, &queuetail);
+    pushptr(t, &freehead, &freetail);
+    tmpcount -= 1;
+    T data = t->data;
+    t->data = defaultvalue;
+    return data;
   }
-
-  T *pushroutine(Y routine) {
-    T *tmproutine = popfreequeue();
-    tmproutine->handle = routine;
-    pushtaskptr(tmproutine, &taskqueue, &taskqueuetail);
-    inctotaltask();
-    return tmproutine;
-  };
-
-  void reschedule(T *task) { pushtaskptr(task, &taskqueue, &taskqueuetail); };
-
-  T *getnextwork() {
-    T *t = taskqueue;
-    erasetaskptr(t, &taskqueue, &taskqueuetail);
-    return t;
-  }
-
-  void settaskwaiter(T *task, Y routine) {
-    if (task == nullptr)
-      return;
-    waitingmap[pushroutine(routine)] = task;
-
-    waitingtaskcount++;
-    activetaskcount--;
-    executingtaskcount--;
-    return;
-  };
-
-  T *poptaskwaiter(T *task) {
-
-    if (task == nullptr)
-      return nullptr;
-    auto handle = waitingmap.find(task);
-    if (handle == waitingmap.end())
-      return nullptr;
-
-    reschedule(handle->second);
-
-    activetaskcount++;
-    executingtaskcount++;
-    waitingtaskcount--;
-    return handle->second;
-  };
-
-  void poptask(T *task) {
-    pushtaskptr(task, &freehead, &freetail);
-    activetaskcount--;
-    executingtaskcount--;
-  };
-
-  bool empty() { return (executingtaskcount == 0); }
-  size_t taskn() { return totaltaskcount; };
+  
+  
+  bool empty() { return (tmpcount == 0); }
+  size_t queuen() { return tmpcount; };
   int getqueuerrror() { return queueerror; }
 
 private:
-  void buffioclean(T *head) {
+ 
+  void buffioclean(struct buffiochain *head) {
     if (head == nullptr)
       return;
     if (head = head->next) {
@@ -94,7 +101,7 @@ private:
       return;
     }
 
-    T *tmp = head;
+    struct buffiochain *tmp = head;
     while (tmp != nullptr) {
       tmp = head->next;
       delete head;
@@ -103,7 +110,7 @@ private:
   };
 
   // checkfor nullptr task before entering this function;
-  void pushtaskptr(T *task, T **head, T **tail) {
+  void pushptr(struct buffiochain *task, struct buffiochain **head, struct buffiochain **tail) {
     // indicates a empty list; insertion in empty list:
     if (*head == nullptr && *tail == nullptr) {
       *head = task;
@@ -128,10 +135,8 @@ private:
 
     return;
   };
-
-  void erasetask(T *task) { erasetaskptr(task, &taskqueue, &taskqueuetail); }
-
-  void erasetaskptr(T *task, T **head, T **tail) {
+ 
+  void eraseptr(struct buffiochain *task, struct buffiochain **head, struct buffiochain **tail) {
     if (task == nullptr || *head == nullptr)
       return;
 
@@ -164,28 +169,27 @@ private:
     task->next = task->prev = nullptr;
   }
 
-  T *popfreequeue() {
+ struct buffiochain *popfreequeue() {
     if (freehead == nullptr) {
-      T *t = new T;
+    struct buffiochain *t = new struct buffiochain;
       t->next = nullptr;
       t->prev = nullptr;
+      std::cout<<"allocating new"<<std::endl;
       return t;
     };
-    T *ret = freehead;
-    erasetaskptr(ret, &freehead, &freetail);
-
+    struct buffiochain *ret = freehead;
+    std::cout<<"reusing"<<std::endl;
+    eraseptr(ret, &freehead, &freetail);
     return ret;
   }
 
-  T *tasknext;
-  T *taskqueue, *taskqueuetail;
-  T *waitingtaskhead, *waitingtasktail;
-  T *freehead, *freetail;
+  struct buffiochain *queuehead, *queuetail;
+  struct buffiochain *freehead, *freetail;
+
   int queueerror;
-  size_t executingtaskcount, totaltaskcount;
-  size_t activetaskcount, waitingtaskcount;
-  size_t freetaskcount;
-  std::unordered_map<T *, T *> waitingmap;
+  size_t tmpcount;
+  size_t totalcount;
+  T defaultvalue;
 };
 
 #endif

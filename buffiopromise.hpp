@@ -28,7 +28,7 @@ struct buffioawaiter {
   buffioroutine self;
 };
 
-struct buffiopushtaskinfo {
+struct buffiopushinfo{
   buffioroutine task;
 };
 
@@ -66,7 +66,7 @@ struct buffiopromise {
     return {.self = self};
   };
 
-  buffioawaiter await_transform(buffiopushtaskinfo info) {
+  buffioawaiter await_transform(buffiopushinfo info) {
     pushhandle = info.task;
     selfstatus.status = BUFFIO_ROUTINE_STATUS_PAUSED;
     return {.self = info.task};
