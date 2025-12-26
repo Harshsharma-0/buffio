@@ -84,7 +84,9 @@ public:
     return *this;
   };
   buffiothread &run(){
-    call();
+    if(threadstatus != BUFFIO_THREAD_RUNNING){
+       call();
+    }
     return *this;
   };
   bool running(){ return (threadstatus == BUFFIO_THREAD_RUNNING);}
@@ -127,7 +129,7 @@ private:
     }
 
     pid = clone(buffiofunc, stacktop,
-                CLONE_FILES | CLONE_FS | CLONE_IO | SIGCHLD, this);
+                CLONE_FILES | CLONE_FS | CLONE_IO| CLONE_VM | SIGCHLD, this);
 
     if (pid < 0) {
       threadstatus = BUFFIO_THREAD_ERROR;

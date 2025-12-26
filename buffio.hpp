@@ -184,10 +184,10 @@ public:
     }
     return;
   };
+
   buffioinstance() : ieventlooptype(BUFFIO_EVENTLOOP_DOWN) , idfactor(0){ 
     pqueue.setdefault({0});
     equeue.setdefault(nullptr);
-
     equeue.reserve(25);
     pqueue.reserve(25);
   }
