@@ -56,12 +56,15 @@ class buffiolfqueue{
   };
 
   public:
-  buffiolfqueue(size_t _order, T _onEmpty): data(nullptr){
-    if(_order < buffioatomix_max_order && _order > BUFFIO_RING_MIN){
-      queueorder = _order;
-      onEmpty = _onEmpty;
-      data = new T[(1 << _order)];
-      for(size_t i = 0; i < (1 << _order); i++)
+  buffiolfqueue(size_t _order, T _onEmpty): data(nullptr){ lfstart(_order,_onEmpty);}
+  buffiolfqueue(): data(nullptr){};
+
+  void lfstart(size_t _order, T _onEmpty){
+   if(_order < buffioatomix_max_order && _order > BUFFIO_RING_MIN && data == nullptr){
+       queueorder = _order;
+       onEmpty = _onEmpty;
+       data = new T[(1 << _order)];
+       for(size_t i = 0; i < (1 << _order); i++)
           data[i] = onEmpty;
 
       acqueue.data = new buffioatomix[(1 << (_order + 1))];
@@ -70,8 +73,8 @@ class buffiolfqueue{
       initfull(&freequeue,_order);
       return;
     }
-  } 
 
+  }
  ~buffiolfqueue(){ 
     if(data != nullptr) delete data;
     if(acqueue.data != nullptr) delete acqueue.data;
@@ -146,6 +149,7 @@ retry:
 
 again:
      entry = which->data[tidx].load(std::memory_order_acquire);  
+
      do{
          entcycle = entry | mask;
          if(entcycle == headcycle){
@@ -157,7 +161,7 @@ again:
             if(entry == entnew)
               break;
         }else{
-          if(++attempt <= 10000)
+          if(++attempt <= 5000)
             goto again;
             entnew = headcycle ^ ((~entry) & size);
         };

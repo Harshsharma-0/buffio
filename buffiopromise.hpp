@@ -54,12 +54,10 @@ struct buffiopromise {
   };
 
   std::suspend_always initial_suspend() noexcept { 
-    std::cout<<"suspended initial"<<std::endl;
-    return {}; 
+       return {}; 
   };
   std::suspend_always final_suspend() noexcept { 
-    std::cout<<"suspended final"<<std::endl;
-    return {};
+       return {};
   };
   std::suspend_always yield_value(int value) {
     selfstatus.status = BUFFIO_ROUTINE_STATUS_YIELD;

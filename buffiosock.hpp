@@ -24,12 +24,32 @@ constexpr int BUFFIO_SOCK_UDP = SOCK_DGRAM;
 constexpr int BUFFIO_SOCK_RAW = SOCK_RAW;
 constexpr int BUFFIO_SOCK_ASYNC = SOCK_NONBLOCK;
 
+struct buffioinfo {
+  const char *address;
+  int portnumber;
+  int listenbacklog;
+  int socktype;
+  int sockfamily;
+};
+
+struct clientinfo {
+  const char *address;
+  int clientfd;
+  int portnumber;
+ };
+
+struct buffiobuffer{
+  char *data;
+  size_t filled;
+  size_t size;
+  void *next;
+};
+
 class buffiosocket{
 
  public:
  
-  buffiosocket(buffioinfo &ioinfo) : linfo(ioinfo), clienthandler(nullptr),
-                                    socketfd(-1) , sockfdblocking(true){
+  buffiosocket(buffioinfo &ioinfo) : linfo(ioinfo), socketfd(-1) , sockfdblocking(true){
 
     if(!(ioinfo.socktype & BUFFIO_SOCK_ASYNC)) sockfdblocking = true;
 
@@ -39,12 +59,6 @@ class buffiosocket{
       case BUFFIO_FAMILY_IPV4:  if(createipv4socket(ioinfo,&socketfd) < 0) return;
       break;
       case BUFFIO_FAMILY_IPV6:
-      break;
-      case BUFFIO_FAMILY_CAN:
-      break;
-      case BUFFIO_FAMILY_NETLINK:
-      break;
-      case BUFFIO_FAMILY_LLC:
       break;
       case BUFFIO_FAMILY_BLUETOOTH:
       break;
@@ -116,7 +130,7 @@ class buffiosocket{
     return 0;
   };
 
-acceptreturn acceptsock(){
+acceptreturn acceptsock(buffioroutine (*clienthandler)(clientinfo cinfo)){
 
       switch(linfo.sockfamily){
         case BUFFIO_FAMILY_LOCAL:  afd = accept(socketfd,NULL,NULL); break;
@@ -171,7 +185,6 @@ acceptreturn acceptsock(){
  bool sockfdblocking;
 
  buffioinfo linfo;
- buffioroutine (*clienthandler)(clientinfo cinfo);
  clientinfo cinfo;
 
  private:

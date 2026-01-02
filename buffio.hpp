@@ -8,74 +8,24 @@
 
 #if defined(BUFFIO_IMPLEMENTATION)
 
-struct buffioinfo {
-  const char *address;
-  int portnumber;
-  int listenbacklog;
-  int socktype;
-  int sockfamily;
-};
-
-struct buffiobuffer {
-  char *data;
-  size_t filled;
-  size_t size;
-};
-
-struct clientinfo {
-  const char *address;
-  int clientfd;
-  int portnumber;
-  buffiobuffer readbuffer;
-  buffiobuffer writebuffer;
-};
 
 #include "./buffiopromise.hpp"
 
-struct buffiotaskinfo{
-  size_t id;
-  buffioroutine task;
-  void *next;
-  void *prev;
-};
+
 
 #include "./buffiosock.hpp"
 #include "./buffioqueue.hpp"
 #include "./buffiothread.hpp"
 #include "./buffiolfqueue.hpp"
 #include "./buffiosockbroker.hpp"
+#include "./buffioschedular.hpp"
 
+#endif
+#endif
 
-class buffioinstance {
-
-private:
-   size_t idfactor;
-   buffioqueue<buffiotaskinfo*> equeue;
-   buffioqueue<buffiotaskinfo> pqueue;
-
-   enum BUFFIO_EVENTLOOP_TYPE ieventlooptype;
-
-public:
- static constexpr auto genid = [](size_t value) -> size_t {
-
-   uint32_t hash = 0x811c9dc5;
-   char *data = (char *)&value;
-   for(int i = 0 ; i < sizeof(size_t); i++){
-      hash *= 0x01000193;
-      hash ^= data[i]; 
-     }
-     return hash;
-   };
-
-
+/*
   static int eventloop(void *data) {
-    buffioinstance *instance = (buffioinstance *)data;
-    buffioqueue<buffiotaskinfo*> *queue = &instance->equeue;
-    buffioqueue<buffiotaskinfo> *pqueue = &instance->pqueue;
-    waitingmap <size_t,buffiotaskinfo*> waitingtask;
-    size_t total = 0;
-  //  buffiosockbroker iobroker(BUFFIO_EPOLL_MAX_THRESHOLD);
-  
+   
     while (queue->empty() == false) {
       buffiotaskinfo *taskinfo = queue->pop();
       if(taskinfo == nullptr) break;
@@ -95,20 +45,20 @@ public:
          * instance to the task and the push from there
          * and must be done via eventloop instance that directly
          * associating with queue;
-         */
-      case BUFFIO_ROUTINE_STATUS_PAUSED:
-        queue->push(
-          pqueue->pushandget(
-                         {.id = buffioinstance::genid(instance->idfactor),
-                         .task = promise->pushhandle
-            }));
+         *
+      case BUFFIO_ROUTINE_STATUS_PAUSED:{
+          buffiotaskinfo *new_ = pqueue->pushandget();
+          new_->id = buffioinstance::genid(instance->idfactor);
+          new_->task = promise->pushhandle;
+
+        queue->push(new_);
         instance->idfactor += 1;
         /* This case is true when the task want to give control
          * back to the eventloop and we reschedule the task to
          * execute the next task in the queue.
          *
-         */
-
+         *
+      }
       case BUFFIO_ROUTINE_STATUS_YIELD:
         promise->selfstatus.status = BUFFIO_ROUTINE_STATUS_EXECUTING;
         queue->push(taskinfo);
@@ -116,14 +66,14 @@ public:
 
         /*  This case is true when the task wants to
          *  wait for certain other operations;
-         */
+         *
 
       case BUFFIO_ROUTINE_STATUS_WAITING:{
-          buffiotaskinfo info;
-          info.id = buffioinstance::genid(instance->idfactor);
-          info.task = promise->waitingfor;
-          queue->push(pqueue->pushandget(info));
-          waitingtask.push(info.id,taskinfo);
+          buffiotaskinfo *info = pqueue->pushandget();
+          info->id = buffioinstance::genid(instance->idfactor);
+          info->task = promise->waitingfor;
+          queue->push(info);
+          waitingtask.push(info->id,taskinfo);
           instance->idfactor += 1;
         }
         break;
@@ -134,7 +84,7 @@ public:
          *  3) BUFFIO_ROUTINE_STATUS_DONE:
          *
          *
-         */  
+         *  
         case BUFFIO_ROUTINE_STATUS_UNHANDLED_EXCEPTION:
         case BUFFIO_ROUTINE_STATUS_ERROR:
         case BUFFIO_ROUTINE_STATUS_DONE:
@@ -165,7 +115,7 @@ public:
          * to reuse the task allocated chunk later and prevent allocation
          * of newer chunk every time.
          */
-
+/*
         break;
       };
     };
@@ -199,18 +149,18 @@ public:
   int push(buffioroutine routine){
     switch (ieventlooptype) {
     case BUFFIO_EVENTLOOP_DOWN:
-    case BUFFIO_EVENTLOOP_SYNC:
-      equeue.push(pqueue.pushandget({.id = buffioinstance::genid(idfactor),
-                  .task = routine}));
+    case BUFFIO_EVENTLOOP_SYNC:{
+      buffiotaskinfo *fresh = pqueue.pushandget();
+      fresh->task = routine;
+      fresh->id = buffioinstance::genid(idfactor);
+      equeue.push(fresh);
       idfactor += 1;
+      }
       break;
     case BUFFIO_EVENTLOOP_ASYNC:
       break;
     }
     return 0;
   };
+*/
 
-};
-
-#endif
-#endif

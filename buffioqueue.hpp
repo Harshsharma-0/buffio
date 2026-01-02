@@ -17,179 +17,97 @@ template<typename X, typename Y>
    };
 };
 
+// introducing more compressed datatype design
+// a^b^b = a; property of xor.
 
 template <typename T> class buffioqueue {
   struct buffiochain{
     T data;
     struct buffiochain *next;
-    struct buffiochain *prev;
    };
 
 public:
-  buffioqueue()
-      : queuehead(nullptr), queuetail(nullptr), freehead(nullptr),
-        freetail(nullptr),tmpcount(0),totalcount(0)
+  buffioqueue(){};
+  void setdefault(T def){};
+  ~buffioqueue() {};
 
-  {
-    queueerror = BUFFIO_QUEUE_STATUS_EMPTY;
-   };
-  void setdefault(T def){defaultvalue = def;}
-  ~buffioqueue() {
-    buffioclean(queuehead);
-    buffioclean(freehead);
-  };
+  
+  
 
-  void reserve(size_t value){
-   if(value != 0)
-      for(size_t i = 0; i < value; i++){
-        buffiochain *tmp = new buffiochain;
-        tmp->data = defaultvalue;
-        pushptr(tmp,&freehead,&freetail);
-      }
+private:  
+ T *data;
+};
 
-  };
-  void push(T data) {
-    struct buffiochain *tmproutine = popfreequeue();
-    tmproutine->data = data;
-    pushptr(tmproutine, &queuehead, &queuetail);
-    tmpcount += 1;
-    totalcount++;
-    };
 
- T *pushandget(T data){
-    struct buffiochain *tmproutine = popfreequeue();
-    tmproutine->data = data;
-    pushptr(tmproutine, &queuehead, &queuetail);
-    tmpcount += 1;
-    totalcount++;
-    return &tmproutine->data;
-   }
+// xor property:
+// a^b^b = a
 
-  // only to use to mark a ptr get by pushandget() to free queue
-  void popget(void *ptr){
-   if(ptr == nullptr) return;
-   struct buffiochain *tmp = (struct buffiochain*)ptr;
-   eraseptr(tmp, &queuehead, &queuetail);
-   pushptr(tmp, &freehead, &freetail);
-   tmp->data = defaultvalue;
-    std::cout<<"pushing back"<<std::endl;
-  };
+template<typename X>
+class buffiomemory{
 
-  T pop(){
-    struct buffiochain *t = queuehead; 
-    if(t == nullptr) return NULL;
-    eraseptr(t, &queuehead, &queuetail);
-    pushptr(t, &freehead, &freetail);
-    tmpcount -= 1;
-    T data = t->data;
-    t->data = defaultvalue;
-    return data;
+struct __memory{
+ struct __memory *mem;
+ X data;
+};
+
+public:
+  buffiomemory(size_t count):mem(nullptr){init(count);}
+  buffiomemory():mem(nullptr){}
+
+  ~buffiomemory(){
+    if(mem == nullptr) return;
+    struct __memory *tmp = mem;
+    for(; tmp != nullptr ;tmp = mem){
+       mem = mem->mem;
+       delete tmp; 
+    }
   }
-  
-  
-  bool empty() { return (tmpcount == 0); }
-  size_t queuen() { return tmpcount; };
-  int getqueuerrror() { return queueerror; }
+
+  // can be used to reserve memory
+  int init(size_t count){
+     if(count <= 0) return -1;
+     struct __memory *tmp = nullptr;
+      for(size_t i = 0; i < count; i++){
+       tmp = new struct __memory;
+       tmp->mem = nullptr;
+       pushfrag(tmp);
+     }
+     return 0;
+  };
+
+  int reclaim(X* frag){
+    if(frag == nullptr) return -1;
+    struct __memory *brk = (struct __memory *)(((uintptr_t)frag) - sizeof(struct __memory*));
+    pushfrag(brk);
+    return 0;
+  }
+
+  X* getfrag(){ 
+    struct __memory *tmp = popfrag();
+    return &tmp->data;
+  }
 
 private:
- 
-  void buffioclean(struct buffiochain *head) {
-    if (head == nullptr)
-      return;
-    if (head = head->next) {
-      delete head;
-      return;
-    }
 
-    struct buffiochain *tmp = head;
-    while (tmp != nullptr) {
-      tmp = head->next;
-      delete head;
-      head = tmp;
-    }
-  };
-
-  // checkfor nullptr task before entering this function;
-  void pushptr(struct buffiochain *task, struct buffiochain **head, struct buffiochain **tail) {
-    // indicates a empty list; insertion in empty list:
-    if (*head == nullptr && *tail == nullptr) {
-      *head = task;
-      *tail = task;
-      task->next = task->prev = task;
-      return;
-    };
-
-    // insertion in list of one element;
-    if (*head == *tail) {
-      (*head)->next = task;
-      task->prev = *head;
-      *tail = task;
-      return;
-    };
-
-    // insertion in a list of element greater than 1;
-    task->next = nullptr;
-    (*tail)->next = task;
-    task->prev = *tail;
-    *tail = task;
-
-    return;
-  };
- 
-  void eraseptr(struct buffiochain *task, struct buffiochain **head, struct buffiochain **tail) {
-    if (task == nullptr || *head == nullptr)
-      return;
-
-    // only element
-    if (*head == *tail) {
-      *head = *tail = nullptr;
-      task->next = task->prev = nullptr;
+ void pushfrag(struct __memory *frag){
+    if(mem == nullptr){ 
+      mem = frag;
+      frag->mem = nullptr;
       return;
     }
+    struct __memory *brk = mem;
+    mem = frag;
+    frag->mem = brk; 
+  }; // push the reclaimed frag to the list;
 
-    // removing head
-    if (task == *head) {
-      *head = task->next;
-      (*head)->prev = nullptr;
-      task->next = task->prev = nullptr;
-      return;
-    }
+ struct __memory *popfrag(){
+    if(mem == nullptr) return nullptr;
+    struct __memory *brk = mem;
+    mem = mem->mem;
+    return brk;
+  }; //return a existing frag of return new allocated frag;
 
-    // removing tail
-    if (task == *tail) {
-      *tail = task->prev;
-      (*tail)->next = nullptr;
-      task->next = task->prev = nullptr;
-      return;
-    }
-
-    // removing if entry is greater than 1
-    task->prev->next = task->next;
-    task->next->prev = task->prev;
-    task->next = task->prev = nullptr;
-  }
-
- struct buffiochain *popfreequeue() {
-    if (freehead == nullptr) {
-    struct buffiochain *t = new struct buffiochain;
-      t->next = nullptr;
-      t->prev = nullptr;
-      std::cout<<"allocating new"<<std::endl;
-      return t;
-    };
-    struct buffiochain *ret = freehead;
-    std::cout<<"reusing"<<std::endl;
-    eraseptr(ret, &freehead, &freetail);
-    return ret;
-  }
-
-  struct buffiochain *queuehead, *queuetail;
-  struct buffiochain *freehead, *freetail;
-
-  int queueerror;
-  size_t tmpcount;
-  size_t totalcount;
-  T defaultvalue;
+ struct __memory *mem;
 };
 
 #endif

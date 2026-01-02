@@ -4,10 +4,21 @@
 
 // socket broker used to listen for events in socket;
 // internally uses epoll for all work;
-constexpr int BUFFIO_POLL_READ = EPOLLIN;
+// EPOLLIN
+// EPOLLOUT
+// EPOLLET
+
+constexpr int BUFFIO_POLL_READ =  EPOLLIN;
 constexpr int BUFFIO_POLL_WRITE = EPOLLOUT;
+constexpr int BUFFIO_POLL_RW = EPOLLIN | EPOLLOUT;
 constexpr int BUFFIO_POLL_ETRIG = EPOLLET;
+
 constexpr size_t BUFFIO_EPOLL_MAX_THRESHOLD = 100;
+
+#define buffio_sock_maskfresh(sock) ((sock) > 0)
+#define buffio_sock_mark_maskstale(sock) sock = ~0;
+
+#define mask_work(mask,exp) (mask|exp)
 
 enum BUFFIO_SOCKBROKER_STATE {
   BUFFIO_SOCKBROKER_ACTIVE = 71,
@@ -18,8 +29,8 @@ enum BUFFIO_SOCKBROKER_STATE {
 };
 
 struct buffiosbrokerinfo {
-  int fd;
-  int event;
+  std::atomic<int> networksock; // if -1 , sock closed flush any buffer;
+  std::atomic<int> event; // if < 0, mask is stale and the entry are consumed;
   void *task;
 };
 
@@ -36,8 +47,7 @@ public:
                      strerror(errno));
         return BUFFIO_SOCKBROKER_ERROR;
       };
-         thread.run();
-      break;
+    break;
     case BUFFIO_SOCKBROKER_ACTIVE:
     case BUFFIO_SOCKBROKER_BUSY:
       break;
@@ -48,12 +58,12 @@ public:
   int push(buffiosbrokerinfo *broker) {
     struct epoll_event event;
     event.events = broker->event;
-    event.data.fd = broker->fd;
+    event.data.fd = broker->networksock;
     event.data.ptr = broker->task;
   
     switch (sbrokerstate) {
     case BUFFIO_SOCKBROKER_ACTIVE:
-      int ret = epoll_ctl(epollstate.epollfd, EPOLL_CTL_ADD, broker->fd, &event);
+      int ret = epoll_ctl(epollstate.epollfd, EPOLL_CTL_ADD, broker->networksock, &event);
       if (ret < 0){
         BUFFIO_ERROR(" Failed to add file descriptor in epoll, reason : ",
                      strerror(errno));
@@ -73,6 +83,8 @@ public:
  
   struct epollcaller{
    std::atomic<int> consumed;
+   buffiolfqueue<void*> enterentry;
+   buffiolfqueue<void*> consumeentry;
    int epollfd;
    size_t fdcount;
    size_t eventcount;
@@ -110,14 +122,7 @@ public:
   buffiosockbroker(size_t maxevents)
       : sbrokerstate(BUFFIO_SOCKBROKER_INACTIVE){
 
-     epollstate.events[0] = new struct epoll_event[maxevents];
-     epollstate.events[1] = new struct epoll_event[maxevents];
-     epollstate.available = nullptr;
-     epollstate.free = nullptr;
-     epollstate.eventcount = maxevents;
-     epollstate.fdcount = 0;
-     epollstate.epollfd = -1;
-     thread[buffiothread::SD]["buffiosocketbroker"](this) = epolllistener;
+       thread[buffiothread::SD]["buffiosocketbroker"](this) = epolllistener;
 
   };
 
