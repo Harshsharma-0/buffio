@@ -10,6 +10,7 @@ enum BUFFIO_ROUTINE_STATUS {
   BUFFIO_ROUTINE_STATUS_PUSH_TASK,
   BUFFIO_ROUTINE_STATUS_DONE,
   BUFFIO_ROUTINE_STATUS_UNHANDLED_EXCEPTION,
+  BUFFIO_ROUTINE_STATUS_WAITING_IO,
 };
 
 enum BUFFIO_TASK_STATUS {
@@ -41,6 +42,42 @@ enum BUFFIO_ACCEPT_STATUS {
   BUFFIO_ACCEPT_STATUS_SUCCESS = 61,
   BUFFIO_ACCEPT_STATUS_NA,
   BUFFFIO_ACCEPT_STATUS_NO_HANDLER,
+};
+
+enum BUFFIO_SOCKBROKER_STATE {
+  BUFFIO_SOCKBROKER_ACTIVE = 71,
+  BUFFIO_SOCKBROKER_INACTIVE,
+  BUFFIO_SOCKBROKER_BUSY,
+  BUFFIO_SOCKBROKER_ERROR,
+  BUFFIO_SOCKBROKER_SUCCESS,
+};
+enum BUFFIO_THREAD_STATUS {
+  BUFFIO_THREAD_NOT = 81,
+  BUFFIO_THREAD_RUNNING,
+  BUFFIO_THREAD_DONE,
+  BUFFIO_THREAD_ERROR,
+  BUFFIO_THREAD_ERROR_MAP,
+};
+
+enum BUFFIO_SOCKBROKER_POLLER_TYPE{ 
+  BUFFIO_POLLER_NONE = 91,
+ /* The worker thread here is used as the event poller and publish work for other thread in the global queue
+  * if a and every thread that dequeue from the queue alternate between the queue and the fd they have
+  */
+  BUFFIO_POLLER_MONOLITHIC,
+  /*
+  * This is used to create a seperate thread for epoll and workers on seperate thread
+  * workers wait on a signal from the epoll to consome and wait sleep
+  *  
+  *  -- WORKERS CAN BE CONFIGURED TO BE ACTIVE AND CONSUME BY THE WORKER POLICY
+  */
+
+  BUFFIO_POLLER_MODULER,
+};
+enum BUFFIO_SOCKBROKER_WORKER_POLICY{
+ BUFFIO_WORKER_POLICY_CONSUME = 101,
+ BUFFIO_WORKER_POLICY_WAIT,
+ BUFFIO_WORKER_POLICY_HYBRID
 };
 
 #endif

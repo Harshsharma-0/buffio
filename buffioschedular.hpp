@@ -65,9 +65,10 @@ public:
        case BUFFIO_ROUTINE_STATUS_EXECUTING:
        case BUFFIO_ROUTINE_STATUS_YIELD:{
              cursor = cursor->next;
-              promise->setstatus(BUFFIO_ROUTINE_STATUS_EXECUTING);
+             promise->setstatus(BUFFIO_ROUTINE_STATUS_EXECUTING);
 
        }break;
+       case BUFFIO_ROUTINE_STATUS_WAITING_IO:{}break; //case used to transfer iorequest to the appropritate worker
        case BUFFIO_ROUTINE_STATUS_PAUSED:{} break;
        case BUFFIO_ROUTINE_STATUS_WAITING:{ 
         struct __schedinternal *tsk = schedmem.getfrag();
@@ -189,6 +190,6 @@ private:
  struct __schedinternal *head;
  struct __schedinternal *tail;
  struct __schedinternal *cursor;
-  
+ buffiosockbroker iopooler; // used to transfer I/O request to the worker thread;
 };
 #endif

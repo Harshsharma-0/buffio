@@ -9,13 +9,6 @@
 #include <sys/utsname.h>
 #include <sys/wait.h>
 
-enum BUFFIO_THREAD_STATUS {
-  BUFFIO_THREAD_NOT = 81,
-  BUFFIO_THREAD_RUNNING,
-  BUFFIO_THREAD_DONE,
-  BUFFIO_THREAD_ERROR,
-  BUFFIO_THREAD_ERROR_MAP,
-};
 
 class buffiothread {
 
@@ -149,8 +142,10 @@ private:
   char *stacktop;
   void *dataptr;
   int threadstatus;
+  int numthread;
   pid_t pid;
   size_t stacksize;
+  
   int (*callfunc)(void *);
 };
 
