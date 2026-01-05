@@ -15,6 +15,9 @@ struct buffiotaskinfo{
 class buffioschedular{
   struct __schedinternal{
    buffiotaskinfo fiber;
+   struct __schedinternal *waiters;
+   struct __schedinternal *wnxt; // contains the next member of the waiter tree;
+   size_t waitercount; // the waiter are popped using this count, it should be taken care of
    __schedinternal *next;
    __schedinternal *prev;
   };
@@ -36,60 +39,150 @@ public:
     capinit = _capinitial;
     return schedmem.init(capinit);
   }
+
   ~buffioschedular(){}
 
    int schedule(buffioroutine routine){
      struct __schedinternal *brk = schedmem.getfrag();
      brk->fiber.task = routine;
-     active += 1;
-     if(head == nullptr){ 
-      head = brk; tail = brk; cursor = head;
-      head->next = head->prev = tail;
-      return 0;
-     }
-
-     // size of the queue is one;
-     if(head == tail){
-       brk->next = brk->prev = tail;
-       head->next = head->prev = brk;
-       head = brk;
-       return 0;
-     }
-     cursor->prev->next = brk;
-     brk->next = cursor;
-     brk->prev = cursor->prev;
-     cursor->prev = brk;
-
-     return 0;
+     brk->waiters = nullptr;
+     return scheduleptr(brk);
    };
 
-   void execnext(){
+   void run(){
+    while(active > 0){
+
     if(cursor == nullptr) return;
-    cursor->fiber.task.resume();
-    cursor = cursor->next;
-   };
+     buffioroutine tsk = cursor->fiber.task;
+     buffiopromise *promise = &tsk.promise();
+     struct __schedinternal *cur = cursor;
 
-   void popcursor(){
-  
-    if(active > 0) active -= 1;
-    if(active == 1){
-       head->fiber.task.destroy();
-       head = tail = nullptr;
-       schedmem.reclaim(cursor);
-       cursor = nullptr;
-       return;
+     if(promise->selfstatus.status == BUFFIO_ROUTINE_STATUS_EXECUTING)
+                        tsk.resume();
+
+
+      switch(promise->selfstatus.status){
+       case BUFFIO_ROUTINE_STATUS_EXECUTING:
+       case BUFFIO_ROUTINE_STATUS_YIELD:{
+             cursor = cursor->next;
+              promise->setstatus(BUFFIO_ROUTINE_STATUS_EXECUTING);
+
+       }break;
+       case BUFFIO_ROUTINE_STATUS_PAUSED:{} break;
+       case BUFFIO_ROUTINE_STATUS_WAITING:{ 
+        struct __schedinternal *tsk = schedmem.getfrag();
+        tsk->fiber.task = promise->waitingfor;
+        tsk->waitercount += 1;
+        pushwaiter(tsk,cursor);
+        replacecursor(tsk);
+        cursor = cursor->next;        
+       } break;
+       case BUFFIO_ROUTINE_STATUS_PUSH_TASK:{}break;
+       case BUFFIO_ROUTINE_STATUS_UNHANDLED_EXCEPTION:
+       case BUFFIO_ROUTINE_STATUS_ERROR:
+       case BUFFIO_ROUTINE_STATUS_DONE:{
+        if(cursor->waiters != nullptr){
+           wakeup(cur,cursor->waitercount);
+           cursor->waitercount = 0;
+        }  
+        cursor = cur->next;
+        poptask(cur);
+        }break;
+     }
     }
-      cursor->next->prev = cursor->prev;
-      cursor->prev->next = cursor->next;
-      schedmem.reclaim(cursor);
-      cursor = cursor->next;
-
-     if(cursor == head) head = cursor;
-     if(cursor == tail) tail = cursor;
-  }
+  };
    
 private:
  
+  void replacecursor(struct __schedinternal *from){
+
+    cursor->prev->next = from;
+    cursor->next->prev = from;
+    from->next = cursor->next;
+    from->prev = cursor->prev;
+    cursor->next = cursor->prev = nullptr;
+    cursor = from;
+
+    if(from == head) head = from;
+    if(from == tail) tail = from;
+
+  }
+
+  int scheduleptr(struct __schedinternal *brk){
+     active += 1;
+       //the queue is empty
+     if(head == nullptr){
+      head = tail = brk;
+      head->prev = head->next = brk; //cyclic chain
+      cursor = head;
+      return 0;
+     }
+
+     //cyclic chain of one element;
+     if(head == tail){
+      head->prev = brk;
+      head->next = brk;      
+      brk->prev = brk->next = tail;
+      tail = brk;
+      return 0;
+     }
+
+     //after checking both we now schedule w.r.t to the cursor of the schedular;
+     cursor->prev->next = brk; // marking brk as next for the node before the cursor
+     brk->prev = cursor->prev; // makring brk previous to the cursor previous
+     brk->next = cursor; // marking brk next to cursor
+     cursor->prev = brk; // marking cursor prev to brk;
+     return 0;
+   } 
+
+  // call after checking you have a valid pointer, pass the waiters field for the structure
+  void wakeup(struct __schedinternal *parent,size_t waitercount){
+     struct __schedinternal *waitinglist = parent->waiters;
+     buffiopromisestatus tmppromise = parent->fiber.task.promise().selfstatus;
+
+    for(size_t i = 0; i < waitercount;i--){
+      buffiopromise *pro = &waitinglist->fiber.task.promise();
+      pro->setstatus(BUFFIO_ROUTINE_STATUS_EXECUTING);
+      pro->childstatus = tmppromise;
+      scheduleptr(waitinglist);
+      waitinglist = waitinglist->wnxt;
+     }
+    return;
+  }
+
+  // pass pointer to the raw task structure
+  void pushwaiter(struct __schedinternal *task,struct __schedinternal *wtsk){
+    if(task->waiters == nullptr){
+       wtsk->wnxt = nullptr;
+       task->waiters = wtsk;
+       task->waitercount += 1;
+       return;
+    }
+    wtsk->wnxt = task->waiters;
+    task->waiters = wtsk;
+    task->waitercount += 1;
+  }
+  void poptask(struct __schedinternal *which){
+
+    if(active == 1){
+       which->fiber.task.destroy();
+       head = tail = nullptr;
+       schedmem.reclaim(which);
+       cursor = nullptr;
+       active -= 1;
+       return;
+    }
+      which->next->prev = which->prev;
+      which->prev->next = which->next;
+      schedmem.reclaim(which);
+      which = which->next;
+
+     if(which == head) head = which;
+     if(which == tail) tail = which;
+     active -= 1;
+     return;
+  }
+
  buffiomemory <__schedinternal>schedmem;
  size_t capinit;
  size_t active;

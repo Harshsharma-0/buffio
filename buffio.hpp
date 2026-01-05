@@ -140,7 +140,6 @@
     equeue.setdefault(nullptr);
     equeue.reserve(25);
     pqueue.reserve(25);
-  }
   ~buffioinstance() {
     BUFFIO_INFO("Total executed task : ", equeue.queuen());
     // clean up-code;

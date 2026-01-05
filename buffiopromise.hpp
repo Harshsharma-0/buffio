@@ -53,12 +53,9 @@ struct buffiopromise {
     return self;
   };
 
-  std::suspend_always initial_suspend() noexcept { 
-       return {}; 
-  };
-  std::suspend_always final_suspend() noexcept { 
-       return {};
-  };
+  std::suspend_always initial_suspend() noexcept { return {}; };
+  std::suspend_always final_suspend() noexcept { return {};};
+
   std::suspend_always yield_value(int value) {
     selfstatus.status = BUFFIO_ROUTINE_STATUS_YIELD;
     return {};
@@ -72,7 +69,7 @@ struct buffiopromise {
 
   buffioawaiter await_transform(buffiopushinfo info) {
     pushhandle = info.task;
-    selfstatus.status = BUFFIO_ROUTINE_STATUS_PAUSED;
+    selfstatus.status = BUFFIO_ROUTINE_STATUS_PUSH_TASK;
     return {.self = info.task};
   };
 
@@ -88,6 +85,7 @@ struct buffiopromise {
         state < 0 ? BUFFIO_ROUTINE_STATUS_ERROR : BUFFIO_ROUTINE_STATUS_DONE;
     return;
   };
+  void setstatus(enum BUFFIO_ROUTINE_STATUS stat){ selfstatus.status = stat; }
   bool checkstatus() {
     return selfstatus.status == BUFFIO_ROUTINE_STATUS_ERROR ||
                    selfstatus.returncode < 0
