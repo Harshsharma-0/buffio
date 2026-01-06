@@ -22,10 +22,11 @@ constexpr size_t BUFFIO_EPOLL_MAX_THRESHOLD = 100;
 
 
 struct buffiosockbrockerconf{
- int pollertype; // type of I/O archetecture to use;
+ int configured;
  int workernum; // number of the workers;
  int expectedfds; // number of the expected to comsume per thread;
- int workerpolicy;
+ enum BUFFIO_SOCKBROKER_POLLER_TYPE pollertype; // type of I/O archetecture to use;
+ enum BUFFIO_SOCKBROKER_WORKER_POLICY  workerpolicy; // policy of for the workers
 };
 
 struct buffiosbrokerinfo {
@@ -35,22 +36,87 @@ struct buffiosbrokerinfo {
 };
 
 struct buffioepollcaller{
-   std::atomic<int> consumed;
-   buffiolfqueue<void*> enterentry;
-   buffiolfqueue<void*> consumeentry;
-   int epollfd;
+   std::atomic<int> *consumed;
+   buffiolfqueue<void*> *enterentry;
+   buffiolfqueue<void*> *consumeentry;
    size_t fdcount;
    size_t eventcount;
+   size_t epollmaxevent;
    struct epoll_event *events[2];
    struct epoll_event *available;
    struct epoll_event *free;
+   int epollfd;
+   int configured;
 };
 
+struct buffioiouringcaller{
+   int configured;
+   int io_uringfd;
+   std::atomic<int> *consumed;
+   buffiolfqueue<void*> *enterentry; // used to enter entry for i/o operation
+   buffiolfqueue<void*> *consumeentry; // used to dispatch tasks that are done to the schedular
+};
+
+union sockbrokerinfo{
+   struct buffioepollcaller epollinfo;
+   struct buffioiouringcaller iouringinfo;
+};
+
+//the main thread worker code inlined with the code to support hybrid archetecture
+static inline int buffiothreadworker(void *data){ return 0;}
+
 class buffiosockbroker {
+ 
+  #define pollertypecfd 1
+  #define workernumcfd 1 << 1
+  #define expectedfdcfd 1 << 2
+  #define workerpolicycfd 1 << 3
+  #define maskbrokerok (pollertyecfg | workernumcfd | expectedfdcfd | workerpolicycfd)
+
+
 public:
+  buffiosockbroker():sbrokerstate(BUFFIO_SOCKBROKER_INACTIVE){ config.configured = 0;};
+  buffiosockbroker(size_t maxevents):sbrokerstate(BUFFIO_SOCKBROKER_INACTIVE){config.configured = 0;};
   
+  void operator[](enum BUFFIO_SOCKBROKER_POLLER_TYPE typ){
+    config.pollertype = typ;
+    config.configured |= pollertypecfd; 
+  }
+  void operator[](enum BUFFIO_SOCKBROKER_WORKER_POLICY ply){
+   config.workerpolicy = ply;
+   config.configured |= workerpolicycfd;
+  }
+  void operator[](int expectedfd,int workernum){
+    if(workernum > 0 && expectedfd > 0){
+      config.workernum = workernum;
+      config.expectedfds = expectedfd;
+      config.configured |= expectedfdcfd | workernumcfd;
+    }
+  }
+  int operator[](struct buffiosockbrokerconf cfg){
+    if(cfg.workernum > 0 && cfg.expectedfds > 0){
+       config = cfg;
+       config.configured = maskbrokerok; 
+    }
+  }
+
+private:
+  static int buffio_epoll_poller(void *data){ return 0;} 
+  static int buffio_epoll_worker(void *data){ return 0;}
+  static int buffio_iouring_poller(void *data){ return 0;}
+
+  buffiothread threadpool;
+  union sockbrokerinfo brkinfo;
+  struct buffiosockbrockerconf config;
+  int sbrokerstate;
+};
+
+
+#endif
+
+  /*
   int start() {
-    switch (sbrokerstate) {
+    switch(sbrokerstate) {
       
     case BUFFIO_SOCKBROKER_INACTIVE:
       epollstate.epollfd = epoll_create(1);
@@ -66,7 +132,7 @@ public:
     }
     return BUFFIO_SOCKBROKER_SUCCESS;
   };
-
+/*
   int push(buffiosbrokerinfo *broker) {
     struct epoll_event event;
     event.events = broker->event;
@@ -93,7 +159,7 @@ public:
  // consumed = 3 epoll event available;
  // consumed = 4 parent consuming epoll;
  
-
+/*
   static int epolllistener(void *data){ 
     struct buffioepollcaller *estate = (struct buffioepollcaller*)data;
     int numfds = epoll_wait(estate->epollfd,estate->events[0],estate->eventcount,-1);  
@@ -103,35 +169,20 @@ public:
     };
      estate->consumed.store(1, std::memory_order_release);
     return 0; 
-  };
+};
+/*
 
   ~buffiosockbroker() {
 
     switch (sbrokerstate) {
     case BUFFIO_SOCKBROKER_INACTIVE: return;
     case BUFFIO_SOCKBROKER_ACTIVE:  
-         thread.killthread();
+         thread.killthread(0);
          close(epollstate.epollfd);
       break;
     case BUFFIO_SOCKBROKER_BUSY:
       break;
     }
   };
-  buffiosockbroker():sbrokerstate(BUFFIO_SOCKBROKER_INACTIVE){}
-  buffiosockbroker(size_t maxevents)
-      : sbrokerstate(BUFFIO_SOCKBROKER_INACTIVE){
+*/
 
-       thread[buffiothread::SD]["buffiosocketbroker"](this) = epolllistener;
-
-  };
-
-private:
-  buffiothread thread;
-  struct buffioepollcaller epollstate;
-  struct buffiosockbrockerconf config;
-  size_t epollmaxevent;
-  int sbrokerstate;
-};
-
-
-#endif
