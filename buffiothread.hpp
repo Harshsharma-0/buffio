@@ -98,7 +98,7 @@ public:
 
   int setN(int nthread){
     if(nthread > 0 && threads == nullptr){
-      threads = new struct threadinfo;
+      threads = new struct threadinfo[nthread];
       numthread = nthread;
       if(threads == nullptr) return -1;
       struct threadinfo ctx = {0};
