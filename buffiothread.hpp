@@ -11,6 +11,8 @@
 #include <sys/wait.h>
 
 
+// The struct buffiothreadinfo lifecycle after running the thread is upon user if they want to keep it or not
+// but when running thread struct buffiothreadinfo must be valid
 struct buffiothreadinfo{
  size_t stacksize;
  void *dataptr;
@@ -45,7 +47,7 @@ public:
   ~buffiothread() { 
     killthread(-1);
     delete[] threads;
-    threads == nullptr;
+    threads = nullptr;
   };
 
    
@@ -118,6 +120,8 @@ public:
   static int setname(const char *name) {
     return prctl(PR_SET_NAME, name, 0, 0, 0);
   };
+  buffiothread(const buffiothread&) = delete;
+  buffiothread &operator= () = delete;
 
   static constexpr size_t S1MB = 1024 * 1024;
   static constexpr size_t S4MB = 4 * (1024 * 1024);
@@ -128,14 +132,17 @@ public:
 
   
 private:
+  // derefer is used both to kill and unmap a thread, and the cases are handled in that manner, if a thread is marked killed it is not
+  // use and not handled by any case it the thread is done only unmapping is done and it the thread is running it is killed and the unmapped
   void derefer(struct threadinfo *info){
     if(info->stalemask == maskok){ 
       switch(info->threadstatus.load(std::memory_order_acquire)){
         case BUFFIO_THREAD_RUNNING:
             kill(info->threadint.pid,SIGKILL);
-            info->threadstatus = BUFFIO_THREAD_KILLED;
-        case BUFFIO_THREAD_DONE:
+            waitpid(info->threadint.pid,0,0);
+            case BUFFIO_THREAD_DONE:
             munmap(info->stack,info->threadint.stacksize);
+            info->threadstatus = BUFFIO_THREAD_KILLED;
             info->stalemask = 0;
         break;
       }
@@ -145,6 +152,8 @@ private:
   static int buffiofunc(void *data) {
      struct threadinfo *instance = (struct threadinfo *)data;
      if(instance->threadint.threadname) buffiothread::setname(instance->threadint.threadname);
+     // the return value will be propageted to the func in future update
+     // TODO: propagete the return value
      instance->threadint.callfunc(instance->threadint.dataptr);
      instance->threadstatus.store(BUFFIO_THREAD_DONE,std::memory_order_release);
      return 0;
