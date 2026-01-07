@@ -140,6 +140,7 @@ private:
         case BUFFIO_THREAD_RUNNING:
             kill(info->threadint.pid,SIGKILL);
             waitpid(info->threadint.pid,0,0);
+            [[fallthrough]];
             case BUFFIO_THREAD_DONE:
             munmap(info->stack,info->threadint.stacksize);
             info->threadstatus = BUFFIO_THREAD_KILLED;
@@ -162,7 +163,7 @@ private:
   int call(struct threadinfo *which){
    
 
-    if(which->stalemask == maskok){
+    if(which->stalemask & maskok) == maskok){
     char *stack = nullptr, *stacktop = nullptr;
     size_t stacksize = which->threadint.stacksize;
     pid_t pid = 0;
@@ -179,7 +180,7 @@ private:
     }
        stacktop = stack + stacksize;
        pid = clone(buffiofunc, stacktop,
-                CLONE_FILES | CLONE_FS | CLONE_IO| CLONE_VM | SIGCHLD, which);
+                CLONE_FILES | CLONE_FS | CLONE_IO| CLONE_VM | CLONE_THREAD | SIGCHLD, which);
 
     if (pid < 0) {
       which->threadstatus = BUFFIO_THREAD_ERROR;
