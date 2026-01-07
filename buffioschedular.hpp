@@ -2,11 +2,31 @@
 #define __BUFFIO_SCHEDULAR__
 
 
-struct buffiotaskinfo{
-  size_t id;
-  buffioroutine task;
-  buffiosbrokerinfo sockinfo;
-};
+#define buffiotask_read_mask 1
+
+// set when the user want to request a write
+#define buffiotask_write_mask 1 << 1 
+
+// set when the user have submitted the fd for polling
+#define buffiotask_io_poller 1 << 2 
+
+// use this to if want to wakeup the routine after the write is done
+#define buffiotask_notify_back 1 << 3 
+
+// use this to directly write content of the received buffer to any fd or buffer
+#define buffiotask_recv_write 1 << 4
+
+#if !defined(BUFFIO_IMPLEMENTATION)
+   #include "buffiopromsie.hpp"
+   #include "buffiosockbroker.hpp"
+#endif
+
+
+// when value of mask < 0, all the read and write request are done
+// when value of mask == 0, the task has not registered any r/w
+// user can also make io_request with the fd directly without the fd
+
+
 
 /* bound to buffiotaskinfo;
  * create a circular buffer of the task using linked list.
@@ -14,7 +34,7 @@ struct buffiotaskinfo{
 
 class buffioschedular{
   struct __schedinternal{
-   buffiotaskinfo fiber;
+   buffiotaskinfo fiber; // check buffiopromise for this struct defination 
    struct __schedinternal *waiters;
    struct __schedinternal *wnxt; // contains the next member of the waiter tree;
    size_t waitercount; // the waiter are popped using this count, it should be taken care of

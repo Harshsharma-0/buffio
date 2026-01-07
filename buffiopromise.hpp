@@ -3,6 +3,8 @@
 
 #include <coroutine>
 #include <exception>
+#include <atomic>
+
 
 struct buffiopromise;
 using buffiohandleroutine = std::coroutine_handle<buffiopromise>;
@@ -12,9 +14,12 @@ using buffiohandleroutine = std::coroutine_handle<buffiopromise>;
 #define buffioreturn co_return
 #define buffiopush co_await
 
+
 struct buffioroutine : buffiohandleroutine {
   using promise_type = ::buffiopromise;
 };
+
+
 
 struct acceptreturn {
   int errorcode;
@@ -132,6 +137,12 @@ public:
 private:
   buffioroutine evalue;
   buffiopromisestatus status;
+};
+
+struct buffiotaskinfo{
+  std::atomic<int64_t> mask; // don't remove this mask as if tracks if there any request available; 
+  size_t id;  //mask track if the task have socket,bucket
+  buffioroutine task;
 };
 
 #endif 

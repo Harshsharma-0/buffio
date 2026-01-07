@@ -38,12 +38,6 @@ struct clientinfo {
   int portnumber;
  };
 
-struct buffiobuffer{
-  char *data;
-  size_t filled;
-  size_t size;
-  void *next;
-};
 
 class buffiosocket{
 
