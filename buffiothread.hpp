@@ -40,8 +40,7 @@ struct threadinfo{
 };
 
 public:
-  buffiothread()
-      : threads(nullptr),numthread(0){ }
+  buffiothread(): threads(nullptr),numthread(0){ }
 
     
   ~buffiothread() { 
@@ -121,7 +120,6 @@ public:
     return prctl(PR_SET_NAME, name, 0, 0, 0);
   };
   buffiothread(const buffiothread&) = delete;
-  buffiothread &operator= () = delete;
 
   static constexpr size_t S1MB = 1024 * 1024;
   static constexpr size_t S4MB = 4 * (1024 * 1024);
@@ -163,7 +161,7 @@ private:
   int call(struct threadinfo *which){
    
 
-    if(which->stalemask & maskok) == maskok){
+    if((which->stalemask & maskok) == maskok){
     char *stack = nullptr, *stacktop = nullptr;
     size_t stacksize = which->threadint.stacksize;
     pid_t pid = 0;
@@ -180,17 +178,18 @@ private:
     }
        stacktop = stack + stacksize;
        pid = clone(buffiofunc, stacktop,
-                CLONE_FILES | CLONE_FS | CLONE_IO| CLONE_VM | CLONE_THREAD | SIGCHLD, which);
+                CLONE_FILES | CLONE_FS | CLONE_IO| CLONE_VM | SIGCHLD, which);
 
     if (pid < 0) {
       which->threadstatus = BUFFIO_THREAD_ERROR;
       BUFFIO_ERROR("Failed to create thread , reason -> "
                   ,strerror(errno),
-                  which->threadint.threadname == nullptr ? "error":"thread name ->",which->threadint.threadname);
-      
+                   which->threadint.threadname == nullptr ? ", error":", thread name ->",
+                   which->threadint.threadname); 
 
       return -1;
     }
+
        int tmpstatus = BUFFIO_THREAD_NOT;
        which->stacktop = stacktop;
        which->stack = stack;

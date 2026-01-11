@@ -56,11 +56,11 @@ class buffiolfqueue{
   };
 
   public:
-  buffiolfqueue(size_t _order, T _onEmpty): data(nullptr){ lfstart(_order,_onEmpty);}
-  buffiolfqueue(): data(nullptr){};
+  buffiolfqueue(size_t _order, T _onEmpty): data(nullptr),threadsblocked(0){ lfstart(_order,_onEmpty);}
+  buffiolfqueue(): data(nullptr),threadsblocked(0){};
 
-  void lfstart(size_t _order, T _onEmpty){
-   if(_order < buffioatomix_max_order && _order > BUFFIO_RING_MIN && data == nullptr){
+  int lfstart(size_t _order, T _onEmpty){
+   if(_order <= buffioatomix_max_order && _order >= BUFFIO_RING_MIN && data == nullptr){
        queueorder = _order;
        onEmpty = _onEmpty;
        data = new T[(1 << _order)];
@@ -68,19 +68,23 @@ class buffiolfqueue{
           data[i] = onEmpty;
 
       acqueue.data = new buffioatomix[(1 << (_order + 1))];
+      if(acqueue.data == nullptr) return -1; 
       freequeue.data = new buffioatomix[(1 << (_order + 1))];
+      if(freequeue.data == nullptr) return -1;
       initempty(&acqueue,_order);
       initfull(&freequeue,_order);
-      return;
+      return 1;
     }
-
+    return -1;
   }
+
  ~buffiolfqueue(){ 
     if(data != nullptr) delete data;
     if(acqueue.data != nullptr) delete acqueue.data;
     if(freequeue.data != nullptr) delete freequeue.data;
   }
 
+//  use enqueue and dequeue together don't mix locked enqueue and dequeue togethter
   bool enqueue(T data_){
     size_t idx = lfdequeue(&freequeue,queueorder);
     if(idx == BUFFIO_EMPTY) return false;
@@ -96,6 +100,34 @@ class buffiolfqueue{
     data[idx] = onEmpty;
     lfenqueue(&freequeue,queueorder,idx);
     return datatmp; 
+  }
+
+  //blocks if the queue is full
+  bool lockedenqueue(T data_){
+  retry_enqueue:
+    if(enqueue(data_)){
+      acqueue.threshold.notify_one();
+      return true;
+    }
+      freequeue.threahold.wait(-1);
+  goto retry_enqueue;
+    return false;
+  }
+
+  T lockeddequeue(){
+    retry_dequeue:
+    size_t idx = lfdequeue(&acqueue,queueorder); 
+    if(idx == BUFFIO_EMPTY){ 
+      acqueue.threshold.wait(-1);
+      goto retry_dequeue;
+    }
+    T datatmp = data[idx];
+    data[idx] = onEmpty;
+    lfenqueue(&freequeue,queueorder,idx);
+    freequeue.threshold.notify_one();
+    return datatmp; 
+  
+
   }
 private:
 
@@ -229,6 +261,7 @@ again:
  T *data;
  T onEmpty;
  size_t queueorder;
+ buffioatomix threadsblocked;
  struct queueconf acqueue;
  struct queueconf freequeue;
 };

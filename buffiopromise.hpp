@@ -142,6 +142,7 @@ private:
 struct buffiotaskinfo{
   std::atomic<int64_t> mask; // don't remove this mask as if tracks if there any request available; 
   size_t id;  //mask track if the task have socket,bucket
+
   buffioroutine task;
 };
 
