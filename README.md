@@ -4,7 +4,7 @@
     - Buffio is collection of seperate `.hpp` files that when combines create a performancefull system that is modular and configurable.
     - Each module of the buffio can be used seperately or with each other,
       > **Buffio core**
-      >  1. `buffio.hpp ` just a wrapper of all buffio modules.
+      >   1. `buffio.hpp ` just a wrapper of all buffio modules.
           2. `buffioschedular` schedular for buffio coroutines and the eventloop.
           3. `buffiosockbroker` socket I/O request watcher and worker thread manager.
           4. `buffiothread` provide class wrapper to create thread and manage them.
