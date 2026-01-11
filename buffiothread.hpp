@@ -174,7 +174,7 @@ private:
       BUFFIO_ERROR("Failed to allocate thread stack, aborting thread creation, reason -> "
                    ,strerror(errno));
 
-      return -1;
+       return -1;
     }
        stacktop = stack + stacksize;
        pid = clone(buffiofunc, stacktop,

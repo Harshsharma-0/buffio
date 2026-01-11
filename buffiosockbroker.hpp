@@ -119,7 +119,7 @@ class buffiosockbroker {
   } 
  __attribute__((used))  static int buffio_epoll_worker_moduler(void *data){ return 0;}
  __attribute__((used))  static int buffio_epoll_monolithic(void *data){ return 0;}
- __attribute__((used)) static int buffio_iouring_poller(void *data){ return 0;}
+ __attribute__((used))  static int buffio_iouring_poller(void *data){ return 0;}
  
 public:
   buffiosockbroker():sbrokerstate(BUFFIO_SOCKBROKER_INACTIVE){ config.sb_configured = 0;};
