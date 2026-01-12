@@ -7,6 +7,11 @@
 *  10000 <= errorcode <= 10500
 */
 
+#if !defined(BUFFIO_IMPLEMENTATION)
+   #include "buffioenum.hpp"
+   #include "buffiosock.hpp"
+#endif
+
 #include <coroutine>
 #include <exception>
 #include <atomic>
@@ -84,6 +89,10 @@ struct buffiopromise {
     return {.self = info.task};
   };
 
+  // overload to submit I/O request via the promise to the sockbroker
+  buffioawaiter await_transform(buffiosocketview &sockview){
+    return {};
+  }
   void unhandled_exception() {
     selfstatus.status = BUFFIO_ROUTINE_STATUS_UNHANDLED_EXCEPTION;
     selfstatus.returncode = -1;

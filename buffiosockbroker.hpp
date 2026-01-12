@@ -13,7 +13,7 @@
 #if !defined(BUFFIO_IMPLEMENTATION)
    #include "buffioenum.hpp"
    #include "buffiosock.hpp"
-   #include "buffiopromsie.hpp"
+   #include "buffiopromise.hpp"
    #include "buffiolfqueue.hpp"
 #endif
 
@@ -37,12 +37,12 @@
 #define bf_sb_pollertype_err 1003
 #define bf_sb_workerpolicy_err 1004
 
-struct buffiosockbrockerconf{
+struct buffiosockbrokerconf{
  int sb_configured;
  int sb_workernum; // number of the workers;
- int sb_expectedfds; // number of the expected fd to conusme across thread;
+ int sb_expectedfds; // number of the expected fd to consume across thread;
  int sb_queuesize; // mast be of power of 2, size is calculated via 2 ^ queuesize;
- enum BUFFIO_SOCKBROKER_POLLER_TYPE sb_pollertype; // type of I/O archetecture to use;
+ enum BUFFIO_SOCKBROKER_POLLER_TYPE sb_pollertype; // type of I/O architecture to use;
  enum BUFFIO_SOCKBROKER_WORKER_POLICY  sb_workerpolicy; // policy of for the workers
 };
 
@@ -50,7 +50,7 @@ struct buffiosockbrockerconf{
 // data can be used by worker or the poller to mark an event is available;
 // internal poller of the buffiosock uses buffiotaskinfo to mark an event available;
 
-
+// opcodes comes from the buffiosock.hpp
 struct buffiosocksubmit{
  int opcode;
  int fd; 
@@ -146,11 +146,11 @@ static inline int buffio_ep_thread_worker(void *data){
 
 class buffiosockbroker {
 
-  static int buffio_epoll_poller_moduler(void *data){
+  static int buffio_epoll_poller_modular(void *data){
 
     return 0;
   } 
- __attribute__((used))  static int buffio_epoll_worker_moduler(void *data){ return 0;}
+ __attribute__((used))  static int buffio_epoll_worker_modular(void *data){ return 0;}
  __attribute__((used))  static int buffio_epoll_monolithic(void *data){ return 0;}
  __attribute__((used))  static int buffio_iouring_poller(void *data){ return 0;}
  
@@ -158,17 +158,26 @@ public:
 
   buffiosockbroker():sbrokerstate(BUFFIO_SOCKBROKER_INACTIVE){ config.sb_configured = 0;};
   buffiosockbroker(size_t maxevents):sbrokerstate(BUFFIO_SOCKBROKER_INACTIVE){config.sb_configured = 0;};
+  ~buffiosockbroker(){
+    switch(sbrokerstate){
+      case BUFFIO_SOCKBROKER_EPOLL_RUNNING:
+      case BUFFIO_SOCKBROKER_EPOLL:
+           shutepoll(brkinfo.epollinfo);
+      break;
+    }
+    return;
+  }
   
-  [[nodiscard(buffio_msg_broker_cfg_ret_val)]] int operator[](struct buffiosockbrockerconf cfg){
+  [[nodiscard(buffio_msg_broker_cfg_ret_val)]] int configure(struct buffiosockbrokerconf cfg){
     if(cfg.sb_workernum > 0 && cfg.sb_expectedfds > 0 && config.sb_configured == 0){
        if(cfg.sb_queuesize >= BUFFIO_RING_MIN && cfg.sb_queuesize <= buffioatomix_max_order){
          config = cfg;
          config.sb_configured = bf_sb_ok;
          return bf_sb_ok;
        }
-       return bf_sb_queuesize_ok;
+       return bf_sb_queuesize_err;
     }
-    return bf_sb_expectedfds_ok;
+    return bf_sb_expectedfds_err;
   }
   // if there is any error the relative mask_ok of the field is returned that caused the error;
   // if success the realtive bf_(which)_ok is returned; which can be ep for epoll or io for io_uring
@@ -176,19 +185,14 @@ public:
     if(sbrokerstate != BUFFIO_SOCKBROKER_INACTIVE) return -1;
     if(config.sb_configured == bf_sb_ok){
       switch(config.sb_pollertype){
-        case BUFFIO_POLLER_MONOLITHIC: 
-          goto epoll_starter;
-          break;
-        case BUFFIO_POLLER_MODULER:
-          goto epoll_starter;
-        break;
+        case BUFFIO_POLLER_MONOLITHIC: break;
+        case BUFFIO_POLLER_MODULAR: break;
         case BUFFIO_POLLER_IO_URING: 
           return 0;
         break;
       }
 
       // code below here is used for epoll instance,
-     epoll_starter: 
 
         struct buffioepollcaller epolltmp = {0};
 
@@ -229,6 +233,7 @@ public:
         epolltmp.ep_configured |= bf_ep_eventsize_ok;
               
         brkinfo.epollinfo = epolltmp;
+        sbrokerstate = BUFFIO_SOCKBROKER_EPOLL;
       return epolltmp.ep_configured;
     }
     return -1;
@@ -236,29 +241,31 @@ public:
 
    int pushreq(){ return 0;}
    int popreq(){ return 0;}
-   
+   buffiosockbroker(const buffiosockbroker&) = delete;
+   buffiosockbroker& operator=(const buffiosockbroker &) = delete;
+
 private:
   void shutepoll(struct buffioepollcaller &which){
     int mask = which.ep_configured;
-    if((mask & bf_ep_fd_ok) == bf_ep_empty_ok){
+    if(mask & bf_ep_fd_ok){
        close(which.ep_fd);
        mask &= ~(bf_ep_fd_ok); // unsetting the mask;
     }
-    if((mask & bf_ep_entry_ok) == bf_ep_entry_ok){
+    if(mask & bf_ep_entry_ok){
       delete which.ep_entry;
       mask &= ~(bf_ep_entry_ok);
     }
-    if((mask & bf_ep_works_ok) == bf_ep_works_ok){
+    if(mask & bf_ep_works_ok){
       delete which.ep_works;
       mask &= ~(bf_ep_works_ok);
     }
-    if((mask & bf_ep_consume_ok) == bf_ep_consume_ok){
+    if(mask & bf_ep_consume_ok){
       delete which.ep_consume;
       mask &= ~(bf_ep_consume_ok);
     }
-    if((mask & bf_ep_events_ok) == bf_ep_events_ok){
+    if(mask & bf_ep_events_ok){
       delete[] which.ep_events;
-      mask &= ~(bf_ep_consume_ok);
+      mask &= ~(bf_ep_events_ok);
     }
     which.ep_configured = mask;
   };
@@ -274,7 +281,7 @@ private:
 
   buffiothread threadpool;
   union sockbrokerinfo brkinfo;
-  struct buffiosockbrockerconf config;
+  struct buffiosockbrokerconf config;
   buffiolfqueue<void*> *sb_input; // give the interested files here
   buffiolfqueue<void*> *sb_output; // pop out the completed tasks here
   int sbrokerstate;

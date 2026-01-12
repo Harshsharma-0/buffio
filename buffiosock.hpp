@@ -42,6 +42,10 @@
 #define bf_so_socktype_err 4
 #define bf_so_sockfamily_err 5
 
+#define bf_op_code_read 1
+#define bf_op_code_write (1 << 1)
+#define bf_op_code_poll (1 << 2)
+#define bf_op_code_remove_poll (1 << 3)
 
 //32-bit number means 8 solts
 
@@ -91,11 +95,11 @@ class buffiosocket{
   union __sockinfointernal{
    struct buffiosockinfo rawinfo;
    struct buffiosockinfo strinfo;
-  }
+  };
  public:
  
-  buffiosocket(buffiosockinfo &ioinfo) : linfo(ioinfo), socketfd(-1) , sockfdblocking(false){};
-  buffiosocket():socketfd(-1),socketfdblocking(false){}
+//  buffiosocket(buffiosockinfo &ioinfo) : linfo(ioinfo), socketfd(-1) , sockfdblocking(false){};
+  //buffiosocket():socketfd(-1),socketfdblocking(false){}
   
 
  ~buffiosocket(){ 

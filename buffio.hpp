@@ -7,8 +7,8 @@
 #if defined(BUFFIO_IMPLEMENTATION)
 
 #include "./buffioenum.hpp"
-#include "./buffiopromise.hpp"
 #include "./buffiosock.hpp"
+#include "./buffiopromise.hpp"
 #include "./buffioqueue.hpp"
 #include "./buffiothread.hpp"
 #include "./buffiolfqueue.hpp"
