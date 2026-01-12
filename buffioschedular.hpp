@@ -1,6 +1,11 @@
 #ifndef __BUFFIO_SCHEDULAR__
 #define __BUFFIO_SCHEDULAR__
 
+/*
+* Error codes range reserved for buffioschedular
+*  [4000 - 5500]
+*  4000 <= errorcode <= 5500
+*/
 
 #define buffiotask_read_mask 1
 
@@ -130,12 +135,13 @@ private:
   }
 
   int scheduleptr(struct __schedinternal *brk){
-     active += 1;
        //the queue is empty
      if(head == nullptr){
       head = tail = brk;
       head->prev = head->next = brk; //cyclic chain
       cursor = head;
+      active += 1;
+
       return 0;
      }
 
@@ -145,6 +151,7 @@ private:
       head->next = brk;      
       brk->prev = brk->next = tail;
       tail = brk;
+      active += 1;
       return 0;
      }
 
@@ -153,6 +160,8 @@ private:
      brk->prev = cursor->prev; // makring brk previous to the cursor previous
      brk->next = cursor; // marking brk next to cursor
      cursor->prev = brk; // marking cursor prev to brk;
+     active += 1;
+
      return 0;
    } 
 
@@ -185,7 +194,7 @@ private:
   }
   void poptask(struct __schedinternal *which){
 
-    if(active == 1){
+    if(head == tail){
        which->fiber.task.destroy();
        head = tail = nullptr;
        schedmem.reclaim(which);

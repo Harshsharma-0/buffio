@@ -1,6 +1,12 @@
 #ifndef __BUFFIO_PROMISE_HPP__
 #define __BUFFIO_PROMISE_HPP__
 
+/*
+* Error codes range reserved for buffiothread
+*  [10000 - 11500]
+*  10000 <= errorcode <= 10500
+*/
+
 #include <coroutine>
 #include <exception>
 #include <atomic>
@@ -142,7 +148,6 @@ private:
 struct buffiotaskinfo{
   std::atomic<int64_t> mask; // don't remove this mask as if tracks if there any request available; 
   size_t id;  //mask track if the task have socket,bucket
-
   buffioroutine task;
 };
 

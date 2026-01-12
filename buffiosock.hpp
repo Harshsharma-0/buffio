@@ -1,6 +1,12 @@
 #ifndef __BUFFIO_SOCK_IMPLEMENTATION__
 #define __BUFFIO_SOCK_IMPLEMENTATION__
 
+/*
+* Error codes range reserved for buffiosock
+*  [0 - 999]
+*  0 <= errorcode <= 999
+*/
+
 #include <fcntl.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -11,26 +17,58 @@
 #include <sys/un.h>
 #include <unistd.h>
 
-constexpr int BUFFIO_FAMILY_LOCAL = AF_UNIX;
-constexpr int BUFFIO_FAMILY_IPV4 = AF_INET;
-constexpr int BUFFIO_FAMILY_IPV6 = AF_INET6;
-constexpr int BUFFIO_FAMILY_CAN = AF_CAN;
-constexpr int BUFFIO_FAMILY_NETLINK = AF_NETLINK;
-constexpr int BUFFIO_FAMILY_LLC = AF_LLC;
-constexpr int BUFFIO_FAMILY_BLUETOOTH = AF_BLUETOOTH;
+#define BUFFIO_FAMILY_LOCAL 1 //AF_UNIX;
+#define BUFFIO_FAMILY_IPV4  2 //AF_INET;
+#define BUFFIO_FAMILY_IPV6  3 //AF_INET6;
+#define BUFFIO_FAMILY_FILE  4 //0;
+#define BUFFIO_FAMILY_PIPE  5 //1;
+#define BUFFIO_FAMILY_FIFO  6 //3;
 
-constexpr int BUFFIO_SOCK_TCP = SOCK_STREAM;
-constexpr int BUFFIO_SOCK_UDP = SOCK_DGRAM;
-constexpr int BUFFIO_SOCK_RAW = SOCK_RAW;
-constexpr int BUFFIO_SOCK_ASYNC = SOCK_NONBLOCK;
+#define BUFFIO_SOCK_TCP   1     // SOCK_STREAM;
+#define BUFFIO_SOCK_UDP   2    //SOCK_DGRAM;
+#define BUFFIO_SOCK_RAW   3    //SOCK_RAW;
+#define BUFFIO_SOCK_ASYNC 4   // SOCK_NONBLOCK;
 
-struct buffioinfo {
+#define bf_so_address_ok 1
+#define bf_so_portnumber_ok (1 << 1)
+#define bf_so_listenbacklog_ok (1 << 2)
+#define bf_so_socktype_ok (1 << 3)
+#define bf_so_sockfamily_ok (1 << 4)
+#define bf_so_ok 0xF0;
+
+#define bf_so_address_err 1
+#define bf_so_portnumber_err 2
+#define bf_so_listenbacklog_err 3
+#define bf_so_socktype_err 4
+#define bf_so_sockfamily_err 5
+
+
+//32-bit number means 8 solts
+
+// 0-15 portnumber unsigned 16-bit 
+// 16-23 listenbacklog unsigned 8-bits for listen backlog
+// 24-27 socktype
+// 28-31 sockfamily
+
+struct buffiosockinfo{
   const char *address;
-  int portnumber;
-  int listenbacklog;
-  int socktype;
-  int sockfamily;
+  int mask;
+  uint32_t infocomined;
 };
+
+struct buffiosockinfostr{
+ int mask;
+ const char *protocol;
+};
+
+#define bf_ci_address_ok 1
+#define bf_ci_clientfd_ok (1 << 1)
+#define bf_ci_portnumber_ok (1 << 2)
+#define bf_ci_ok (bf_ci_address | bf_ci_clientfd_ok | bf_ci_clientfd_ok)
+
+#define bf_ci_address_err 100
+#define bf_ci_clientfd_err 101
+#define bf_ci_portnumber_err 102
 
 struct clientinfo {
   const char *address;
@@ -38,33 +76,40 @@ struct clientinfo {
   int portnumber;
  };
 
+class buffiosocketview{
+  buffiosocketview():data(nullptr),mask(0),sock(-1){}
+  buffiosocketview(int sock):data(nullptr),mask(0),sock(-1){}
+private:
+  int sock;
+  int mask;
+  void *data;
+};
+
 
 class buffiosocket{
 
+  union __sockinfointernal{
+   struct buffiosockinfo rawinfo;
+   struct buffiosockinfo strinfo;
+  }
  public:
  
-  buffiosocket(buffioinfo &ioinfo) : linfo(ioinfo), socketfd(-1) , sockfdblocking(true){
-
-    if(!(ioinfo.socktype & BUFFIO_SOCK_ASYNC)) sockfdblocking = true;
-
-     switch(ioinfo.sockfamily){
-      case BUFFIO_FAMILY_LOCAL: if(createlocalsocket(ioinfo,&socketfd) < 0) return;
-      break;
-      case BUFFIO_FAMILY_IPV4:  if(createipv4socket(ioinfo,&socketfd) < 0) return;
-      break;
-      case BUFFIO_FAMILY_IPV6:
-      break;
-      case BUFFIO_FAMILY_BLUETOOTH:
-      break;
-      default: BUFFIO_ERROR(" UNKNOWN TYPE SOCKET CREATION FAILED "); return;
-      break;
-    };
-    
-             
-     return;
-  };
+  buffiosocket(buffiosockinfo &ioinfo) : linfo(ioinfo), socketfd(-1) , sockfdblocking(false){};
+  buffiosocket():socketfd(-1),socketfdblocking(false){}
   
-   int createipv4socket(buffioinfo &ioinfo , int *socketfd){
+
+ ~buffiosocket(){ 
+ };
+
+private:
+
+};
+
+#endif
+
+/*
+*
+*   int createipv4socket(buffiosockinfo &ioinfo , int *socketfd){
 
       *socketfd = socket(ioinfo.sockfamily,ioinfo.socktype,0);
        struct sockaddr_in addr;
@@ -84,7 +129,7 @@ class buffiosocket{
     return 0;
    }
 
-   int createlocalsocket(buffioinfo &ioinfo ,int *socketfd){
+   int createlocalsocket(buffiosockinfo &ioinfo ,int *socketfd){
         *socketfd = socket(ioinfo.sockfamily,ioinfo.socktype,0);
          struct sockaddr_un addr;
          memset(&addr,'\0',sizeof(sockaddr_un));
@@ -100,93 +145,4 @@ class buffiosocket{
     return 0;
    };
 
- ~buffiosocket(){ 
-    if(socketfd > 0){
-      if(close(socketfd) < 0){
-        BUFFIO_ERROR(" SOCKET CLOSE FAILURE");
-     };
-     if(linfo.sockfamily  == BUFFIO_FAMILY_LOCAL) unlink(linfo.address);
-
-     BUFFIO_LOG(" SOCKET CLOSED SUCCESFULLY");
-    }
- };
-
- int listensock(){
-    linfo.listenbacklog = linfo.listenbacklog < 0 ? 0 : linfo.listenbacklog;
-    if(listen(socketfd,linfo.listenbacklog) < 0){
-        BUFFIO_ERROR(" FAILED TO LISTEN ON SOCKET \n reason : ",strerror(errno));
-        return -1;
-    }
-        BUFFIO_INFO(" listening on socket : \n" 
-                        "              address - ",linfo.address,
-                        "\n              port - ",linfo.portnumber);
-
-    return 0;
-  };
-
-acceptreturn acceptsock(buffioroutine (*clienthandler)(clientinfo cinfo)){
-
-      switch(linfo.sockfamily){
-        case BUFFIO_FAMILY_LOCAL:  afd = accept(socketfd,NULL,NULL); break;
-        case BUFFIO_FAMILY_IPV4: { 
-           sockinfolen = sizeof(struct sockaddr_in); 
-           struct sockaddr_in address_in;
-           afd = accept(socketfd,(struct sockaddr*)&address_in,&sockinfolen);
-           if(afd > 0){
-             portnumber = ntohs(address_in.sin_port);
-             aacceptedaddress  = inet_ntoa((struct in_addr)address_in.sin_addr); 
-           }
-         }
-        break;
-        case BUFFIO_FAMILY_IPV6:  break;
-     }; 
-
-    if(afd < 0){
-       if(errno == EAGAIN || errno == EWOULDBLOCK)
-             return {.errorcode = BUFFIO_ACCEPT_STATUS_NA , .handle = NULL};
-      
-       BUFFIO_ERROR(" Failed to accept connection, \n reason: ",strerror(errno),errno);
-             return {.errorcode = BUFFIO_ACCEPT_STATUS_ERROR , .handle = NULL};
-    }
-      
-      cinfo = {.address = aacceptedaddress , .clientfd = afd,.portnumber = portnumber};
-      BUFFIO_LOG(" Accepted a connection : address -> ",aacceptedaddress , 
-                 "\n                           port -> ",portnumber);
-
-      if(!clienthandler) return {.errorcode = BUFFFIO_ACCEPT_STATUS_NO_HANDLER,.handle = NULL};  
-      return {.errorcode = BUFFIO_ACCEPT_STATUS_SUCCESS , .handle = clienthandler(cinfo)};
-};
-
-  // TODO: DO ERROR CHECK IN FUNCTIONS:
-  void setfdblocking(){ 
-    if(!sockfdblocking){
-      int flags = fcntl(socketfd,F_GETFL,0);
-      flags &= ~O_NONBLOCK;
-      fcntl(socketfd,F_SETFL,flags);
-      sockfdblocking = true;
-    }
-  };
-  void setfdnonblocking(){
-    if(sockfdblocking){
-      int flags = fcntl(socketfd,F_GETFL,0);
-      flags |= O_NONBLOCK;
-      fcntl(socketfd,F_SETFL,flags);
-      sockfdblocking = false;
-    }
-  };
-
- int socketfd;
- bool sockfdblocking;
-
- buffioinfo linfo;
- clientinfo cinfo;
-
- private:
-      socklen_t sockinfolen = 0;
-      char *aacceptedaddress = nullptr;
-      int afd = -1;
-      int portnumber = 0;
-};
-
-
-#endif
+* */

@@ -2,6 +2,12 @@
 #define __BUFFIO_LF_QUEUE__
 
 /*
+* Error codes range reserved for buffiothread
+*  [8000 - 9500]
+*  8000 <= errorcode <= 9500
+*/
+
+/*
 * IMPLEMENTAION BASED ON:
 *  - https://rusnikola.github.io/files/ringpaper-disc.pdf
 *  - github-repo: https://github.com/rusnikola/lfqueue

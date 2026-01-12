@@ -1,8 +1,18 @@
 #ifndef __BUFFIO_SOCK_BROKER__
 #define __BUFFIO_SOCK_BROKER__
+/*
+* Error codes range reserved for buffiosockbroker
+*
+*  [1000 - 2000]
+*  1000 <= errorcode <= 2000
+*
+*
+*
+*/
 
 #if !defined(BUFFIO_IMPLEMENTATION)
    #include "buffioenum.hpp"
+   #include "buffiosock.hpp"
    #include "buffiopromsie.hpp"
    #include "buffiolfqueue.hpp"
 #endif
@@ -21,6 +31,12 @@
 #define bf_sb_ok (bf_sb_workernum_ok | bf_sb_expectedfds_ok | \
                   bf_sb_queuesize_ok | bf_sb_pollertype_ok | bf_sb_workerpolicy_ok)
 
+#define bf_sb_workernum_err 1000
+#define bf_sb_expectedfds_err 1001
+#define bf_sb_queuesize_err 1002
+#define bf_sb_pollertype_err 1003
+#define bf_sb_workerpolicy_err 1004
+
 struct buffiosockbrockerconf{
  int sb_configured;
  int sb_workernum; // number of the workers;
@@ -34,6 +50,7 @@ struct buffiosockbrockerconf{
 // data can be used by worker or the poller to mark an event is available;
 // internal poller of the buffiosock uses buffiotaskinfo to mark an event available;
 
+
 struct buffiosocksubmit{
  int opcode;
  int fd; 
@@ -46,11 +63,16 @@ struct buffioreq{
   size_t len;
   char *buffer;
 };
+struct buffiosviewreq{
+ int opcode;
+ buffiosocketview *sockview; 
+};
 
 union buffiosockreq{
   struct buffiosocksubmit pollfd;
   struct buffioreq writereq;
   struct buffioreq readreq;
+  struct buffiosviewreq sockview;
 };
 
 //#define bf buffio
@@ -61,17 +83,28 @@ union buffiosockreq{
 #define bf_ep_events_ok (1 << 4)
 #define bf_ep_eventsize_ok (1 << 5)
 #define bf_ep_fd_ok (1 << 6)
-#define bf_ep_done ( 1 << 7)
+#define bf_ep_thread_ok (1 << 7)
 
 #define bf_ep_ok (uint8_t)0xFF
 
+#define bf_ep_empty_err 1101
+#define bf_ep_entry_err 1102
+#define bf_ep_consume_err 1103
+#define bf_ep_works_err 1104
+#define bf_ep_events_err 1105
+#define bf_ep_eventsize_err 1106
+#define bf_ep_fd_err 1107
+#define bf_ep_thread_err 1108
+
+#define BUFFIO_SB_QUEUE buffiolfqueue<buffiosocketview*>
 
 struct buffioepollcaller{
-   std::atomic<int> *ep_empty;
-   buffiolfqueue<void*> *ep_entry; // ep_entry are the entry that you want to add to the epoll instance;
-   buffiolfqueue<void*> *ep_works; // ep_works are the entry that are pushed to the worker thread;
-   buffiolfqueue<void*> *ep_consume; // ep_consume are the entry that are processed;
+   std::atomic<int> *ep_empty; // reserved for future use;
+   BUFFIO_SB_QUEUE *ep_entry; // ep_entry are the entry that you want to add to the epoll instance;
+   BUFFIO_SB_QUEUE *ep_works; // ep_works are the entry that are pushed to the worker thread;
+   BUFFIO_SB_QUEUE *ep_consume; // ep_consume are the entry that are processed;
    struct epoll_event *ep_events;
+   buffiothreadinfo *threads;
    size_t ep_eventsize;
    size_t ep_totalfd;
    int ep_fd; 
@@ -79,7 +112,7 @@ struct buffioepollcaller{
 };
 
 
-#define bf_io_io_uringfd_ok 1
+#define bf_io_io_uringfd_ok (1 << 9)
 #define bf_io_uconsumed_ok (1 << 1)
 #define bf_io_uenterentry_ok (1 << 2)
 #define bf_io_uconsumeentry_ok (1 << 3)
@@ -122,6 +155,7 @@ class buffiosockbroker {
  __attribute__((used))  static int buffio_iouring_poller(void *data){ return 0;}
  
 public:
+
   buffiosockbroker():sbrokerstate(BUFFIO_SOCKBROKER_INACTIVE){ config.sb_configured = 0;};
   buffiosockbroker(size_t maxevents):sbrokerstate(BUFFIO_SOCKBROKER_INACTIVE){config.sb_configured = 0;};
   
@@ -154,56 +188,88 @@ public:
       }
 
       // code below here is used for epoll instance,
-     epoll_starter:
-        int mask = 0;
-        brkinfo.epollinfo.ep_configured |= createepollinstance(&brkinfo.epollinfo.ep_fd);
-        brkinfo.epollinfo.ep_entry = new buffiolfqueue<void*>;
-        brkinfo.epollinfo.ep_works = new buffiolfqueue<void*>;
-        brkinfo.epollinfo.ep_consume = new buffiolfqueue<void*>;
-        brkinfo.epollinfo.ep_events = new struct epoll_event[config.sb_expectedfds];
-        brkinfo.epollinfo.ep_eventsize = config.sb_expectedfds;
-        brkinfo.epollinfo.ep_totalfd = 0;
-        
-        if(brkinfo.epollinfo.ep_entry != nullptr){
-         if(brkinfo.epollinfo.ep_entry->lfstart(config.sb_queuesize,nullptr) < 0)
-                       return (int)bf_ep_entry_ok;           
-         
-           mask |= bf_ep_entry_ok;
+     epoll_starter: 
+
+        struct buffioepollcaller epolltmp = {0};
+
+        int ep_fd_tmp = createepollinstance(&epolltmp.ep_fd);
+        if(ep_fd_tmp == bf_ep_fd_err) return bf_ep_fd_err;
+        epolltmp.ep_configured |= bf_ep_fd_ok;
+
+        epolltmp.ep_entry = new BUFFIO_SB_QUEUE;
+        if(epolltmp.ep_entry == nullptr){
+         shutepoll(epolltmp);
+         return bf_ep_entry_err;
         }
 
-        if(brkinfo.epollinfo.ep_works != nullptr){
-         if(brkinfo.epollinfo.ep_works->lfstart(config.sb_queuesize,nullptr) < 0)
-                      return (int)bf_ep_works_ok;         
+        epolltmp.ep_configured |= bf_ep_entry_ok;
+        epolltmp.ep_works = new BUFFIO_SB_QUEUE;
 
-           mask |= bf_ep_works_ok;
-         
-        }
-        if(brkinfo.epollinfo.ep_consume != nullptr){
-         if(brkinfo.epollinfo.ep_consume->lfstart(config.sb_queuesize,nullptr) < 0)
-                     return (int)bf_ep_consume_ok;
-
-            mask |= bf_ep_consume_ok;
+        if(epolltmp.ep_works == nullptr){
+            shutepoll(epolltmp);
+            return bf_ep_works_err;
         }
 
-        if(brkinfo.epollinfo.ep_events == nullptr)
-              return (int)bf_ep_events_ok;
+        epolltmp.ep_configured |= bf_ep_works_ok;
+        epolltmp.ep_consume = new BUFFIO_SB_QUEUE;
+        if(epolltmp.ep_consume == nullptr){
+          shutepoll(epolltmp);
+          return bf_ep_consume_err;
+        }
 
-       mask |= bf_ep_events_ok | bf_ep_eventsize_ok;
-       brkinfo.epollinfo.ep_configured |= mask | bf_ep_done;
+        epolltmp.ep_events = new struct epoll_event[config.sb_expectedfds];
+        if(epolltmp.ep_events == nullptr){
+         shutepoll(epolltmp);
+         return bf_ep_events_err;
+        }
 
-      return brkinfo.epollinfo.ep_configured;
+        epolltmp.ep_configured |= bf_ep_events_ok;
+        epolltmp.ep_eventsize = config.sb_expectedfds;
+        epolltmp.ep_totalfd = 0;
+        epolltmp.ep_configured |= bf_ep_eventsize_ok;
+              
+        brkinfo.epollinfo = epolltmp;
+      return epolltmp.ep_configured;
     }
     return -1;
   };
 
+   int pushreq(){ return 0;}
+   int popreq(){ return 0;}
+   
 private:
+  void shutepoll(struct buffioepollcaller &which){
+    int mask = which.ep_configured;
+    if((mask & bf_ep_fd_ok) == bf_ep_empty_ok){
+       close(which.ep_fd);
+       mask &= ~(bf_ep_fd_ok); // unsetting the mask;
+    }
+    if((mask & bf_ep_entry_ok) == bf_ep_entry_ok){
+      delete which.ep_entry;
+      mask &= ~(bf_ep_entry_ok);
+    }
+    if((mask & bf_ep_works_ok) == bf_ep_works_ok){
+      delete which.ep_works;
+      mask &= ~(bf_ep_works_ok);
+    }
+    if((mask & bf_ep_consume_ok) == bf_ep_consume_ok){
+      delete which.ep_consume;
+      mask &= ~(bf_ep_consume_ok);
+    }
+    if((mask & bf_ep_events_ok) == bf_ep_events_ok){
+      delete[] which.ep_events;
+      mask &= ~(bf_ep_consume_ok);
+    }
+    which.ep_configured = mask;
+  };
+
  [[nodiscard]]int createepollinstance(int *fdr){
     int fd = epoll_create(1); 
     if(fd > 0){ 
       *fdr = fd;
       return bf_ep_fd_ok;
     }
-    return 0; 
+    return bf_ep_fd_err; 
   }
 
   buffiothread threadpool;
@@ -216,10 +282,3 @@ private:
 
 
 #endif
-
- // consumed = -1, indicate empty;
- // consumed = 0, all ok;
- // consumed = 1, epoll error;
- // consumed = 2, epoll continue;
- // consumed = 3 epoll event available;
- // consumed = 4 parent consuming epoll;

@@ -1,6 +1,12 @@
 #ifndef __BUFFIO_THREAD_HPP__
 #define __BUFFIO_THREAD_HPP__
 
+/*
+* Error codes range reserved for buffiothread
+*  [6000 - 7500]
+*  6000 <= errorcode <= 7500
+*/
+
 #include <atomic>
 #include <sched.h>
 #include <signal.h>

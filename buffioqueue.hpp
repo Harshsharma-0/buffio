@@ -1,6 +1,12 @@
 #ifndef __BUFFIO_QUEUE_HPP__
 #define __BUFFIO_QUEUE_HPP__
 
+/*
+* Error codes range reserved for buffioqueue
+*  [2500 - 3500 ]
+*  2500 <= errorcode <= 3500
+*/
+
 #include <unordered_map>
 
 
