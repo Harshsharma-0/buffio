@@ -1,5 +1,6 @@
 #ifndef __BUFFIO_ENUM__
 #define __BUFFIO_ENUM__
+#include <cstdint>
 
 enum BUFFIO_ROUTINE_STATUS {
   BUFFIO_ROUTINE_STATUS_WAITING = 21,
@@ -20,6 +21,7 @@ enum BUFFIO_TASK_STATUS {
   BUFFIO_TASK_WAITER_NONE,
 };
 
+/*
 enum BUFFIO_QUEUE_STATUS {
   BUFFIO_QUEUE_STATUS_ERROR = 40,
   BUFFIO_QUEUE_STATUS_SUCCESS = 41,
@@ -28,7 +30,7 @@ enum BUFFIO_QUEUE_STATUS {
   BUFFIO_QUEUE_STATUS_SHUTDOWN,
   BUFFIO_QUEUE_STATUS_CONTINUE,
 };
-
+*/
 enum BUFFIO_EVENTLOOP_TYPE {
   BUFFIO_EVENTLOOP_SYNC = 50, // use this to block main thread
   BUFFIO_EVENTLOOP_ASYNC,     // use this to launch a thread;
@@ -44,25 +46,27 @@ enum BUFFIO_ACCEPT_STATUS {
   BUFFFIO_ACCEPT_STATUS_NO_HANDLER,
 };
 
-enum BUFFIO_SOCKBROKER_STATE {
-  BUFFIO_SOCKBROKER_INACTIVE = 71,
-  BUFFIO_SOCKBROKER_ERROR,
-  BUFFIO_SOCKBROKER_EPOLL,
-  BUFFIO_SOCKBROKER_EPOLL_RUNNING,
-  BUFFIO_SOCKBROKER_IO_URING,
-  BUFFIO_SOCKBROKER_IO_URING_RUNNING,
-};
 
+enum class buffio_sockbroker_state: uint32_t{
+ inactive          = 71,
+ error             = 72,
+ epoll             = 73,
+ io_uring          = 74,
+ epoll_running     = 75,
+ io_uring_running  = 76
+};
 //constexpr int BUFFIO_THREAD_NOT = 81;
 //constexpr int BUFFIO_THREAD_RUNNING = 82;
 
-enum BUFFIO_THREAD_STATUS {
-  BUFFIO_THREAD_NOT = 81,
-  BUFFIO_THREAD_RUNNING,
-  BUFFIO_THREAD_KILLED = 83,
-  BUFFIO_THREAD_DONE,
-  BUFFIO_THREAD_ERROR,
-  BUFFIO_THREAD_ERROR_MAP,
+
+
+enum class buffio_thread_status: uint32_t{
+ inactive  = 81,
+ running   = 82,
+ killed    = 83,
+ done      = 84,
+ error     = 85,
+ error_map = 86,
 };
 
 enum BUFFIO_SOCKBROKER_POLLER_TYPE{ 
@@ -81,19 +85,32 @@ enum BUFFIO_SOCKBROKER_POLLER_TYPE{
   BUFFIO_POLLER_MODULAR,
   BUFFIO_POLLER_IO_URING
 };
+
 enum BUFFIO_SOCKBROKER_WORKER_POLICY{
  BUFFIO_WORKER_POLICY_CONSUME = 101,
  BUFFIO_WORKER_POLICY_WAIT,
  BUFFIO_WORKER_POLICY_HYBRID
 };
 
-enum BUFFIO_FD_OPCODE{
- BUFFIO_FD_READ = 150,
- BUFFIO_FD_WRITE,
- BUFFIO_FD_START_POLL,
- BUFFIO_FD_END_POLL,
- BUFFIO_FD_PAGE_READ,
- BUFFIO_FD_WRITE_PAGE,
+enum class buffio_sb_poller_type: uint32_t{
+  nono = 91,
+  monolithic = 92,
+  modular = 93,
+  io_uring = 94
 };
 
+enum class buffio_sb_worker_policy: uint32_t{
+ consume = 101,
+ wait = 102,
+ hybrid = 103
+};
+
+enum class buffio_fd_opcode: uint32_t {
+   read = 150,
+   write = 151,
+   start_poll = 152,
+   end_poll = 153,
+   page_read = 154,
+   page_write = 155
+};
 #endif

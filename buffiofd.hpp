@@ -84,7 +84,7 @@ struct clientinfo {
  };
 
 struct buffiofdreq_rw{
-  enum BUFFIO_FD_OPCODE opcode;
+  buffio_fd_opcode opcode;
   char *buffer;
   size_t len;
   void *data;
@@ -92,7 +92,7 @@ struct buffiofdreq_rw{
 
 
 struct buffiofdreq_add{
-  enum BUFFIO_FD_OPCODE opcode;
+  buffio_fd_opcode opcode;
   int fd;
   void *data;
 };
