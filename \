@@ -4,6 +4,7 @@
 /*
 * Error codes range reserved for buffiosock
 *  [0 - 999]
+*  [Note] Errorcodes are negative value in this range.
 *  0 <= errorcode <= 999
 */
 
@@ -54,14 +55,14 @@
 // 24-27 socktype
 // 28-31 sockfamily
 
-struct buffiosockinfo{
+struct buffiofdinfo{
   const char *address;
-  int mask;
-  uint32_t infocomined;
+  int portnumber;
+  int socktype;
+  int sockfamily;
 };
 
 struct buffiosockinfostr{
- int mask;
  const char *protocol;
 };
 
@@ -80,33 +81,81 @@ struct clientinfo {
   int portnumber;
  };
 
-class buffiosocketview{
-  buffiosocketview():data(nullptr),mask(0),sock(-1){}
-  buffiosocketview(int sock):data(nullptr),mask(0),sock(-1){}
-private:
-  int sock;
-  int mask;
+struct buffiofdreq{
+  char *buffer;
+  size_t len;
   void *data;
+}
+
+class buffiopage{
+  struct page{
+     char *buffer;
+     size_t len;
+     struct page *next;
+  };
+ public:
+   buffiopage(){}
+  ~buffiopage(){}
+
+  buffiopage &operator(const buffiopage&) = delete;
+  buffiopage(buffiopage &) = delete;
+
+private:
+ buffiomemory <char>pagesmem;
+ struct page *pages;
+ size_t pagecount;
+};
+
+class buffiofdview{
+  public:
+  buffiofdview():data(nullptr),fd(-1){}
+
+  [[nodiscard]] int init(int fd, int _rw_order){}
+   
+  [[nodiscard]] int makereq(const char * data, size_t len, enum BUFFIO_FD_OPCODE opcode){
+    if(data == nullptr || len == 0) return -1;
+     switch(opcode){
+      case BUFFIO_FD_READ:
+      break;
+      case BUFFIO_FD_WRITE:
+      break;
+     }
+
+    return 0;
+   }
+
+  ~buffiofdview(){}
+
+private:
+  int fd;
+  buffiopage read;
+  buffiopage write;
 };
 
 
-class buffiosocket{
-
-  union __sockinfointernal{
-   struct buffiosockinfo rawinfo;
-   struct buffiosockinfo strinfo;
-  };
- public:
+class buffiofd{
+public:
  
-//  buffiosocket(buffiosockinfo &ioinfo) : linfo(ioinfo), socketfd(-1) , sockfdblocking(false){};
-  //buffiosocket():socketfd(-1),socketfdblocking(false){}
-  
+   buffiofd(buffiosockinfo &ioinfo):mask(0){init(ioinfo);};
+   buffiofd(const char *protocol):mask(0){init(protocol);};
+   buffiofd():mask(0){}
 
- ~buffiosocket(){ 
- };
+   [[nodiscard]] int init(const char *protocol){}  
+   [[nodiscard]] int init(struct buffiofdinfo &info){}
+   [[nodiscard]] static int createipsocket(){ return 0;}; // function to create a ipsocket
+   [[nodiscard]] static int createpipe(){return 0;}; // function to create a pipe
+   [[nodiscard]] static int createfifo(){return 0;}; // function to create a fifo
+   [[nodiscard]] static int createfile(){return 0;}; // function to open a file
+  
+  
+   buffiofd(const buffiofd &) = delete;
+   buffiofd &operator=(const buffiofd&) = delete;
+  ~buffiofd(){};
 
 private:
-
+   int mask;
+   struct buffiosockinfo rawinfo;
+   buffiofdview sock;
 };
 
 #endif

@@ -7,11 +7,11 @@
 #if defined(BUFFIO_IMPLEMENTATION)
 
 #include "./buffioenum.hpp"
-#include "./buffiosock.hpp"
+#include "./buffiomemory.hpp"
+#include "./buffiofd.hpp"
 #include "./buffiopromise.hpp"
-#include "./buffioqueue.hpp"
-#include "./buffiothread.hpp"
 #include "./buffiolfqueue.hpp"
+#include "./buffiothread.hpp"
 #include "./buffiosockbroker.hpp"
 #include "./buffioschedular.hpp"
 

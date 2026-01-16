@@ -59,12 +59,21 @@ public:
            cursor(nullptr),capinit(0),active(0){};
 
   // initliser of the schedular
+  int init(struct buffiosockbrokerconf _cfg,size_t _capinitial){
+     int tmp_err = init(_capinitial);
+     if(tmp_err < 0) return tmp_err;
+     int poll_err = iopoller.configure(_cfg);
+     if(poll_err < 0) return poll_err;
+     int ini_err = iopoller.init();
+     if(ini_err < 0) return ini_err;
+     return 0;
+  }
   int init(size_t _capinitial){
     if(capinit != 0) return -1;
     capinit = _capinitial;
     return schedmem.init(capinit);
   }
-
+  
   ~buffioschedular(){}
 
    int schedule(buffioroutine routine){
@@ -117,7 +126,7 @@ public:
      }
     }
   };
-   
+  
 private:
  
   void replacecursor(struct __schedinternal *from){
@@ -215,10 +224,10 @@ private:
 
  buffiomemory <__schedinternal>schedmem;
  size_t capinit;
- size_t active;
+ size_t active; 
  struct __schedinternal *head;
  struct __schedinternal *tail;
  struct __schedinternal *cursor;
- buffiosockbroker iopooler; // used to transfer I/O request to the worker thread;
+ buffiosockbroker iopoller; // used to transfer I/O request to the worker thread;
 };
 #endif

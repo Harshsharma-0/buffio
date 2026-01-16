@@ -90,7 +90,7 @@ struct buffiopromise {
   };
 
   // overload to submit I/O request via the promise to the sockbroker
-  buffioawaiter await_transform(buffiosocketview &sockview){
+  buffioawaiter await_transform(buffiofd &sockview){
     return {};
   }
   void unhandled_exception() {

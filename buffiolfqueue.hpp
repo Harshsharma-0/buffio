@@ -26,7 +26,9 @@
    #define buffioatomix_max_order  25
    #define BUFFIO_CACHE_FACTOR 7U
    #define BUFFIO_CACHE_BYTES 1 << BUFFIO_CACHE_FACTOR
-   #define BUFFIO_RING_MIN (BUFFIO_CACHE_FACTOR - 2)
+   #define BUFFIO_RING_MIN (BUFFIO_CACHE_FACTOR - 3)
+   #define BUFFIO_LFQUEUE_MIN BUFFIO_RING_MIN
+   #define BUFFIO_LFQUEUE_MAX buffioatomix_max_order
 
 #endif
 #if defined(__aarch64__) || defined(__x86_64__) || defined(__powerpc64__)
@@ -38,9 +40,12 @@
 
    #define BUFFIO_CACHE_FACTOR 7U
    #define BUFFIO_CACHE_BYTES 1 << BUFFIO_CACHE_FACTOR
-   #define BUFFIO_RING_MIN (BUFFIO_CACHE_FACTOR - 3)
+   #define BUFFIO_RING_MIN (BUFFIO_CACHE_FACTOR - 4)
+   #define BUFFIO_LFQUEUE_MIN BUFFIO_RING_MIN
+   #define BUFFIO_LFQUEUE_MAX buffioatomix_max_order
 
 #endif
+
 
 #define cache_remap(index,order,n) (size_t)(((index & (n - 1)) >> (order - BUFFIO_RING_MIN)) \
                                   | ((index << BUFFIO_RING_MIN) & n - 1))
@@ -98,6 +103,9 @@ class buffiolfqueue{
     lfenqueue(&acqueue,queueorder,idx);
     return true;
   };
+  bool queuefull(){
+  return acqueue.threshold.load(std::memory_order_acquire) < 0 ? true : false;
+  }
 
   T dequeue(){
     size_t idx = lfdequeue(&acqueue,queueorder); 
