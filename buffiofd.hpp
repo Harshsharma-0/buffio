@@ -1,5 +1,5 @@
-#ifndef BUFFIO_SOCK_IMPLEMENTATION
-#define BUFFIO_SOCK_IMPLEMENTATION
+#ifndef BUFFIO_SOCK
+#define BUFFIO_SOCK
 
 /*
  * Error codes range reserved for buffiosock
@@ -21,9 +21,9 @@
 #include <unistd.h>
 
 #if !defined(BUFFIO_IMPLEMENTATION)
-#include "buffioenum.hpp" // header for opcode
-#include "buffiolfqueue.hpp"
-#include "buffiomemory.hpp"
+   #include "buffioenum.hpp" // header for opcode
+   #include "buffiolfqueue.hpp"
+   #include "buffiomemory.hpp"
 #endif
 
 enum class buffio_fd_family : uint32_t {
@@ -40,20 +40,6 @@ enum class buffio_fd_family : uint32_t {
     local_udp = 10
 };
 
-enum class buffio_fd_block : uint32_t {
-    block = 0,
-    no_block = 1,
-};
-
-enum class buffioFdActive : uint32_t {
-    none = 0,
-    ipv4 = 1,
-    ipv6 = 2,
-//    fifo = 3,
-    file = 4,
-    pipe = 5,
-    local = 6
-};
 
 enum class buffio_fd_error : int {
     none = 0,
@@ -78,14 +64,8 @@ struct buffiofdsocketinfo {
     const char* address;
     int portnumber;
     buffio_fd_family family;
-    buffio_fd_block block;
 };
 
-struct buffiofdinfo {
-    const char* address;
-    buffio_fd_family family;
-    buffio_fd_block block;
-};
 
 struct buffiofdreq_rw {
     buffio_fd_opcode opcode;
@@ -111,16 +91,10 @@ union buffiofdreq {
     struct buffiofdreq_add add;
 };
 
-// buffiosockbroker support both pages write and read and raw buffer read write
-// use pages to read large amount of data
-/*
- *
- *
- */
 
 class buffiofd {
     // magic magic things
-    union fd_union {
+    union fd_union{
         struct {
             int fd;
             bool unlink_on_close;
@@ -135,15 +109,15 @@ public:
     buffiofd()
     {
         fd_family = buffio_fd_family::none;
-        active = buffioFdActive::none;
         data = { 0 };
     };
 
-    // function to create a ipsocket
-    [[nodiscard]] buffio_fd_error createsocket(struct buffiofdsocketinfo& info)
+    // function to create a ipsocket, blocking for future update
+    [[nodiscard]] buffio_fd_error createsocket(struct buffiofdsocketinfo& info,
+                                                        bool blocking = true)
     {
         // proceed only if there is no fd currently opened in the context
-        if (active != buffioFdActive::none)
+        if (fd_family != buffio_fd_family::none)
             return buffio_fd_error::occupied;
 
         int domain = 0;
@@ -162,7 +136,7 @@ public:
             if (!info.address || info.portnumber <= 0 || info.portnumber > 65535)
                 return buffio_fd_error::portnumber;
 
-            sockaddr_in* in = reinterpret_cast<sockaddr_in*>(&addr);
+            sockaddr_in *in = reinterpret_cast<sockaddr_in*>(&addr);
             in->sin_family = AF_INET;
             in->sin_port = htons(info.portnumber);
             if (inet_pton(AF_INET, info.address, &in->sin_addr) != 1)
@@ -203,34 +177,23 @@ public:
         data.sock.unlink_on_close = unlink_on_close;
         data.sock.addr_len = addr_len;
         fd_family = info.family;
-        active = (domain == AF_INET) ? buffioFdActive::ipv4 : buffioFdActive::local;
         return buffio_fd_error::none;
     };
 
     // function to create a pipe
     [[nodiscard]]
-    buffio_fd_error createpipe(buffio_fd_block block = buffio_fd_block::block)
+    buffio_fd_error createpipe(bool block = true)
     {
 
-        if (active != buffioFdActive::none)
+        if (fd_family != buffio_fd_family::none)
             return buffio_fd_error::occupied;
 
         if (::pipe(data.pipe_fds) != 0)
             return buffio_fd_error::pipe;
-        if (block == buffio_fd_block::no_block) {
-            if (fcntl(data.pipe_fds[0], F_SETFD, O_NONBLOCK) == -1) {
-                ::close(data.pipe_fds[0]);
-                return buffio_fd_error::fcntl;
-            }
-            if (fcntl(data.pipe_fds[1], F_SETFD, O_NONBLOCK) == -1) {
-                ::close(data.pipe_fds[0]);
-                ::close(data.pipe_fds[1]);
-
-                return buffio_fd_error::fcntl;
-            }
+        if (block == false) {
+         //TODO: add func to set nonblocking;
         }
         fd_family = buffio_fd_family::pipe;
-        active = buffioFdActive::pipe;
 
         return buffio_fd_error::none;
     };
@@ -238,13 +201,13 @@ public:
   // fifo must be managed by the user, only helper function to create fifo
     [[nodiscard]] 
        buffio_fd_error createfifo(const char* path = nullptr,mode_t mode = 0666){
-     if(path == nullptr) return buffio_fd_error::fifo_path;
-     if(mkfifo(path,mode) == 0) 
-       return buffio_fd_error::none;
-     return buffio_fd_error::fifo;
+          if(path == nullptr) return buffio_fd_error::fifo_path;
+            if(mkfifo(path,mode) == 0) 
+              return buffio_fd_error::none;
+         return buffio_fd_error::fifo;
     }
 
-    [[nodiscard]] int createfile(const char* path = nullptr)
+    [[nodiscard]] int openfile(const char* path = nullptr)
     {
         // TODO: add file support
         if (path == nullptr)
@@ -258,36 +221,36 @@ public:
     // return void
     void shutfd() noexcept
     {
-        switch (active) {
-        case buffioFdActive::file: {
+        if(fd_family == buffio_fd_family::none) return;
+        switch (fd_family) {
+        case buffio_fd_family::file: {
             // not handled yet
         } break;
-        case buffioFdActive::pipe: {
+        case buffio_fd_family::pipe:{
             ::close(data.pipe_fds[0]);
             ::close(data.pipe_fds[1]);
         } break;
-        case buffioFdActive::ipv4: {
+        case buffio_fd_family::ipv4_tcp:
+        case buffio_fd_family::ipv4_udp: {
             ::close(data.sock.fd);
         } break;
-        case buffioFdActive::local: {
+        case buffio_fd_family::local_udp:
+        case buffio_fd_family::local_tcp: {
             if (data.sock.unlink_on_close == true) {
                 sockaddr_un* un = reinterpret_cast<sockaddr_un*>(&data.sock.addr);
                 ::unlink(un->sun_path);
             }
             ::close(data.sock.fd);
-
         } break;
         };
 
         fd_family = buffio_fd_family::none;
-        active = buffioFdActive::none;
         data = { 0 };
     };
     ~buffiofd() { shutfd(); };
 
 private:
     buffio_fd_family fd_family;
-    buffioFdActive active;
     fd_union data;
 };
 
