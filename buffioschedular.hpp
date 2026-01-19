@@ -1,5 +1,5 @@
-#ifndef __BUFFIO_SCHEDULAR__
-#define __BUFFIO_SCHEDULAR__
+#ifndef BUFFIO_SCHEDULAR
+#define BUFFIO_SCHEDULAR
 
 /*
 * Error codes range reserved for buffioschedular

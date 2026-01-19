@@ -1,32 +1,30 @@
-#ifndef __BUFFIO_SOCK_IMPLEMENTATION__
-#define __BUFFIO_SOCK_IMPLEMENTATION__
+#ifndef BUFFIO_SOCK_IMPLEMENTATION
+#define BUFFIO_SOCK_IMPLEMENTATION
 
 /*
  * Error codes range reserved for buffiosock
  *  [0 - 999]
  *  [Note] Errorcodes are negative value in this range.
  *  0 <= errorcode <= 999
+ *  Naming convention is scheduled to change in future to Ocaml style
  */
 
 #include <arpa/inet.h>
-#include <atomic>
 #include <cstring>
 #include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
-#include <regex>
 #include <sys/socket.h>
-#include <sys/un.h>
-#include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/un.h>
 #include <unistd.h>
 
-#define ipv4_regex "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
-
-constexpr const char* buffio_ipv_localhost = "localhost";
-constexpr const char *buffio_fd_default_address = "127.0.0.1";
-
-constexpr const int buffio_fd_default_port = 8081;
+#if !defined(BUFFIO_IMPLEMENTATION)
+#include "buffioenum.hpp" // header for opcode
+#include "buffiolfqueue.hpp"
+#include "buffiomemory.hpp"
+#endif
 
 enum class buffio_fd_family : uint32_t {
     none = 0,
@@ -47,24 +45,32 @@ enum class buffio_fd_block : uint32_t {
     no_block = 1,
 };
 
-enum class buffio_fd_error: int {
- none           = 0,
- socket         = -1,
- bind           = -2,
- open           = -3,
- file_path      = -4,
- socket_address = -5,
- port_number    = -6,
- pipe           = -7,
- fifo           = -8,
- fifo_path      = -9,
- occupied       = -10,
- family         = -11,
- address_ipv4   = -12,
- address_ipv6   = -13,
- portnumber     = -14,
+enum class buffioFdActive : uint32_t {
+    none = 0,
+    ipv4 = 1,
+    ipv6 = 2,
+    fifo = 3,
+    file = 4,
+    pipe = 5,
+    local = 6
 };
 
+enum class buffio_fd_error : int {
+    none = 0,
+    socket = -101,
+    bind = -102,
+    open = -103,
+    file_path = -104,
+    socket_address = -105,
+    portnumber = -106,
+    pipe = -107,
+    fifo = -108,
+    fifo_path = -109,
+    occupied = -101,
+    family = -101,
+    address_ipv4 = -102,
+    address_ipv6 = -103,
+};
 
 // used for ip socket
 struct buffiofdsocketinfo {
@@ -108,51 +114,52 @@ union buffiofdreq {
 // use pages to read large amount of data
 /*
  *
-
+ *
  */
-
 
 class buffiofd {
 
-
-// magic magic things
-union __socketunified{
-      struct{
-         int fd;
-         int laddr;
-         union{
-           struct sockaddr_in ipv4;
-           struct sockaddr_in6 ipv6;
-           struct sockaddr_un local;
-         }info;
-      }sock;
-      int pipe_fds[2];
-      struct file_info{
-         char *address;
-         int fd;
-    } file_info;
-};
-
+    // magic magic things
+    union __socketunified {
+        struct {
+            int fd;
+            int laddr;
+            union {
+                struct sockaddr_in ipv4;
+                struct sockaddr_in6 ipv6;
+                struct sockaddr_un local;
+            } info;
+        } sock;
+        int pipe_fds[2];
+        struct file_info {
+            char* address;
+            int fd;
+        } file_info;
+    };
 
 public:
-    buffiofd(){
+    buffiofd()
+    {
         fd_family = buffio_fd_family::none;
+        fdActive = buffioFdActive::none;
+
+        buffio_fd_info = { 0 };
         memset(&buffio_fd_info, '\0', sizeof(union __socketunified));
     };
 
     // function to create a ipsocket
-    [[nodiscard]] buffio_fd_error createsocket(struct buffiofdsocketinfo& info){
+    [[nodiscard]] buffio_fd_error createsocket(struct buffiofdsocketinfo& info)
+    {
         // proceed only if there is no fd currently opened in the context
-        if (fd_family == buffio_fd_family::none ) {
+        if (fdActive == buffioFdActive::none) {
 
             union __socketunified sock_info = { 0 };
-            std::regex ipvalidator(ipv4_regex);
 
             int socketfamily = AF_INET;
             int sockettype = SOCK_STREAM;
             size_t field_size = 0;
-     
-            memset(&sock_info, '\0', sizeof(union __socketunified));
+
+            buffio_fd_info = { 0 };
 
             switch (info.family) {
             case buffio_fd_family::local_udp:
@@ -165,18 +172,19 @@ public:
                 sock_info.sock.info.local.sun_family = socketfamily;
                 field_size = sizeof(struct sockaddr_un);
 
-                if (info.address == nullptr) break;
+                if (info.address == nullptr)
+                    break;
                 int len = strlen(info.address);
                 len -= 1;
-                if(len > sizeof(sockaddr_un))
+                if (len > sizeof(sockaddr_un.sun_path))
                     return buffio_fd_error::socket_address;
 
-                //TODO: check if the path is valid string of path 
+                // TODO: check if the path is valid string of path
                 strncpy(sock_info.sock.info.local.sun_path, info.address,
-                         sizeof(sock_info.sock.info.local.sun_path) - 1);
-                 sock_info.sock.laddr = 1;
-                 fd_family =  info.family;
-
+                    sizeof(sock_info.sock.info.local.sun_path) - 1);
+                sock_info.sock.laddr = 1;
+                fd_family = info.family;
+                fdActive = buffioFdActive::local;
             } break;
             case buffio_fd_family::ipv4_udp:
                 sockettype = SOCK_DGRAM;
@@ -184,141 +192,149 @@ public:
 
             case buffio_fd_family::ipv4_tcp: {
 
-                if(info.portnumber <= 0)  
-                      return buffio_fd_error::portnumber;
-                if(info.address == nullptr)
-                      return buffio_fd_error::address_ipv4;
-                if(strcmp(info.address, buffio_ipv_localhost) == 0)
-                      break;
-                if (!std::regex_match(info.address,ipvalidator))
-                      return buffio_fd_error::address_ipv4;
+                if (info.portnumber <= 0)
+                    return buffio_fd_error::portnumber;
+                if (info.address == nullptr)
+                    return buffio_fd_error::address_ipv4;
+
+                in_addr tmp_addr;
+                if (inet_pton(AF_INET, info.address, &tmp_addr) != 1)
+                    return buffio_fd_error::address_ipv4;
 
                 field_size = sizeof(struct sockaddr_in);
                 sock_info.sock.info.ipv4.sin_family = socketfamily;
                 sock_info.sock.info.ipv4.sin_port = htons(info.portnumber);
-                sock_info.sock.info.ipv4.sin_addr.s_addr =inet_addr(info.address);
-                fd_family =  info.family;
+                sock_info.sock.info.ipv4.sin_addr = tmp_addr;
+                fd_family = info.family;
+                fdActive = buffioFdActive::ipv4;
 
-
-                }break;
-          /* TODO: implement ipv6
-            case buffio_fd_family::ipv6_udp: {
-                socketfamily = AF_INET6;
-                sockettype = SOCK_DGRAM;
             } break;
+                /* TODO: implement ipv6
+                  case buffio_fd_family::ipv6_udp: {
+                      socketfamily = AF_INET6;
+                      sockettype = SOCK_DGRAM;
+                  } break;
 
-            case buffio_fd_family::ipv6_tcp: {
-                socketfamily = AF_INET6;
-            } break;
-            */
+                  case buffio_fd_family::ipv6_tcp: {
+                      socketfamily = AF_INET6;
+                  } break;
+                  */
             default:
                 return buffio_fd_error::family;
                 break;
             }
 
             int sockfd = socket(socketfamily, sockettype, 0);
-            if(sockfd < 0){
-              fd_family = buffio_fd_family::none;      
-              return buffio_fd_error::socket;
+            if (sockfd < 0) {
+                fd_family = buffio_fd_family::none;
+                fdActive = buffioFdActive::none;
+                buffio_fd_info = { 0 };
+                return buffio_fd_error::socket;
             }
             sock_info.sock.fd = sockfd;
             buffio_fd_info = sock_info;
             // 0 if local socket don't want to bind to addres
-            if (field_size == 0) 
-              return buffio_fd_error::none;
+            if (field_size == 0)
+                return buffio_fd_error::none;
 
-            if(bind(sockfd,(struct sockaddr*)&sock_info.sock.info,field_size) < 0)
-            {
-                close(sockfd);
-                fd_family = buffio_fd_family::none;
-                buffio_fd_info = {0};
-                return buffio_fd_error::bind;
-            } 
-            return buffio_fd_error::none;
+            if (bind(sockfd, (struct sockaddr*)&sock_info.sock.info, field_size) == 0)
+                return buffio_fd_error::none;
+
+            close(sockfd);
+            fd_family = buffio_fd_family::none;
+            fdActive = buffioFdActive::none;
+            buffio_fd_info = { 0 };
+            return buffio_fd_error::bind;
         };
         return buffio_fd_error::occupied;
     };
 
     // function to create a pipe
-    [[nodiscard]] 
-     buffio_fd_error createpipe(buffio_fd_block block = buffio_fd_block::block)
-    { 
-       if(fd_family != buffio_fd_family::none)
-                    return buffio_fd_error::occupied;
-        int pipefd = pipe(buffio_fd_info.pipe_fds); 
-        if(pipefd < 0) return buffio_fd_error::pipe;
-        fd_family = buffio_fd_family::pipe;
-        return buffio_fd_error::none;
-    };
-
-    // function to create a fifo
     [[nodiscard]]
-    buffio_fd_error createfifo(const char *path = nullptr){
-     if(path == nullptr) return buffio_fd_error::fifo_path;
-     if(fd_family != buffio_fd_family::none)
-                    return buffio_fd_error::occupied;
+    buffio_fd_error createpipe(buffio_fd_block block = buffio_fd_block::block)
+    {
 
-     int fifofd = mkfifo(path,0);
-     if(fifofd < 0) return buffio_fd_error::fifo; 
-     buffio_fd_info.file_info.fd = fifofd;
-     //TODO: make path also available in the field; 
-     fd_family = buffio_fd_family::fifo;
+        if (buffioFdActive != buffioFdActive::none)
+            return buffio_fd_error::occupied;
+
+        int pipefd = pipe(buffio_fd_info.pipe_fds);
+        if (pipefd < 0)
+            return buffio_fd_error::pipe;
+        fd_family = buffio_fd_family::pipe;
+        buffioFdActive = buffioFdActive::pipe;
 
         return buffio_fd_error::none;
     };
+
+    /*
+      // function to create a fifo
+      [[nodiscard]]
+      buffio_fd_error createfifo(const char *path = nullptr){
+       if(path == nullptr) return buffio_fd_error::fifo_path;
+       if(fd_family != buffio_fd_family::none)
+                      return buffio_fd_error::occupied;
+
+       int fifofd = mkfifo(path,0);
+       if(fifofd < 0) return buffio_fd_error::fifo;
+       buffio_fd_info.file_info.fd = fifofd;
+       //TODO: make path also available in the field;
+       fd_family = buffio_fd_family::fifo;
+
+          return buffio_fd_error::none;
+      };
+      */
 
     // function to open a file
-    [[nodiscard]] int createfile(const char *path = nullptr)
+    [[nodiscard]] int createfile(const char* path = nullptr)
     {
-     // TODO: add file support
-        if(path == nullptr) return -1;
+        // TODO: add file support
+        if (path == nullptr)
+            return -1;
         return 0;
     };
 
     buffiofd(const buffiofd&) = delete;
     buffiofd& operator=(const buffiofd&) = delete;
 
-    // return void 
-    void shutfd(){
-      if(fd_family == buffio_fd_family::none)
-                  return;
+    // return void
+    void shutfd()
+    {
+        if (buffioFdActive == buffioFdActive::none)
+            return;
 
-      /* sock is the majority, so it is intilised by default to close,
-       * if there any other case the fd is changed and that is closed
-      */
-      int fd = buffio_fd_info.sock.fd; 
-      switch(fd_family){
-        case buffio_fd_family::file : [[fallthrough]]; // don't remove
-        case buffio_fd_family::fifo : {
-         fd = buffio_fd_info.file_info.fd;
-         } break;
-        case buffio_fd_family::pipe : {
-         close(buffio_fd_info.pipe_fds[0]); 
-         close(buffio_fd_info.pipe_fds[1]); 
-         return;
-        }break;
-      /*
-        case buffio_fd_family::ipv4_tcp : {} break;
-        case buffio_fd_family::ipv4_udp : {} break;
-        case buffio_fd_family::ipv6_tcp : {} break;
-        case buffio_fd_family::ipv6_udp : {} break;
-        case buffio_fd_family::ip_raw   : {} break;
-      */
-        case buffio_fd_family::local_tcp:
-         [[fallthrough]];
-        case buffio_fd_family::local_udp:{
-         if(buffio_fd_info.sock.laddr == 1)
-            unlink(buffio_fd_info.sock.info.local.sun_path);
-         } break;
-      }
-      close(fd);
+        /* sock is the majority, so it is intilised by default to close,
+         * if there any other case the fd is changed and that is closed
+         */
+        int fd = buffio_fd_info.sock.fd;
+        switch (buffioFdActive) {
+        case buffioFdActive::file: {
+         //not handled yet
+        } break;
+        case buffioFdActive::fifo: {
+        } break;
+        case buffioFdActive::pipe: {
+            close(buffio_fd_info.pipe_fds[0]);
+            close(buffio_fd_info.pipe_fds[1]);
+        } break;
+        case buffioFdActive::ipv4: {
+            close(buffio_fd_info.sock_fd);
+        } break;
+        case buffioFdActive::local: {
+            if (buffio_fd_info.sock.laddr == 1)
+                unlink(buffio_fd_info.sock.info.local.sun_path);
+        } break;
+        };
 
+        fd_family = buffio_fd_family::none;
+        fdActive = buffioFdActive::none;
+        buffio_fd_info = { 0 };
     };
-    ~buffiofd(){shutfd();};
+    ~buffiofd() { shutfd(); };
 
 private:
     buffio_fd_family fd_family;
-    union __socketunified buffio_fd_info; 
+    buffioFdActive fdActive;
+    union __socketunified buffio_fd_info;
 };
 
 #endif

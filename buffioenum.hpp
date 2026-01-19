@@ -1,5 +1,5 @@
-#ifndef __BUFFIO_ENUM__
-#define __BUFFIO_ENUM__
+#ifndef BUFFIO_ENUM
+#define BUFFIO_ENUM
 #include <cstdint>
 
 enum class buffio_routine_status: uint32_t{

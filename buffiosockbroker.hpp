@@ -1,5 +1,5 @@
-#ifndef __BUFFIO_SOCK_BROKER__
-#define __BUFFIO_SOCK_BROKER__
+#ifndef BUFFIO_SOCK_BROKER
+#define BUFFIO_SOCK_BROKER
 /*
  * Error codes range reserved for buffiosockbroker
  *
