@@ -59,13 +59,14 @@ public:
            cursor(nullptr),capinit(0),active(0){};
 
   // initliser of the schedular
-  int init(struct buffiosockbrokerconf _cfg,size_t _capinitial){
+   int init(struct buffiosockbrokerconf _cfg,size_t _capinitial){
      int tmp_err = init(_capinitial);
      if(tmp_err < 0) return tmp_err;
-     int poll_err = iopoller.configure(_cfg);
-     if(poll_err < 0) return poll_err;
-     int ini_err = iopoller.init();
-     if(ini_err < 0) return ini_err;
+
+     sb_error poll_err = iopoller.configure(_cfg);
+     if(poll_err != sb_error::none) return static_cast<int>(poll_err);
+     sb_error ini_err = iopoller.init();
+     if(ini_err != sb_error::none) return static_cast<int>(ini_err);
      return 0;
   }
   int init(size_t _capinitial){
@@ -91,20 +92,22 @@ public:
      buffiopromise *promise = &tsk.promise();
      struct __schedinternal *cur = cursor;
 
-     if(promise->selfstatus.status == BUFFIO_ROUTINE_STATUS_EXECUTING)
+     if(promise->selfstatus.status == buffio_routine_status::executing)
                         tsk.resume();
 
 
       switch(promise->selfstatus.status){
-       case BUFFIO_ROUTINE_STATUS_EXECUTING:
-       case BUFFIO_ROUTINE_STATUS_YIELD:{
+        case buffio_routine_status::executing:
+        cursor = cursor->next;
+        break;
+        case buffio_routine_status::yield:{
              cursor = cursor->next;
-             promise->setstatus(BUFFIO_ROUTINE_STATUS_EXECUTING);
+             promise->setstatus(buffio_routine_status::executing);
 
        }break;
-       case BUFFIO_ROUTINE_STATUS_WAITING_IO:{}break; //case used to transfer iorequest to the appropritate worker
-       case BUFFIO_ROUTINE_STATUS_PAUSED:{} break;
-       case BUFFIO_ROUTINE_STATUS_WAITING:{ 
+       case buffio_routine_status::waiting_io: {} break;
+       case buffio_routine_status::paused: {} break;
+       case buffio_routine_status::waiting:{
         struct __schedinternal *tsk = schedmem.getfrag();
         tsk->fiber.task = promise->waitingfor;
         tsk->waitercount += 1;
@@ -112,17 +115,17 @@ public:
         replacecursor(tsk);
         cursor = cursor->next;        
        } break;
-       case BUFFIO_ROUTINE_STATUS_PUSH_TASK:{}break;
-       case BUFFIO_ROUTINE_STATUS_UNHANDLED_EXCEPTION:
-       case BUFFIO_ROUTINE_STATUS_ERROR:
-       case BUFFIO_ROUTINE_STATUS_DONE:{
+       case buffio_routine_status::push_task:{}break;     
+       case buffio_routine_status::unhandled_exception:
+       case buffio_routine_status::error:
+       case buffio_routine_status::done:{
         if(cursor->waiters != nullptr){
            wakeup(cur,cursor->waitercount);
            cursor->waitercount = 0;
         }  
         cursor = cur->next;
         poptask(cur);
-        }break;
+       }break;
      }
     }
   };
@@ -181,7 +184,7 @@ private:
 
     for(size_t i = 0; i < waitercount;i--){
       buffiopromise *pro = &waitinglist->fiber.task.promise();
-      pro->setstatus(BUFFIO_ROUTINE_STATUS_EXECUTING);
+      pro->setstatus(buffio_routine_status::executing);
       pro->childstatus = tmppromise;
       scheduleptr(waitinglist);
       waitinglist = waitinglist->wnxt;

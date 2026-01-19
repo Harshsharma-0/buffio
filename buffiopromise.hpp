@@ -49,7 +49,7 @@ struct buffiopushinfo{
 };
 
 struct buffiopromisestatus {
-  enum BUFFIO_ROUTINE_STATUS status;
+  buffio_routine_status status;
   int returncode = 0;
   std::exception_ptr routineexception;
 };
@@ -65,7 +65,7 @@ struct buffiopromise {
 
   buffioroutine get_return_object() {
     self = {buffioroutine::from_promise(*this)};
-    selfstatus.status = BUFFIO_ROUTINE_STATUS_EXECUTING;
+    selfstatus.status = buffio_routine_status::executing;
     return self;
   };
 
@@ -73,19 +73,19 @@ struct buffiopromise {
   std::suspend_always final_suspend() noexcept { return {};};
 
   std::suspend_always yield_value(int value) {
-    selfstatus.status = BUFFIO_ROUTINE_STATUS_YIELD;
+    selfstatus.status = buffio_routine_status::yield;
     return {};
   };
 
   buffioawaiter await_transform(buffioroutine waitfor) {
     waitingfor = waitfor;
-    selfstatus.status = BUFFIO_ROUTINE_STATUS_WAITING;
+    selfstatus.status = buffio_routine_status::waiting;
     return {.self = self};
   };
 
   buffioawaiter await_transform(buffiopushinfo info) {
     pushhandle = info.task;
-    selfstatus.status = BUFFIO_ROUTINE_STATUS_PUSH_TASK;
+    selfstatus.status = buffio_routine_status::push_task;
     return {.self = info.task};
   };
 
@@ -94,7 +94,7 @@ struct buffiopromise {
     return {};
   }
   void unhandled_exception() {
-    selfstatus.status = BUFFIO_ROUTINE_STATUS_UNHANDLED_EXCEPTION;
+    selfstatus.status = buffio_routine_status::unhandled_exception;
     selfstatus.returncode = -1;
     selfstatus.routineexception = std::current_exception();
   };
@@ -102,12 +102,12 @@ struct buffiopromise {
   void return_value(int state) {
     selfstatus.returncode = state;
     selfstatus.status =
-        state < 0 ? BUFFIO_ROUTINE_STATUS_ERROR : BUFFIO_ROUTINE_STATUS_DONE;
+        state < 0 ? buffio_routine_status::error : buffio_routine_status::done;
     return;
   };
-  void setstatus(enum BUFFIO_ROUTINE_STATUS stat){ selfstatus.status = stat; }
+  void setstatus(buffio_routine_status stat){ selfstatus.status = stat; }
   bool checkstatus() {
-    return selfstatus.status == BUFFIO_ROUTINE_STATUS_ERROR ||
+    return selfstatus.status == buffio_routine_status::error ||
                    selfstatus.returncode < 0
                ? true
                : false;
@@ -122,15 +122,12 @@ public:
   };
   void exceptionthrower() {
     switch (status.status) {
-    case BUFFIO_ROUTINE_STATUS_UNHANDLED_EXCEPTION:
+      case buffio_routine_status::unhandled_exception:
       std::rethrow_exception(status.routineexception);
       break;
-    case BUFFIO_ROUTINE_STATUS_ERROR:
+      case buffio_routine_status::error:
       throw std::runtime_error(
           "error in execution of routine return code less than 0");
-      break;
-    case BUFFIO_ROUTINE_STATUS_DONE:
-      return;
       break;
     }
   }
