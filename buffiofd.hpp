@@ -152,7 +152,7 @@ public:
             int domain = 0;
             int type = 0; 
 
-            sockaddr_storage addr;
+            sockaddr_storage addr = {0};
             socklen_t addr_len = 0;
             bool unlink_on_close = false;
 
@@ -161,7 +161,9 @@ public:
             case buffio_fd_family::ipv4_tcp:
             case buffio_fd_family::ipv4_udp:{
              domain = AF_INET;
-                     if(!info.address || info.portnumber <= 0)
+             type = info.family == buffio_fd_family::local_ipv4_tcp ? SOCK_STREAM : SOCK_DGRAM;
+
+             if(!info.address || info.portnumber <= 0)
                    return buffio_fd_error::portnumber;
 
               sockaddr_in *in = reinterpret_cast<sockaddr_in*>(&addr);
@@ -170,7 +172,7 @@ public:
               if(inet_pton(AF_INET,info.address,&in->sin_addr) != 1)
                                return buffio_fd_error::address_ipv4;
               addr_len = sizeof(sockaddr_in);
-             }
+             }break;
             case buffio_fd_family::local_udp:
             case buffio_fd_family::local_tcp:{
                        
@@ -215,9 +217,9 @@ public:
         if (active != buffioFdActive::none)
             return buffio_fd_error::occupied;
 
-        int pipefd = ::pipe(data.pipe_fds);
-        if (pipefd != 0)
+        if (::pipe(data.pipe_fds) != 0)
             return buffio_fd_error::pipe;
+
         fd_family = buffio_fd_family::pipe;
         active = buffioFdActive::pipe;
 
@@ -255,8 +257,9 @@ public:
             if (data.sock.unlink_on_close == true){
                 sockaddr_un *un = reinterpret_cast<sockaddr_un*>(&data.sock.addr);
                 ::unlink(un->sun_path);
-                ::close(data.sock.fd);
             }
+                ::close(data.sock.fd);
+
         } break;
         };
 
