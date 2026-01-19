@@ -30,7 +30,7 @@ enum class buffio_fd_family : uint32_t {
     none = 0,
     file = 1,
     pipe = 2,
-    fifo = 3,
+//    fifo = 3,
     ipv4_tcp = 4,
     ipv4_udp = 5,
     ipv6_tcp = 6,
@@ -49,7 +49,7 @@ enum class buffioFdActive : uint32_t {
     none = 0,
     ipv4 = 1,
     ipv6 = 2,
-    fifo = 3,
+//    fifo = 3,
     file = 4,
     pipe = 5,
     local = 6
@@ -70,6 +70,7 @@ enum class buffio_fd_error : int {
     family = -112,
     address_ipv4 = -113,
     address_ipv6 = -114,
+    fcntl = -115
 };
 
 // used for ip socket
@@ -118,7 +119,6 @@ union buffiofdreq {
  */
 
 class buffiofd {
-
     // magic magic things
     union fd_union {
         struct {
@@ -128,10 +128,7 @@ class buffiofd {
             socklen_t addr_len;
         } sock;
         int pipe_fds[2];
-        struct file_info {
-            char* address;
-            int fd;
-        } file_info;
+        int file_fd;
     };
 
 public:
@@ -139,7 +136,7 @@ public:
     {
         fd_family = buffio_fd_family::none;
         active = buffioFdActive::none;
-        data = {0};
+        data = { 0 };
     };
 
     // function to create a ipsocket
@@ -147,66 +144,67 @@ public:
     {
         // proceed only if there is no fd currently opened in the context
         if (active != buffioFdActive::none)
-              return buffio_fd_error::occupied;
+            return buffio_fd_error::occupied;
 
-            int domain = 0;
-            int type = 0; 
+        int domain = 0;
+        int type = 0;
 
-            sockaddr_storage addr = {0};
-            socklen_t addr_len = 0;
-            bool unlink_on_close = false;
+        sockaddr_storage addr = { 0 };
+        socklen_t addr_len = 0;
+        bool unlink_on_close = false;
 
-        
-            switch (info.family){
-            case buffio_fd_family::ipv4_tcp:
-            case buffio_fd_family::ipv4_udp:{
-             domain = AF_INET;
-             type = info.family == buffio_fd_family::local_ipv4_tcp ? SOCK_STREAM : SOCK_DGRAM;
+        switch (info.family) {
+        case buffio_fd_family::ipv4_tcp:
+        case buffio_fd_family::ipv4_udp: {
+            domain = AF_INET;
+            type = info.family == buffio_fd_family::ipv4_tcp ? SOCK_STREAM : SOCK_DGRAM;
 
-             if(!info.address || info.portnumber <= 0)
-                   return buffio_fd_error::portnumber;
+            if (!info.address || info.portnumber <= 0 || info.portnumber > 65535)
+                return buffio_fd_error::portnumber;
 
-              sockaddr_in *in = reinterpret_cast<sockaddr_in*>(&addr);
-              in->sin_family = AF_INET;
-              in->sin_port = htons(info.portnumber);
-              if(inet_pton(AF_INET,info.address,&in->sin_addr) != 1)
-                               return buffio_fd_error::address_ipv4;
-              addr_len = sizeof(sockaddr_in);
-             }break;
-            case buffio_fd_family::local_udp:
-            case buffio_fd_family::local_tcp:{
-                       
-             if(info.address == nullptr) return buffio_fd_error::socket_address;
-             domain = AF_UNIX;
-             type = info.family == buffio_fd_family::local_tcp ? SOCK_STREAM : SOCK_DGRAM;
+            sockaddr_in* in = reinterpret_cast<sockaddr_in*>(&addr);
+            in->sin_family = AF_INET;
+            in->sin_port = htons(info.portnumber);
+            if (inet_pton(AF_INET, info.address, &in->sin_addr) != 1)
+                return buffio_fd_error::address_ipv4;
+            addr_len = sizeof(sockaddr_in);
+        } break;
+        case buffio_fd_family::local_udp:
+        case buffio_fd_family::local_tcp: {
 
-             sockaddr_un *un = reinterpret_cast<sockaddr_un*>(&addr);
-             un->sun_family = AF_UNIX;
-             addr_len = sizeof(sockaddr_un);
+            if (info.address == nullptr)
+                return buffio_fd_error::socket_address;
+            domain = AF_UNIX;
+            type = info.family == buffio_fd_family::local_tcp ? SOCK_STREAM : SOCK_DGRAM;
 
-             size_t len = strlen(info.address);
-             if(len >= sizeof(un->sun_path)) return buffio_fd_error::socket_address;
-             std::memcpy(un->sun_path,info.address,len+1);
-             unlink_on_close = true;
-            }break;
-            default:
-                return buffio_fd_error::family;
-                break;
-            }
-           int fd = ::socket(domain,type,0);
-           if(fd < 0) return buffio_fd_error::socket;
-           if(::bind(fd,reinterpret_cast<sockaddr *>(&addr),addr_len) != 0){
-                ::close(fd);
-                return buffio_fd_error::bind;
-           }
-           data.sock.fd = fd;
-           data.sock.addr = addr;
-           data.sock.unlink_on_close = unlink_on_close;
-           data.sock.addr_len = addr_len;
-           fd_family = info.family;
-           active = (domain == AF_INET) ? buffioFdActive::ipv4 : buffioFdActive::local;
-           return buffio_fd_error::none;
-         
+            sockaddr_un* un = reinterpret_cast<sockaddr_un*>(&addr);
+            un->sun_family = AF_UNIX;
+            addr_len = sizeof(sockaddr_un);
+
+            size_t len = strlen(info.address);
+            if (len >= sizeof(un->sun_path))
+                return buffio_fd_error::socket_address;
+            std::memcpy(un->sun_path, info.address, len + 1);
+            unlink_on_close = true;
+        } break;
+        default:
+            return buffio_fd_error::family;
+            break;
+        }
+        int fd = ::socket(domain, type, 0);
+        if (fd < 0)
+            return buffio_fd_error::socket;
+        if (::bind(fd, reinterpret_cast<sockaddr*>(&addr), addr_len) != 0) {
+            ::close(fd);
+            return buffio_fd_error::bind;
+        }
+        data.sock.fd = fd;
+        data.sock.addr = addr;
+        data.sock.unlink_on_close = unlink_on_close;
+        data.sock.addr_len = addr_len;
+        fd_family = info.family;
+        active = (domain == AF_INET) ? buffioFdActive::ipv4 : buffioFdActive::local;
+        return buffio_fd_error::none;
     };
 
     // function to create a pipe
@@ -219,12 +217,32 @@ public:
 
         if (::pipe(data.pipe_fds) != 0)
             return buffio_fd_error::pipe;
+        if (block == buffio_fd_block::no_block) {
+            if (fcntl(data.pipe_fds[0], F_SETFD, O_NONBLOCK) == -1) {
+                ::close(data.pipe_fds[0]);
+                return buffio_fd_error::fcntl;
+            }
+            if (fcntl(data.pipe_fds[1], F_SETFD, O_NONBLOCK) == -1) {
+                ::close(data.pipe_fds[0]);
+                ::close(data.pipe_fds[1]);
 
+                return buffio_fd_error::fcntl;
+            }
+        }
         fd_family = buffio_fd_family::pipe;
         active = buffioFdActive::pipe;
 
         return buffio_fd_error::none;
     };
+ 
+  // fifo must be managed by the user, only helper function to create fifo
+    [[nodiscard]] 
+       buffio_fd_error createfifo(const char* path = nullptr,mode_t mode = 0666){
+     if(path == nullptr) return buffio_fd_error::fifo_path;
+     if(mkfifo(path,mode) == 0) 
+       return buffio_fd_error::none;
+     return buffio_fd_error::fifo;
+    }
 
     [[nodiscard]] int createfile(const char* path = nullptr)
     {
@@ -242,23 +260,21 @@ public:
     {
         switch (active) {
         case buffioFdActive::file: {
-         //not handled yet
-        } break;
-        case buffioFdActive::fifo: {
+            // not handled yet
         } break;
         case buffioFdActive::pipe: {
             ::close(data.pipe_fds[0]);
             ::close(data.pipe_fds[1]);
         } break;
-        case buffioFdActive::ipv4:{
+        case buffioFdActive::ipv4: {
             ::close(data.sock.fd);
         } break;
         case buffioFdActive::local: {
-            if (data.sock.unlink_on_close == true){
-                sockaddr_un *un = reinterpret_cast<sockaddr_un*>(&data.sock.addr);
+            if (data.sock.unlink_on_close == true) {
+                sockaddr_un* un = reinterpret_cast<sockaddr_un*>(&data.sock.addr);
                 ::unlink(un->sun_path);
             }
-                ::close(data.sock.fd);
+            ::close(data.sock.fd);
 
         } break;
         };
