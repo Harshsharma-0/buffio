@@ -84,8 +84,7 @@ public:
         if (::pthread_sigmask(SIG_BLOCK, &signalSet, NULL) != 0)
             return -1;
         if (::pthread_create(&threadHandler, NULL,
-                buffioSignalHandler::threadSigHandler, this)
-            != 0)
+                buffioSignalHandler::threadSigHandler, this) != 0)
             return -1;
         return 0;
     };
@@ -148,6 +147,9 @@ public:
                 delete[] loop->name;
             ::free(loop->stack);
         }
+        numThreads = 0;
+        threads = nullptr;
+        threadsId = nullptr;
         return;
     };
 
@@ -183,6 +185,7 @@ public:
             return -1;
         if (::pthread_attr_setstack(&tmpThr->attr, tmpThr->stack, stackSize) != 0)
             return -1;
+
         tmpThr->stackSize = stackSize;
         tmpThr->func = func;
         if (threads == nullptr) {
@@ -246,8 +249,8 @@ private:
         tmpThr->status.store(buffioThreadStatus::running, std::memory_order_release);
 
         if (tmpThr->name != nullptr)
-        buffiothread:
-            setname(tmpThr->name);
+            ::prctl(PR_SET_NAME, tmpThr->name, 0, 0, 0);
+
 
         int error = tmpThr->func(tmpThr->resource);
 
