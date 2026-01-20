@@ -134,22 +134,24 @@ public:
     buffiothread()
         : threads(nullptr)
         , numThreads(0)
-        , threadsId(nullptr)
-    {}
+        , threadsId(nullptr){}
 
     // only free the allocated resource for the thread not terminate it
     void threadfree()
     {
-        if (threadsId != nullptr)
-            delete[] threadsId;
-        for (auto* loop = threads; loop != nullptr; loop = loop->next) {
+        if (threadsId != nullptr) delete[] threadsId;
+        
+        struct threadinternal *tmp = nullptr;
+        for (auto* loop = threads; loop != nullptr;) {
             if (loop->name != nullptr)
                 delete[] loop->name;
             ::free(loop->stack);
+          tmp = loop;
+          loop = loop->next;
+          delete tmp;
         }
         numThreads = 0;
-        threads = nullptr;
-        threadsId = nullptr;
+        threads = threadsId = nullptr;
         return;
     };
 
@@ -201,21 +203,21 @@ public:
 
     // return array of ids of the thread
     [[nodiscard]]
-    pthread_t* run()
-    {
+    pthread_t* run(){
 
         if (threadsId != nullptr || threads == nullptr)
             return nullptr;
 
         threadsId = new pthread_t[numThreads];
-
         auto tmpStatus = buffioThreadStatus::configOk;
         size_t count = 0;
+
         for (auto* thr = threads; threads != nullptr; threads = threads->next) {
-            if (thr->status != buffioThreadStatus::configOk)
-                continue;
+
+            if (thr->status != buffioThreadStatus::configOk) continue;
             if (::pthread_create(&thr->id, &thr->attr, buffioFunc, thr) != 0)
                 return nullptr;
+
             ::pthread_attr_destroy(&thr->attr);
             threadsId[count] = thr->id;
             count += 1;
@@ -223,13 +225,11 @@ public:
         return threadsId;
     };
 
-    void wait(pthread_t threadId)
-    {
+    void wait(pthread_t threadId){
         ::pthread_join(threadId, NULL);
     }
 
-    static int setname(const char* name)
-    {
+    static int setname(const char* name){
         return prctl(PR_SET_NAME, name, 0, 0, 0);
     };
     buffiothread(const buffiothread&) = delete;
