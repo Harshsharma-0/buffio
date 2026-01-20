@@ -69,7 +69,7 @@ struct buffiopromise {
     return self;
   };
 
-  std::suspend_always initial_suspend() noexcept { return {}; };
+  std::suspend_always initial_suspend() noexcept { return {};};
   std::suspend_always final_suspend() noexcept { return {};};
 
   std::suspend_always yield_value(int value) {
@@ -91,6 +91,7 @@ struct buffiopromise {
 
   // overload to submit I/O request via the promise to the sockbroker
   buffioawaiter await_transform(buffiofd &sockview){
+    selfstatus.status = buffio_routine_status::waiting_io;
     return {};
   }
   void unhandled_exception() {

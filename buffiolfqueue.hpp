@@ -67,8 +67,10 @@ class buffiolfqueue{
   };
 
   public:
-  buffiolfqueue(size_t _order, T _onEmpty): data(nullptr),threadsblocked(0){ lfstart(_order,_onEmpty);}
-  buffiolfqueue(): data(nullptr),threadsblocked(0){};
+  buffiolfqueue(): data(nullptr),threadsblocked(0){
+     acqueue.data = nullptr;
+     freequeue.data = nullptr;
+   };
 
   int lfstart(size_t _order, T _onEmpty){
    if(_order <= buffioatomix_max_order && _order >= BUFFIO_RING_MIN && data == nullptr){

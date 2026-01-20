@@ -88,6 +88,7 @@ enum class sb_ep_error: int{
   epollinstance = -1110,
   op_add        = -1111,
   op_del        = -1112,
+  occupied      = -1113
  };
 
 
@@ -103,27 +104,6 @@ using buffio_sb_queue = buffiolfqueue<buffiofdreq>;
 // not defined yet
 #define bf_io_ok 0
 
-// integrated iouring in a simple structure due to arch changes
-struct buffiopollcaller{
-   // reserved for future use;
-    std::atomic<int>* ep_empty;
- 
-   // ep_entry are the entry that you want to add to the epoll instance;
-    buffio_sb_queue* ep_entry;    
-
-   // ep_works are the entry that are pushed to the worker thread;
-    buffio_sb_queue* ep_works;    
-
-   // ep_consume are the entry that are processed;
-    buffio_sb_queue* ep_consume; 
-   //   struct epoll_event* ep_events;
-    buffiothreadinfo* ep_threads;
-   //  size_t ep_eventsize;
-    size_t ep_totalfd;
-    int ep_fd;
-    sb_ep_state ep_configured;
-    int io_ufd;
-};
 
 class buffiosockbroker {
 
@@ -150,10 +130,12 @@ class buffiosockbroker {
 
     static int buffio_epoll_poller_modular(void* data)
     { 
+    /*
       buffiopollcaller *sb_ep = (buffiopollcaller*)data;
       buffio_sb_queue *ep_entry = sb_ep->ep_entry;
       buffio_sb_queue *ep_works = sb_ep->ep_works;
       buffio_sb_queue *ep_conusme = sb_ep->ep_consume;
+    */
 
       
     //  int err = buffio_ep_thread_poll(0,nullptr,0);
@@ -173,23 +155,24 @@ class buffiosockbroker {
     __attribute__((used)) static int buffio_iouring_poller(void* data) { return 0; }
 
 public:
-    buffiosockbroker()
-    {
+    buffiosockbroker():ep_fd(-1),ep_totalfd(0),io_ufd(-1),ep_threads(nullptr){
         sb_state = buffio_sockbroker_state::inactive;
         config.sb_configured = sb_cfg_flag::none;
+        sb_ep_state ep_configured = sb_ep_state::none;
     };
-    ~buffiosockbroker()
-    {
+
+    ~buffiosockbroker(){
         switch (sb_state) {
           case buffio_sockbroker_state::epoll_running:
           case buffio_sockbroker_state::epoll:
-            shutpoll(pollinfo);
+            shutpoll();
             break;
         }
         return;
     }
 
-    [[nodiscard(broker_cfg_nodiscard_msg)]] sb_error configure(struct buffiosockbrokerconf cfg)
+    [[nodiscard(broker_cfg_nodiscard_msg)]] 
+                sb_error configure(struct buffiosockbrokerconf cfg)
     {
         if (cfg.sb_workernum > 0 && cfg.sb_expectedfds > 0 && 
                            config.sb_configured == sb_cfg_flag::none) {
@@ -206,7 +189,6 @@ public:
 
   sb_error init()
     {
-        std::cout<<sizeof(buffiofd)<<std::endl;
         if (sb_state != buffio_sockbroker_state::inactive)
                return sb_error::unknown;
 
@@ -214,7 +196,7 @@ public:
             switch (config.sb_pollertype) {
             case buffio_sb_poller_type::monolithic:
             case buffio_sb_poller_type::modular:{
-                sb_ep_error err = configureepoll(&pollinfo); 
+                sb_ep_error err = configureepoll(); 
                 if(err == sb_ep_error::none) 
                     return sb_error::none;
     
@@ -242,7 +224,8 @@ public:
     buffiosockbroker& operator=(const buffiosockbroker&) = delete;
 
     sb_ep_error poll_fd(struct buffiofdreq_add *entry){
-       if(sb_state != buffio_sockbroker_state::inactive && pollinfo.ep_configured == sb_ep_state_ok){
+       if(sb_state != buffio_sockbroker_state::inactive 
+                              && ep_configured == sb_ep_state_ok){
           switch(entry->opcode){
             case buffio_fd_opcode::start_poll: break;
             case buffio_fd_opcode::end_poll: break;
@@ -253,58 +236,31 @@ public:
     };
 
 private:
-    sb_ep_error configureepoll(struct buffiopollcaller *info)
+    sb_ep_error configureepoll()
     {
         // code below here is used for epoll instance,
 
-        struct buffiopollcaller epolltmp = { 0 };
+        if(ep_configured == sb_ep_state_ok) return sb_ep_error::occupied;
 
-        int ep_fd_tmp = createepollinstance(&epolltmp.ep_fd);
+        int ep_fd_tmp = createepollinstance(&ep_fd);
         if (ep_fd_tmp < 0)
             return sb_ep_error::fd;
 
-        epolltmp.ep_configured |= sb_ep_state::fd_ok;
+        ep_configured |= sb_ep_state::fd_ok;
+        ep_configured |= sb_ep_state::entry_ok;
+        ep_configured |= sb_ep_state::works_ok;
+        ep_configured |= sb_ep_state::consume_ok;
+        ep_configured |= sb_ep_state::events_ok;
+        ep_totalfd = 0;
 
-        epolltmp.ep_entry = new  buffio_sb_queue;
-        if (epolltmp.ep_entry == nullptr) {
-            shutpoll(epolltmp);
-            return sb_ep_error::entry;
-        }
-
-        epolltmp.ep_configured |= sb_ep_state::entry_ok;
-        epolltmp.ep_works = new  buffio_sb_queue;
-
-        if (epolltmp.ep_works == nullptr) {
-            shutpoll(epolltmp);
-            return sb_ep_error::works;
-        }
-
-        epolltmp.ep_configured |= sb_ep_state::works_ok;
-        epolltmp.ep_consume = new  buffio_sb_queue;
-        if (epolltmp.ep_consume == nullptr) {
-            shutpoll(epolltmp);
-            return sb_ep_error::consume;
-        }
-        epolltmp.ep_configured |= sb_ep_state::consume_ok;
-        
-       /* field not required removed
-        epolltmp.ep_events = new struct epoll_event[config.sb_expectedfds];
-        if (epolltmp.ep_events == nullptr) {
-            shutpoll(epolltmp);
-            return sb_ep_error::events;
-        }
-        */
-
-        epolltmp.ep_configured |= sb_ep_state::events_ok;
-//      epolltmp.ep_eventsize = config.sb_expectedfds;
-        epolltmp.ep_totalfd = 0;
-        epolltmp.ep_configured |= sb_ep_state::eventsize_ok;
+        ep_configured |= sb_ep_state::eventsize_ok;
 
         int i = 0;
-        epolltmp.ep_threads = new buffiothreadinfo[(config.sb_workernum + 1)];
+    /*
+        ep_threads = new buffiothreadinfo[(config.sb_workernum + 1)];
 
-        if (epolltmp.ep_threads == nullptr){
-            shutpoll(epolltmp);
+        if (ep_threads == nullptr){
+            shutpoll();
             return sb_ep_error::thread;
         };
 
@@ -314,66 +270,59 @@ private:
             threadinfo_tmp.stacksize = buffiothread::SD;
             threadinfo_tmp.dataptr = nullptr;
             threadinfo_tmp.callfunc = buffiosockbroker::buffio_epoll_poller_modular;
-            epolltmp.ep_threads[0] = threadinfo_tmp; 
+            ep_threads[0] = threadinfo_tmp; 
             i = 1; 
         break;
       };
-        epolltmp.ep_configured |= sb_ep_state::thread_ok;
+        ep_configured |= sb_ep_state::thread_ok;
 
         for (; i < config.sb_workernum; i++) {
             struct buffiothreadinfo threadinfo_tmp = { 0 };
             threadinfo_tmp.stacksize = buffiothread::SD;
             threadinfo_tmp.dataptr = nullptr;
             threadinfo_tmp.callfunc = buffio_epoll_monolithic;
-            epolltmp.ep_threads[i] = threadinfo_tmp;
+            ep_threads[i] = threadinfo_tmp;
         }
-
-        if (threadpool.runthreads(config.sb_workernum, epolltmp.ep_threads) < 0){
-            shutpoll(epolltmp);
+/*
+        if (threadpool.runthreads(config.sb_workernum, ep_threads) < 0){
+            shutpoll();
             return sb_ep_error::thread_run;
         }
+    */
  
    
-        epolltmp.ep_configured |= sb_ep_state::thread_run_ok | sb_ep_state::empty_ok;
-        *info = epolltmp;
+        ep_configured |= sb_ep_state::thread_run_ok | sb_ep_state::empty_ok;
         sb_state = buffio_sockbroker_state::epoll;
         return sb_ep_error::none;
     }
 
-    void shutpoll(struct buffiopollcaller& which)
+    void shutpoll()
     {
-        sb_ep_state mask = which.ep_configured;
+        sb_ep_state mask = ep_configured;
         if (ep_has_flag(mask,sb_ep_state::fd_ok)) {
-            close(which.ep_fd);
+            close(ep_fd);
             mask &= ~(sb_ep_state::fd_ok); // unsetting the mask;
         }
-        if (ep_has_flag(mask,sb_ep_state::entry_ok)) {
-            delete which.ep_entry;
+        if (ep_has_flag(mask,sb_ep_state::entry_ok))
             mask &= ~(sb_ep_state::entry_ok);
-        }
-        if (ep_has_flag(mask,sb_ep_state::works_ok)) {
-            delete which.ep_works;
+        
+        if (ep_has_flag(mask,sb_ep_state::works_ok)) 
             mask &= ~(sb_ep_state::works_ok);
-        }
-        if (ep_has_flag(mask,sb_ep_state::consume_ok)) {
-            delete which.ep_consume;
+        
+        if (ep_has_flag(mask,sb_ep_state::consume_ok))
             mask &= ~(sb_ep_state::consume_ok);
-        }
     
-       // if (ep_has_flag(mask,sb_ep_state::events_ok)){
-       //      delete[] which.ep_events;
-              mask &= ~(sb_ep_state::events_ok);
-       //}
+            mask &= ~(sb_ep_state::events_ok);
 
         if (ep_has_flag(mask,sb_ep_state::thread_ok)) {
             if (ep_has_flag(mask,sb_ep_state::thread_run_ok)) {
-                threadpool.killthread(-1);
-                mask &= ~(sb_ep_state::thread_run_ok);
+                    mask &= ~(sb_ep_state::thread_run_ok);
             }
-            delete[] which.ep_threads;
+            delete[] ep_threads;
+            ep_threads = nullptr;
             mask &= ~(sb_ep_state::thread_ok);
         }
-        which.ep_configured = mask;
+        ep_configured = sb_ep_state::none;
         sb_state = buffio_sockbroker_state::inactive; 
     };
 
@@ -388,11 +337,19 @@ private:
     }
 
     buffiothread threadpool;
-    struct buffiopollcaller pollinfo;
     struct buffiosockbrokerconf config;
-    buffio_sb_queue  *sb_input; // give the interested files here
-    buffio_sb_queue  *sb_output; // pop out the completed tasks here
     buffio_sockbroker_state sb_state;
+
+    std::atomic<int> ep_empty;
+    buffio_sb_queue ep_entry;    
+    buffio_sb_queue ep_works;    
+    buffio_sb_queue ep_consume; 
+    pthread_t *ep_threads;
+    size_t ep_totalfd;
+    int ep_fd;
+    sb_ep_state ep_configured;
+    int io_ufd;
+
 };
 
 #endif

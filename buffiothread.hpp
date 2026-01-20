@@ -2,12 +2,15 @@
 #define __BUFFIO_THREAD_HPP__
 
 /*
-* Error codes range reserved for buffiothread
-*  [6000 - 7500]
-*  6000 <= errorcode <= 7500
-*/
+ * Error codes range reserved for buffiothread
+ *  [6000 - 7500]
+ *  6000 <= errorcode <= 7500
+ */
 
 #include <atomic>
+#include <cstdlib>
+#include <cstring>
+#include <pthread.h>
 #include <sched.h>
 #include <signal.h>
 #include <sys/mman.h>
@@ -15,235 +18,248 @@
 #include <sys/types.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
-
+#include <unordered_map>
+#include <vector>
 
 // The struct buffiothreadinfo lifecycle after running the thread is upon user if they want to keep it or not
 // but when running thread struct buffiothreadinfo must be valid
-struct buffiothreadinfo{
- size_t stacksize;
- void *dataptr;
- char *threadname;
- pid_t pid;
- int (*callfunc)(void*);
- int idx;
-};
 
-enum class buffio_threadinfo_state: uint32_t{
- none     = 0,
- stack_ok = 1u,
- func_ok  = 1u << 1,
- data_ok  = 1u << 2,
- name_ok  = 1u << 3,
-};
+// class to handle signals across many buffiothreads instance;
+// order in which the handler are added, in that specific order the handler are executed;
+// FIFO: policy
+class buffioSignalHandler {
+    struct handler {
+        int id;
+        int (*func)(void* data);
+        void* data;
+        struct handler* next;
+    };
 
-constexpr buffio_threadinfo_state operator|(buffio_threadinfo_state a, 
-                                               buffio_threadinfo_state b){
-  return static_cast<buffio_threadinfo_state>
-                  (static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
-};
-
-constexpr buffio_threadinfo_state& operator|=(buffio_threadinfo_state& lhs ,
-                                                    buffio_threadinfo_state rhs){
-     lhs = lhs | rhs;
-     return lhs;
-}
-
-constexpr buffio_threadinfo_state operator&(buffio_threadinfo_state  a,
-                                             buffio_threadinfo_state  b)
-{
-    return static_cast<buffio_threadinfo_state>(
-        static_cast<uint32_t>(a) & static_cast<uint32_t>(b)
-    );
-};
-
-constexpr buffio_threadinfo_state thread_state_ok = buffio_threadinfo_state::stack_ok |
-                                                    buffio_threadinfo_state::func_ok  |
-                                                    buffio_threadinfo_state::data_ok  |
-                                                    buffio_threadinfo_state::name_ok;
-class buffiothread {
-
-
-struct threadinfo{
-    char *stack;
-    char *stacktop;
-    struct buffiothreadinfo threadint;
-    buffio_threadinfo_state thread_mask;
-    std::atomic<buffio_thread_status> threadstatus;
-};
+    using buffioSignalMap = std::unordered_map<int, std::vector<struct handler>>;
 
 public:
-  buffiothread(): threads(nullptr),numthread(0){ }
-
-    
-  ~buffiothread() { 
-    killthread(-1);
-    delete[] threads;
-    threads = nullptr;
-  };
-
-   
-  void killthread(int id) {
-    if (threads == nullptr)
-       return;
-
-    if(id < 0){
-    for(int i = 0; i < numthread ; i++) derefer(&threads[i]);
-      return;
+    buffioSignalHandler()
+        : mapLock(0)
+    {
+        ::sigemptyset(&signalSet);
+        map.reserve(5);
     }
-    if(id >= 0 && id < numthread)
-        derefer(&threads[id]);
+    static void* threadSigHandler(void* data)
+    {
+        buffioSignalHandler* core = reinterpret_cast<buffioSignalHandler*>(data);
+        int s = 0, sig = 0;
+        sigset_t mineSig = core->signalSet;
+        buffioSignalMap* cmap = &core->map;
 
-     return;
-  };
+        for (;;) {
+            s = ::sigwait(&mineSig, &sig);
+            if ((*cmap).find(sig) != (*cmap).end()) {
+                auto& vec = (*cmap)[sig];
+                for (auto& ent : vec) {
+                    ent.func(ent.data);
+                }
+            }
+        }
+        return nullptr;
+    };
+    buffioSignalHandler(const buffioSignalHandler&) = delete;
+    // function to add a mask
+    int maskadd(int sigNum = 0)
+    {
+        if (sigNum == 0)
+            return -1;
+        return ::sigaddset(&signalSet, sigNum);
+    };
+    // function remove the mask
+    int maskremove(int sigNum = 0)
+    {
+        if (sigNum == 0)
+            return -1;
+        return ::sigdelset(&signalSet, sigNum);
+    };
 
-  int runthreads(int n,struct buffiothreadinfo *__threads){
-   if(n <= 0 || !__threads) return -1;
-   if(threads != nullptr) return -2;
+    // function to mount the handler
+    int mount()
+    {
+        if (::pthread_sigmask(SIG_BLOCK, &signalSet, NULL) != 0)
+            return -1;
+        if (::pthread_create(&threadHandler, NULL,
+                buffioSignalHandler::threadSigHandler, this)
+            != 0)
+            return -1;
+        return 0;
+    };
+    // function to unregister a mask
+    int unregister(int sigNum = 0,int id = -1)
+    {
+        if (sigNum == 0 || id = -1)
+            return -1;
+        map.erase(sigNum); // don't care if exist or not
+        return 0;
+    };
 
-   threads = new struct threadinfo[n];
-   if(threads == nullptr) return -3;
-   numthread = n;
+    int registerHandler(int sigNum = 0,
+        int (*func)(void* data) = nullptr,
+        void* data = nullptr)
+    {
 
-   for(int i = 0; i < n ; i++){
-     threads[i].threadstatus = buffio_thread_status::inactive;
-     threads[i].thread_mask = buffio_threadinfo_state::none;
-     if(__threads[i].callfunc){
-         threads[i].threadint.callfunc = __threads[i].callfunc; 
-         threads[i].thread_mask |= buffio_threadinfo_state::func_ok;
+        if (sigNum == 0 || func == nullptr)
+            return -1;
+        map[sigNum].push_back({ .func = func, .data = data });
+        return 0;
+    };
 
-      }
-      if(__threads[i].threadname){
-         threads[i].threadint.threadname = __threads[i].threadname;
-
-      }
-         threads[i].thread_mask |= buffio_threadinfo_state::name_ok;
-
-      if(__threads[i].stacksize > buffiothread::S1KB){
-        threads[i].threadint.stacksize = __threads[i].stacksize;
-        threads[i].thread_mask |= buffio_threadinfo_state::stack_ok;
-
-      }
-      threads[i].threadint.dataptr = __threads[i].dataptr;
-      threads[i].thread_mask |= buffio_threadinfo_state::data_ok;
-      __threads[i].idx = -1;
-      if(call(&threads[i]) > 0){
-
-        __threads[i].pid = threads[i].threadint.pid;
-        __threads[i].idx = i; 
-
-      }
-
-   }
-
-    return 0;
-  }
-  void wait(pid_t id){waitpid(id,0,0);}
-  void waitidx(int idx){
-    if(idx >= 0 && idx < numthread){
-       if(threads[idx].threadstatus.load(std::memory_order_acquire)
-                 == buffio_thread_status::running)
-           waitpid(threads[idx].threadint.pid,0,0);
-    }
-  }
-  void waitall(){
-    for(int i = 0; i < numthread; i++){
-      switch(threads[i].threadstatus.load(std::memory_order_acquire)){
-       case buffio_thread_status::running:
-       waitpid(threads[i].threadint.pid,0,0);
-       break;
-      }
-    }
-  }
-
-
-  static int setname(const char *name) {
-    return prctl(PR_SET_NAME, name, 0, 0, 0);
-  };
-  buffiothread(const buffiothread&) = delete;
-
-  static constexpr size_t S1MB = 1024 * 1024;
-  static constexpr size_t S4MB = 4 * (1024 * 1024);
-  static constexpr size_t S9MB = 9 * (1024 * 1024);
-  static constexpr size_t S10MB = 10 * (1024 * 1024);
-  static constexpr size_t SD = buffiothread::S9MB;
-  static constexpr size_t S1KB = 1024;
-
-  
 private:
-  // derefer is used both to kill and unmap a thread, and the cases are handled in that manner, if a thread is marked killed it is not
-  // use and not handled by any case it the thread is done only unmapping is done and it the thread is running it is killed and the unmapped
-  void derefer(struct threadinfo *info){
-    if(info->thread_mask == thread_state_ok){ 
-      switch(info->threadstatus.load(std::memory_order_acquire)){
-        case buffio_thread_status::running:
-            kill(info->threadint.pid,SIGKILL);
-            waitpid(info->threadint.pid,0,0);
-            [[fallthrough]];
-            case buffio_thread_status::done:
-            munmap(info->stack,info->threadint.stacksize);
-            info->threadstatus = buffio_thread_status::killed;
-            info->thread_mask = buffio_threadinfo_state::none;
-        break;
-      }
-    }
-  };
-
-  static int buffiofunc(void *data) {
-     struct threadinfo *instance = (struct threadinfo *)data;
-     if(instance->threadint.threadname) 
-         buffiothread::setname(instance->threadint.threadname);
-     // the return value will be propageted to the func in future update
-     // TODO: propagete the return value
-     instance->threadint.callfunc(instance->threadint.dataptr);
-     instance->threadstatus.store(buffio_thread_status::done,std::memory_order_release);
-     return 0;
-  };
-
-  int call(struct threadinfo *which){
-   
-
-    if((which->thread_mask & thread_state_ok) == thread_state_ok){
-    char *stack = nullptr, *stacktop = nullptr;
-    size_t stacksize = which->threadint.stacksize;
-    pid_t pid = 0;
-
-    stack = (char *)mmap(NULL,stacksize, PROT_READ | PROT_WRITE,
-                         MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0);
-
-    if (stack == (void *)-1) {
-      which->threadstatus = buffio_thread_status::error_map;
-      BUFFIO_ERROR("Failed to allocate thread stack, aborting thread creation, reason -> "
-                   ,strerror(errno));
-
-       return -1;
-    }
-       stacktop = stack + stacksize;
-       pid = clone(buffiofunc, stacktop,
-                CLONE_FILES | CLONE_FS | CLONE_IO| CLONE_VM | SIGCHLD, which);
-    if (pid < 0) {
-      which->threadstatus = buffio_thread_status::error;
-      BUFFIO_ERROR("Failed to create thread , reason -> "
-                  ,strerror(errno),
-                   which->threadint.threadname == nullptr ? ", error":", thread name ->",
-                   which->threadint.threadname); 
-
-      return -1;
-    }
-
-       buffio_thread_status tmpstatus = buffio_thread_status::inactive;
-       which->stacktop = stacktop;
-       which->stack = stack;
-       which->threadstatus.compare_exchange_weak(tmpstatus,buffio_thread_status::running
-                                                     ,std::memory_order_acq_rel);
-       which->threadint.pid = pid;
-     };
-
-    return 1;
-  };
-
-  struct threadinfo *threads;
-  int numthread;
+    std::atomic<int> mapLock; // 0 if unlocked, -1 if locked;
+    buffioSignalMap map;
+    sigset_t signalSet;
+    pthread_t threadHandler;
 };
 
+// thread termination is the user work
+class buffiothread {
 
-#endif 
+    struct threadinternal {
+        void* resource;
+        void* stack;
+        char* name;
+        int (*func)(void*);
+        threadinternal* next;
+        size_t stackSize;
+        pthread_attr_t attr;
+        pthread_t id;
+        std::atomic<buffioThreadStatus> status;
+    };
+
+public:
+    buffiothread()
+        : threads(nullptr)
+        , numThreads(0)
+        , threadsId(nullptr)
+    {}
+
+    // only free the allocated resource for the thread not terminate it
+    void threadfree()
+    {
+        if (threadsId != nullptr)
+            delete[] threadsId;
+        for (auto* loop = threads; loop != nullptr; loop = loop->next) {
+            if (loop->name != nullptr)
+                delete[] loop->name;
+            ::free(loop->stack);
+        }
+        return;
+    };
+
+    int add(const char* name = nullptr,
+        int (*func)(void*) = nullptr,
+        void* data = nullptr,
+        size_t stackSize = buffiothread::SD)
+    {
+
+        if (stackSize < buffiothread::S1KB || func == nullptr)
+            return -1;
+        struct threadinternal* tmpThr = new struct threadinternal;
+        std::memset(tmpThr, '\0', sizeof(struct threadinternal));
+        tmpThr->status = buffioThreadStatus::configOk;
+
+        if (::pthread_attr_init(&tmpThr->attr) != 0)
+            return -1;
+
+        tmpThr->resource = data;
+        tmpThr->name = nullptr;
+        tmpThr->stackSize = stackSize;
+        if (name != nullptr) {
+            size_t len = std::strlen(name);
+            if (len < 100) {
+                // TODO: error check;
+                char* name_tmp = new char[len + 1];
+                std::memcpy(name_tmp, name, len + 1);
+                tmpThr->name = name_tmp;
+            }
+        }
+
+        if (::posix_memalign(&tmpThr->stack, sysconf(_SC_PAGESIZE), stackSize) != 0)
+            return -1;
+        if (::pthread_attr_setstack(&tmpThr->attr, tmpThr->stack, stackSize) != 0)
+            return -1;
+        tmpThr->stackSize = stackSize;
+        tmpThr->func = func;
+        if (threads == nullptr) {
+            threads = tmpThr;
+        } else {
+            tmpThr->next = threads;
+            threads = tmpThr;
+        }
+        tmpThr->status = buffioThreadStatus::configOk;
+        numThreads += 1;
+        return 0;
+    };
+
+    // return array of ids of the thread
+    [[nodiscard]]
+    pthread_t* run()
+    {
+
+        if (threadsId != nullptr || threads == nullptr)
+            return nullptr;
+
+        threadsId = new pthread_t[numThreads];
+
+        auto tmpStatus = buffioThreadStatus::configOk;
+        size_t count = 0;
+        for (auto* thr = threads; threads != nullptr; threads = threads->next) {
+            if (thr->status != buffioThreadStatus::configOk)
+                continue;
+            if (::pthread_create(&thr->id, &thr->attr, buffioFunc, thr) != 0)
+                return nullptr;
+            ::pthread_attr_destroy(&thr->attr);
+            threadsId[count] = thr->id;
+            count += 1;
+        }
+        return threadsId;
+    };
+
+    void wait(pthread_t threadId)
+    {
+        ::pthread_join(threadId, NULL);
+    }
+
+    static int setname(const char* name)
+    {
+        return prctl(PR_SET_NAME, name, 0, 0, 0);
+    };
+    buffiothread(const buffiothread&) = delete;
+
+    static constexpr size_t S1MB = 1024 * 1024;
+    static constexpr size_t S4MB = 4 * (1024 * 1024);
+    static constexpr size_t S9MB = 9 * (1024 * 1024);
+    static constexpr size_t S10MB = 10 * (1024 * 1024);
+    static constexpr size_t SD = buffiothread::S9MB;
+    static constexpr size_t S1KB = 1024;
+
+private:
+    static void* buffioFunc(void* data)
+    {
+
+        struct threadinternal* tmpThr = reinterpret_cast<threadinternal*>(data);
+        tmpThr->status.store(buffioThreadStatus::running, std::memory_order_release);
+
+        if (tmpThr->name != nullptr)
+        buffiothread:
+            setname(tmpThr->name);
+
+        int error = tmpThr->func(tmpThr->resource);
+
+        tmpThr->status.store(buffioThreadStatus::done,
+            std::memory_order_release);
+        ::pthread_exit(nullptr);
+        return nullptr;
+    };
+
+    struct threadinternal* threads;
+    pthread_t* threadsId;
+    size_t numThreads;
+};
+
+#endif

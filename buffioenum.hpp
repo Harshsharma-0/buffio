@@ -34,13 +34,13 @@ enum class buffio_sockbroker_state: uint32_t{
 
 
 
-enum class buffio_thread_status: uint32_t{
- inactive  = 81,
+enum class buffioThreadStatus: uint32_t{
+ none      = 81,
  running   = 82,
  killed    = 83,
  done      = 84,
  error     = 85,
- error_map = 86,
+ configOk  = 86,
 };
 
 enum class buffio_sb_poller_type: uint32_t{
