@@ -23,68 +23,69 @@
 #define broker_cfg_nodiscard_msg                                               \
   "The value returned by this function must not be discarded"
 
-enum class sb_error : int {
+enum class sockBrokerError : int {
   none = 0,
-  workernum = -1000,
-  expectedfds = -1001,
-  queuesize = -1002,
-  pollertype = -1003,
-  workerpolicy = -1004,
+  workerNum = -1000,
+  expectedFds = -1001,
+  queueSize = -1002,
+  pollerType = -1003,
+  workerPolicy = -1004,
   unknown = -1005,
-  epollinstace = -1006,
+  epollInstace = -1006,
 };
 
-struct buffiosockbrokerconf {
-  sb_cfg_flag sb_configured;
-  int sb_workernum;   // number of the workers;
-  int sb_expectedfds; // number of the expected fd to consume across thread;
-  int sb_queuesize;   // mast be of power of 2, size is calculated via 2 ^
-                      // queuesize;
-  buffio_sb_poller_type sb_pollertype;     // type of I/O architecture to use;
-  buffio_sb_worker_policy sb_workerpolicy; // policy of for the workers
-};
+typedef struct buffioSockBrokerConfig {
+  sockBrokerConfigFlags sockBrokerFlags;
+  int workerNum;   // number of the workers;
+  int expectedFds; // number of the expected fd to consume across
+  int queueSize;   // mast be of power of 2, size is calculated via
+                   // 2^queuesize;
+  sockBrokerPollerType pollerType;     // type of I/O architecture to use;
+  sockBrokerWorkerPolicy WorkerPolicy; // policy of for the workers
+
+} buffioSockBrokerConfig;
 
 // opcodes comes from the buffiosock.hpp
 
-enum class sb_ep_state : uint32_t {
+enum class sbEpollState : uint32_t {
   none = 0,
-  empty_ok = 1u,
-  entry_ok = 1u << 1,
-  consume_ok = 1u << 2,
-  works_ok = 1u << 3,
-  events_ok = 1u << 4,
-  eventsize_ok = 1u << 5,
-  fd_ok = 1u << 6,
-  thread_ok = 1u << 7,
-  thread_run_ok = 1u << 8
+  emptyOk = 1u,
+  entryOk = 1u << 1,
+  consumeOk = 1u << 2,
+  worksOk = 1u << 3,
+  eventsOk = 1u << 4,
+  eventSizeOk = 1u << 5,
+  fdOk = 1u << 6,
+  threadOk = 1u << 7,
+  threadRunOk = 1u << 8
 };
 
-#define operator_for sb_ep_state
+#define operator_for sbEpollState
 #include "buffiooperator.hpp"
 
-constexpr sb_ep_state sb_ep_state_ok =
-    sb_ep_state::empty_ok | sb_ep_state::entry_ok | sb_ep_state::consume_ok |
-    sb_ep_state::works_ok | sb_ep_state::events_ok | sb_ep_state::eventsize_ok |
-    sb_ep_state::fd_ok | sb_ep_state::thread_ok | sb_ep_state::thread_run_ok;
+constexpr sbEpollState sbEpollStateOk =
+    sbEpollState::emptyOk | sbEpollState::entryOk | sbEpollState::consumeOk |
+    sbEpollState::worksOk | sbEpollState::eventsOk | sbEpollState::eventSizeOk |
+    sbEpollState::fdOk | sbEpollState::threadOk | sbEpollState::threadRunOk;
 
-enum class sb_ep_error : int {
+enum class sockBrokerEpollError : int {
   none = 0,
   empty = -1101,
   entry = -1102,
   consume = -1103,
   works = -1104,
   events = -1105,
-  eventsize = -1106,
+  eventSize = -1106,
   fd = -1107,
   thread = -1108,
-  thread_run = -1109,
-  epollinstance = -1110,
-  op_add = -1111,
-  op_del = -1112,
+  threadRun = -1109,
+  epollInstance = -1110,
+  opAdd = -1111,
+  opDel = -1112,
   occupied = -1113
 };
 
-using buffio_sb_queue = buffiolfqueue<buffioFdViewWeak>;
+using buffioSockBrokerQueue = buffiolfqueue<buffioFdViewWeak>;
 
 #define bf_io_io_uringfd_ok (1 << 9)
 #define bf_io_uconsumed_ok (1 << 1)
@@ -95,15 +96,15 @@ using buffio_sb_queue = buffiolfqueue<buffioFdViewWeak>;
 
 // not defined yet
 #define bf_io_ok 0
-
-class buffiosockbroker {
+class buffioSockBroker {
 
   // the main thread worker code inlined with the code to support hybrid arch
   // only call to register fd for read write.
 
-  static inline int buffio_ep_thread_poll(int fd, buffio_sb_queue *ep_entry,
-                                          buffio_sb_queue *ep_works,
-                                          buffio_sb_queue *ep_consume) {
+  static inline int buffio_ep_thread_poll(int fd,
+                                          buffioSockBrokerQueue *ep_entry,
+                                          buffioSockBrokerQueue *ep_works,
+                                          buffioSockBrokerQueue *ep_consume) {
 
     size_t evnt_size = 1024;
     struct epoll_event evnt[1024];
@@ -127,18 +128,18 @@ class buffiosockbroker {
   }
 
 public:
-  buffiosockbroker()
-      : ep_fd(-1), ep_totalfd(0), io_ufd(-1), ep_threads(nullptr) {
+  buffioSockBroker()
+      : epollFd(-1), epollTotalFd(0), ioUringFd(-1), epollThreads(nullptr) {
 
-    sb_state = buffio_sockbroker_state::inactive;
-    config.sb_configured = sb_cfg_flag::none;
-    sb_ep_state ep_configured = sb_ep_state::none;
+    sockBrokerConfig.sockBrokerFlags = sockBrokerConfigFlags::none;
+    sockBrokerState = buffioSockBrokerState::inActive;
+    epollConfigured = sbEpollState::none;
   };
 
-  ~buffiosockbroker() {
-    switch (sb_state) {
-    case buffio_sockbroker_state::epoll_running:
-    case buffio_sockbroker_state::epoll:
+  ~buffioSockBroker() {
+    switch (sockBrokerState) {
+    case buffioSockBrokerState::epollRunning:
+    case buffioSockBrokerState::epoll:
       shutpoll();
       break;
     }
@@ -146,135 +147,137 @@ public:
   }
 
   [[nodiscard(broker_cfg_nodiscard_msg)]]
-  constexpr sb_error configure(struct buffiosockbrokerconf cfg) {
-    if (cfg.sb_workernum > 0 && cfg.sb_expectedfds > 0 &&
-        config.sb_configured == sb_cfg_flag::none) {
+  constexpr sockBrokerError configure(struct buffioSockBrokerConfig &config) {
 
-      if (cfg.sb_queuesize >= BUFFIO_RING_MIN &&
-          cfg.sb_queuesize <= buffioatomix_max_order) {
+    if (config.workerNum > 0 && config.expectedFds > 0 &&
+        config.sockBrokerFlags == sockBrokerConfigFlags::none) {
 
-        if ((cfg.sb_workernum + 1) >= (1 << cfg.sb_queuesize))
-          return sb_error::workernum;
+      if (config.queueSize >= BUFFIO_RING_MIN &&
+          config.queueSize <= buffioatomix_max_order) {
 
-        config = cfg;
-        config.sb_configured = sb_cfg_ok;
-        return sb_error::none;
+        if ((config.workerNum + 1) >= (1 << config.queueSize))
+          return sockBrokerError::workerNum;
+
+        sockBrokerConfig = config;
+        sockBrokerConfig.sockBrokerFlags = sockBrokerConfigOk;
+
+        return sockBrokerError::none;
       }
-      return sb_error::queuesize;
+      return sockBrokerError::queueSize;
     }
 
-    return sb_error::workernum;
+    return sockBrokerError::workerNum;
   }
 
-  sb_error init() {
-    if (sb_state != buffio_sockbroker_state::inactive)
-      return sb_error::unknown;
+  sockBrokerError init() {
+    if (sockBrokerState != buffioSockBrokerState::inActive)
+      return sockBrokerError::unknown;
 
-    if (config.sb_configured == sb_cfg_ok) {
+    if (sockBrokerConfig.sockBrokerFlags == sockBrokerConfigOk) {
 
-      switch (config.sb_pollertype) {
+      switch (sockBrokerConfig.pollerType) {
 
-      case buffio_sb_poller_type::monolithic:
-      case buffio_sb_poller_type::modular: {
-        sb_ep_error err = configureepoll();
+      case sockBrokerPollerType::monolithic:
+      case sockBrokerPollerType::modular: {
+        sockBrokerEpollError err = configureEpoll();
 
-        if (err == sb_ep_error::none)
-          return sb_error::none;
+        if (err == sockBrokerEpollError::none)
+          return sockBrokerError::none;
 
-        return sb_error::epollinstace;
+        return sockBrokerError::epollInstace;
 
       } break;
-      case buffio_sb_poller_type::io_uring:
+      case sockBrokerPollerType::io_uring:
         break;
       }
-      return sb_error::pollertype;
+      return sockBrokerError::pollerType;
     }
-    return sb_error::unknown;
+    return sockBrokerError::unknown;
   }
 
   int pushreq() { return 0; }
   int popreq() { return 0; }
 
   bool running() {
-    if (sb_state != buffio_sockbroker_state::inactive &&
-        sb_state != buffio_sockbroker_state::error)
+    if (sockBrokerState != buffioSockBrokerState::inActive &&
+        sockBrokerState != buffioSockBrokerState::error)
       return true;
 
     return false;
   };
 
-  buffiosockbroker(const buffiosockbroker &) = delete;
-  buffiosockbroker &operator=(const buffiosockbroker &) = delete;
+  buffioSockBroker(const buffioSockBroker &) = delete;
+  buffioSockBroker &operator=(const buffioSockBroker &) = delete;
 
-  sb_ep_error poll_fd(struct buffioFdReq_add *entry) {
-    if (sb_state != buffio_sockbroker_state::inactive &&
-        ep_configured == sb_ep_state_ok) {
+  sockBrokerEpollError pollFd(struct buffioFdReq_add *entry) {
+    if (sockBrokerState != buffioSockBrokerState::inActive &&
+        epollConfigured == sbEpollStateOk) {
       switch (entry->opcode) {
       case buffio_fd_opcode::start_poll:
         break;
       case buffio_fd_opcode::end_poll:
         break;
       }
-      return sb_ep_error::none;
+      return sockBrokerEpollError::none;
     };
-    return sb_ep_error::epollinstance;
+    return sockBrokerEpollError::epollInstance;
   };
 
 private:
-  sb_ep_error configureepoll() {
+  sockBrokerEpollError configureEpoll() {
     // code below here is used for epoll instance,
 
-    if (ep_configured == sb_ep_state_ok)
-      return sb_ep_error::occupied;
+    if (epollConfigured == sbEpollStateOk)
+      return sockBrokerEpollError::occupied;
 
-    int ep_fd_tmp = createepollinstance(&ep_fd);
+    int ep_fd_tmp = createEpollInstance(&epollFd);
     if (ep_fd_tmp < 0)
-      return sb_ep_error::fd;
+      return sockBrokerEpollError::fd;
 
-    ep_configured |= sb_ep_state::fd_ok;
-    ep_configured |= sb_ep_state::entry_ok;
-    ep_configured |= sb_ep_state::works_ok;
-    ep_configured |= sb_ep_state::consume_ok;
-    ep_configured |= sb_ep_state::events_ok;
-    ep_totalfd = 0;
+    epollConfigured |= sbEpollState::fdOk;
+    epollConfigured |= sbEpollState::entryOk;
+    epollConfigured |= sbEpollState::worksOk;
+    epollConfigured |= sbEpollState::consumeOk;
+    epollConfigured |= sbEpollState::eventsOk;
+    epollConfigured |= sbEpollState::eventSizeOk;
+    epollConfigured |= sbEpollState::threadRunOk | sbEpollState::emptyOk;
+    epollTotalFd = 0;
 
-    ep_configured |= sb_ep_state::eventsize_ok;
-
-    ep_configured |= sb_ep_state::thread_run_ok | sb_ep_state::empty_ok;
-    sb_state = buffio_sockbroker_state::epoll;
-    return sb_ep_error::none;
+    sockBrokerState = buffioSockBrokerState::epoll;
+    return sockBrokerEpollError::none;
   }
 
   void shutpoll() {
-    sb_ep_state mask = ep_configured;
-    if (ep_has_flag(mask, sb_ep_state::fd_ok)) {
-      close(ep_fd);
-      mask &= ~(sb_ep_state::fd_ok); // unsetting the mask;
+
+    sbEpollState mask = epollConfigured;
+    if (ep_has_flag(mask, sbEpollState::fdOk)) {
+      close(epollFd);
+      mask &= ~(sbEpollState::fdOk); // unsetting the mask;
     }
-    if (ep_has_flag(mask, sb_ep_state::entry_ok))
-      mask &= ~(sb_ep_state::entry_ok);
+    if (ep_has_flag(mask, sbEpollState::entryOk))
+      mask &= ~(sbEpollState::entryOk);
 
-    if (ep_has_flag(mask, sb_ep_state::works_ok))
-      mask &= ~(sb_ep_state::works_ok);
+    if (ep_has_flag(mask, sbEpollState::worksOk))
+      mask &= ~(sbEpollState::worksOk);
 
-    if (ep_has_flag(mask, sb_ep_state::consume_ok))
-      mask &= ~(sb_ep_state::consume_ok);
+    if (ep_has_flag(mask, sbEpollState::consumeOk))
+      mask &= ~(sbEpollState::consumeOk);
 
-    mask &= ~(sb_ep_state::events_ok);
+    mask &= ~(sbEpollState::eventsOk);
 
-    if (ep_has_flag(mask, sb_ep_state::thread_ok)) {
-      if (ep_has_flag(mask, sb_ep_state::thread_run_ok)) {
-        mask &= ~(sb_ep_state::thread_run_ok);
+    if (ep_has_flag(mask, sbEpollState::threadOk)) {
+      if (ep_has_flag(mask, sbEpollState::threadRunOk)) {
+        mask &= ~(sbEpollState::threadRunOk);
       }
-      delete[] ep_threads;
-      ep_threads = nullptr;
-      mask &= ~(sb_ep_state::thread_ok);
+      delete[] epollThreads;
+      epollThreads = nullptr;
+      mask &= ~(sbEpollState::threadOk);
     }
-    ep_configured = sb_ep_state::none;
-    sb_state = buffio_sockbroker_state::inactive;
+    epollConfigured = sbEpollState::none;
+    sockBrokerState = buffioSockBrokerState::inActive;
   };
 
-  [[nodiscard]] int createepollinstance(int *fdr) {
+  [[nodiscard]] int createEpollInstance(int *fdr) {
     int fd = epoll_create1(EPOLL_CLOEXEC);
     if (fd >= 0) {
       *fdr = fd;
@@ -283,19 +286,20 @@ private:
     return -1;
   }
 
-  buffiothread threadpool;
-  struct buffiosockbrokerconf config;
-  buffio_sockbroker_state sb_state;
+  buffiothread sockBrokerThreadPool;
+  buffioSockBrokerConfig sockBrokerConfig;
+  buffioSockBrokerState sockBrokerState;
+  buffioSockBrokerQueue epollentry;
+  buffioSockBrokerQueue epollWorks;
+  buffioSockBrokerQueue epollConsume;
 
-  std::atomic<int> ep_empty;
-  buffio_sb_queue ep_entry;
-  buffio_sb_queue ep_works;
-  buffio_sb_queue ep_consume;
-  pthread_t *ep_threads;
-  size_t ep_totalfd;
-  int ep_fd;
-  sb_ep_state ep_configured;
-  int io_ufd;
+  pthread_t *epollThreads;
+  size_t epollTotalFd;
+
+  sbEpollState epollConfigured;
+  std::atomic<int> epollEmpty;
+  int epollFd;
+  int ioUringFd;
 };
 
 #endif

@@ -44,16 +44,16 @@ public:
       : head(nullptr), tail(nullptr), cursor(nullptr), capinit(0), active(0) {};
 
   // initliser of the schedular
-  int init(struct buffiosockbrokerconf _cfg, size_t _capinitial) {
+  int init(buffioSockBrokerConfig _cfg, size_t _capinitial) {
     int tmp_err = init(_capinitial);
     if (tmp_err < 0)
       return tmp_err;
 
-    sb_error poll_err = iopoller.configure(_cfg);
-    if (poll_err != sb_error::none)
+    sockBrokerError poll_err = iopoller.configure(_cfg);
+    if (poll_err != sockBrokerError::none)
       return static_cast<int>(poll_err);
-    sb_error ini_err = iopoller.init();
-    if (ini_err != sb_error::none)
+    sockBrokerError ini_err = iopoller.init();
+    if (ini_err != sockBrokerError::none)
       return static_cast<int>(ini_err);
     return 0;
   }
@@ -227,7 +227,6 @@ private:
   struct __schedinternal *head;
   struct __schedinternal *tail;
   struct __schedinternal *cursor;
-  buffiosockbroker
-      iopoller; // used to transfer I/O request to the worker thread;
+  buffioSockBroker iopoller;
 };
 #endif
