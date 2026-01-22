@@ -21,237 +21,263 @@
 #include <unistd.h>
 
 #if !defined(BUFFIO_IMPLEMENTATION)
-   #include "buffioenum.hpp" // header for opcode
-   #include "buffiolfqueue.hpp"
-   #include "buffiomemory.hpp"
+#include "buffioenum.hpp" // header for opcode
+#include "buffiomemory.hpp"
 #endif
 
-enum class buffio_fd_family : uint32_t {
-    none = 0,
-    file = 1,
-    pipe = 2,
-//    fifo = 3,
-    ipv4_tcp = 4,
-    ipv4_udp = 5,
-    ipv6_tcp = 6,
-    ipv6_udp = 7,
-    ip_raw = 8,
-    local_tcp = 9,
-    local_udp = 10
+#include <atomic>
+#include <memory>
+
+enum class buffioSocketFamily : int {
+  none = 0,
+  local = 1,
+  ipv4 = 2,
+  ipv6 = 3,
+  raw = 4,
+  pipe = 5,
+  fifo = 6,
+  file = 7,
 };
 
+enum class buffioSocketProtocol : int { none = 0, tcp = 1, udp = 2 };
 
-enum class buffio_fd_error : int {
-    none = 0,
-    socket = -101,
-    bind = -102,
-    open = -103,
-    file_path = -104,
-    socket_address = -105,
-    portnumber = -106,
-    pipe = -107,
-    fifo = -108,
-    fifo_path = -109,
-    occupied = -110,
-    family = -112,
-    address_ipv4 = -113,
-    address_ipv6 = -114,
-    fcntl = -115
+enum class buffioFdError : int {
+  none = 0,
+  socket = -101,
+  bind = -102,
+  open = -103,
+  file_path = -104,
+  socketAddress = -105,
+  portnumber = -106,
+  pipe = -107,
+  fifo = -108,
+  fifo_path = -109,
+  occupied = -110,
+  family = -112,
+  fcntl = -113
 };
 
-// used for ip socket
-struct buffiofdsocketinfo {
-    const char* address;
-    int portnumber;
-    buffio_fd_family family;
+struct buffioFdReq_rw {
+  buffio_fd_opcode opcode;
+  char *buffer;
+  size_t len;
+  void *data;
 };
 
-
-struct buffiofdreq_rw {
-    buffio_fd_opcode opcode;
-    char* buffer;
-    size_t len;
-    void* data;
+struct buffioFdReq_add {
+  buffio_fd_opcode opcode;
+  int fd;
+  void *data;
 };
 
-struct buffiofdreq_add {
-    buffio_fd_opcode opcode;
-    int fd;
-    void* data;
+struct buffioFdReq_paged {
+  buffio_fd_opcode opcode;
+  buffiopage *page;
 };
 
-struct buffiofdreq_paged {
-    struct buffiofdreq_rw data; // opcode will come from the data field for this;
-    buffiopage* page;
+union buffioFdReq {
+  struct buffioFdReq_rw rw;
+  struct buffioFdReq_paged paged;
+  struct buffioFdReq_add add;
 };
 
-union buffiofdreq {
-    struct buffiofdreq_rw rw;
-    struct buffiofdreq_paged paged;
-    struct buffiofdreq_add add;
-};
-
-
-class buffiofd {
-    // magic magic things
-    union fd_union{
-        struct {
-            int fd;
-            bool unlink_on_close;
-            sockaddr_storage addr;
-            socklen_t addr_len;
-        } sock;
-        int pipe_fds[2];
-        int file_fd;
-    };
+class buffioFdInfo {
 
 public:
-    buffiofd()
-    {
-        fd_family = buffio_fd_family::none;
-        data = { 0 };
+  buffioSocketFamily family;
+  std::atomic<int> value; // mask that contain the type of request
+  buffioFdReq request;
+
+  int fds[2]; // additional space for pipe also;
+  std::unique_ptr<char[]> path;
+
+  ~buffioFdInfo() {
+    switch (family) {
+    case buffioSocketFamily::file:
+      break;
+    case buffioSocketFamily::pipe: {
+      ::close(fds[0]);
+      ::close(fds[1]);
+    } break;
+    case buffioSocketFamily::ipv6:
+      [[fallthrough]];
+    case buffioSocketFamily::ipv4: {
+      ::close(fds[0]);
+    } break;
+    case buffioSocketFamily::local: {
+      ::unlink((const char *)path.get());
+      ::close(fds[0]);
+    } break;
+    };
+  };
+};
+
+using buffioFdView = std::shared_ptr<buffioFdInfo>;
+using buffioFdViewWeak = std::weak_ptr<buffioFdInfo>;
+
+class buffiofd {
+
+public:
+  // function to create a ipsocket, blocking for future update
+  buffiofd() { error = buffioFdError::none; }
+  buffiofd &operator=(const buffiofd &) = default;
+
+  [[nodiscard]]
+  buffioFdView
+  createSocket(const char *address = nullptr, int portNumber = 8080,
+               buffioSocketFamily family = buffioSocketFamily::ipv4,
+               buffioSocketProtocol protocol = buffioSocketProtocol::tcp,
+               bool blocking = true) {
+
+    if (address == nullptr) {
+      error = buffioFdError::socketAddress;
+      return nullptr;
     };
 
-    // function to create a ipsocket, blocking for future update
-    [[nodiscard]] buffio_fd_error createsocket(struct buffiofdsocketinfo& info,
-                                                        bool blocking = true)
-    {
-        // proceed only if there is no fd currently opened in the context
-        if (fd_family != buffio_fd_family::none)
-            return buffio_fd_error::occupied;
-
-        int domain = 0;
-        int type = 0;
-
-        sockaddr_storage addr = { 0 };
-        socklen_t addr_len = 0;
-        bool unlink_on_close = false;
-
-        switch (info.family) {
-        case buffio_fd_family::ipv4_tcp:
-        case buffio_fd_family::ipv4_udp: {
-            domain = AF_INET;
-            type = info.family == buffio_fd_family::ipv4_tcp ? SOCK_STREAM : SOCK_DGRAM;
-
-            if (!info.address || info.portnumber <= 0 || info.portnumber > 65535)
-                return buffio_fd_error::portnumber;
-
-            sockaddr_in *in = reinterpret_cast<sockaddr_in*>(&addr);
-            in->sin_family = AF_INET;
-            in->sin_port = htons(info.portnumber);
-            if (inet_pton(AF_INET, info.address, &in->sin_addr) != 1)
-                return buffio_fd_error::address_ipv4;
-            addr_len = sizeof(sockaddr_in);
-        } break;
-        case buffio_fd_family::local_udp:
-        case buffio_fd_family::local_tcp: {
-
-            if (info.address == nullptr)
-                return buffio_fd_error::socket_address;
-            domain = AF_UNIX;
-            type = info.family == buffio_fd_family::local_tcp ? SOCK_STREAM : SOCK_DGRAM;
-
-            sockaddr_un* un = reinterpret_cast<sockaddr_un*>(&addr);
-            un->sun_family = AF_UNIX;
-            addr_len = sizeof(sockaddr_un);
-
-            size_t len = strlen(info.address);
-            if (len >= sizeof(un->sun_path))
-                return buffio_fd_error::socket_address;
-            std::memcpy(un->sun_path, info.address, len + 1);
-            unlink_on_close = true;
-        } break;
-        default:
-            return buffio_fd_error::family;
-            break;
-        }
-        int fd = ::socket(domain, type, 0);
-        if (fd < 0)
-            return buffio_fd_error::socket;
-        if (::bind(fd, reinterpret_cast<sockaddr*>(&addr), addr_len) != 0) {
-            ::close(fd);
-            return buffio_fd_error::bind;
-        }
-        data.sock.fd = fd;
-        data.sock.addr = addr;
-        data.sock.unlink_on_close = unlink_on_close;
-        data.sock.addr_len = addr_len;
-        fd_family = info.family;
-        return buffio_fd_error::none;
-    };
-
-    // function to create a pipe
-    [[nodiscard]]
-    buffio_fd_error createpipe(bool block = true)
-    {
-
-        if (fd_family != buffio_fd_family::none)
-            return buffio_fd_error::occupied;
-
-        if (::pipe(data.pipe_fds) != 0)
-            return buffio_fd_error::pipe;
-        if (block == false) {
-         //TODO: add func to set nonblocking;
-        }
-        fd_family = buffio_fd_family::pipe;
-
-        return buffio_fd_error::none;
-    };
- 
-  // fifo must be managed by the user, only helper function to create fifo
-    [[nodiscard]] 
-       buffio_fd_error createfifo(const char* path = nullptr,mode_t mode = 0666){
-          if(path == nullptr) return buffio_fd_error::fifo_path;
-            if(mkfifo(path,mode) == 0) 
-              return buffio_fd_error::none;
-         return buffio_fd_error::fifo;
+    if (portNumber <= 0 || portNumber > 65535) {
+      error = buffioFdError::portnumber;
+      return nullptr;
     }
+    std::unique_ptr<char[]> addressPtr = nullptr;
 
-    [[nodiscard]] int openfile(const char* path = nullptr)
-    {
-        // TODO: add file support
-        if (path == nullptr)
-            return -1;
-        return 0;
+    int domain = static_cast<int>(family);
+    int type = static_cast<int>(protocol);
+
+    sockaddr_storage addr = {0};
+    socklen_t addrLen = 0;
+
+    switch (family) {
+    case buffioSocketFamily::ipv4: {
+      domain = AF_INET;
+      type = protocol == buffioSocketProtocol::tcp ? SOCK_STREAM : SOCK_DGRAM;
+
+      sockaddr_in *in4AddrLoc = reinterpret_cast<sockaddr_in *>(&addr);
+      if (inet_pton(domain, address, &in4AddrLoc->sin_addr) != 1) {
+        error = buffioFdError::socketAddress;
+        return nullptr;
+      };
+      size_t len = ::strlen(address);
+      std::unique_ptr<char[]> tmpPtrIn = std::make_unique<char[]>(len + 1);
+      ::memcpy(tmpPtrIn.get(), address, (len + 1));
+      addressPtr = std::move(tmpPtrIn);
+
+      in4AddrLoc->sin_family = domain;
+      in4AddrLoc->sin_port = htons(portNumber);
+      addrLen = sizeof(sockaddr_in);
+    } break;
+
+    case buffioSocketFamily::ipv6: {
+      domain = AF_INET6;
+      type = protocol == buffioSocketProtocol::tcp ? SOCK_STREAM : SOCK_DGRAM;
+
+      sockaddr_in6 *in6AddrLoc = reinterpret_cast<sockaddr_in6 *>(&addr);
+      if (inet_pton(domain, address, &in6AddrLoc->sin6_addr) != 1) {
+        error = buffioFdError::socketAddress;
+        return nullptr;
+      }
+      size_t len = ::strlen(address);
+      std::unique_ptr<char[]> tmpPtrIn6 = std::make_unique<char[]>(len + 1);
+      ::memcpy(tmpPtrIn6.get(), address, (len + 1));
+      addressPtr = std::move(tmpPtrIn6);
+
+      in6AddrLoc->sin6_family = domain;
+      in6AddrLoc->sin6_port = htons(portNumber);
+      addrLen = sizeof(sockaddr_in6);
+
+    } break;
+    case buffioSocketFamily::local: {
+      domain = AF_UNIX;
+      type = protocol == buffioSocketProtocol::tcp ? SOCK_STREAM : SOCK_DGRAM;
+
+      sockaddr_un *unAddrLoc = reinterpret_cast<sockaddr_un *>(&addr);
+      size_t len = ::strlen(address);
+      if (len >= sizeof(unAddrLoc->sun_path)) {
+        error = buffioFdError::socketAddress;
+        return nullptr;
+      };
+      std::unique_ptr<char[]> tmpPtrUn = std::make_unique<char[]>(len + 1);
+      addressPtr = std::move(tmpPtrUn);
+
+      ::memcpy(unAddrLoc->sun_path, address, len + 1);
+      addrLen = sizeof(sockaddr_un);
+    } break;
+    case buffioSocketFamily::raw:
+      break;
+    default:
+      return nullptr;
+      break;
     };
 
-    buffiofd(const buffiofd&) = delete;
-    buffiofd& operator=(const buffiofd&) = delete;
-
-    // return void
-    void shutfd() noexcept
-    {
-        if(fd_family == buffio_fd_family::none) return;
-        switch (fd_family) {
-        case buffio_fd_family::file: {
-            // not handled yet
-        } break;
-        case buffio_fd_family::pipe:{
-            ::close(data.pipe_fds[0]);
-            ::close(data.pipe_fds[1]);
-        } break;
-        case buffio_fd_family::ipv4_tcp:
-        case buffio_fd_family::ipv4_udp: {
-            ::close(data.sock.fd);
-        } break;
-        case buffio_fd_family::local_udp:
-        case buffio_fd_family::local_tcp: {
-            if (data.sock.unlink_on_close == true) {
-                sockaddr_un* un = reinterpret_cast<sockaddr_un*>(&data.sock.addr);
-                ::unlink(un->sun_path);
-            }
-            ::close(data.sock.fd);
-        } break;
-        };
-
-        fd_family = buffio_fd_family::none;
-        data = { 0 };
+    int socketFd = ::socket(domain, type, 0);
+    if (socketFd < 0) {
+      error = buffioFdError::socket;
+      return nullptr;
     };
-    ~buffiofd() { shutfd(); };
 
-private:
-    buffio_fd_family fd_family;
-    fd_union data;
+    if (::bind(socketFd, reinterpret_cast<sockaddr *>(&addr), addrLen) != 0) {
+      error = buffioFdError::bind;
+      return nullptr;
+    };
+    buffioFdView fdPtr = std::make_shared<buffioFdInfo>();
+    if (fdPtr.get() == nullptr)
+      return nullptr;
+
+    fdPtr->path = std::move(addressPtr);
+    fdPtr->family = family;
+    fdPtr->fds[0] = socketFd;
+    return fdPtr;
+  };
+
+  [[nodiscard]]
+  buffioFdView createPipe(bool block = true) {
+    int fdTmp[2];
+
+    if (::pipe(fdTmp) != 0)
+      error = buffioFdError::pipe;
+
+    buffioFdView fdPtr = std::make_shared<buffioFdInfo>();
+    if (fdPtr.get() == nullptr)
+      return nullptr;
+
+    fdPtr->family = buffioSocketFamily::pipe;
+    fdPtr->fds[0] = fdTmp[0];
+    fdPtr->fds[1] = fdTmp[1];
+    error = buffioFdError::none;
+
+    return fdPtr;
+  };
+
+  [[nodiscard]]
+  buffioFdView createfifo(const char *path = nullptr, mode_t mode = 0666) {
+
+    if (mkfifo(path, mode) == 0)
+      error = buffioFdError::none;
+
+    buffioFdView fdPtr = std::make_shared<buffioFdInfo>();
+    if (fdPtr.get() == nullptr)
+      return nullptr;
+
+    size_t len = ::strlen(path);
+    std::unique_ptr<char[]> tmpPtr = std::make_unique<char[]>(len + 1);
+    ::memcpy(tmpPtr.get(), path, (len + 1));
+    fdPtr->path = std::move(tmpPtr);
+
+    error = buffioFdError::fifo;
+  }
+
+  /*
+    [[nodiscard]] buffioFdView openfile(const char *path = nullptr,
+                                        int mode = 0) {
+      // TODO: add file support
+      if (path == nullptr)
+        error = -1;
+
+      error = 0;
+      return 0;
+    };
+  */
+
+  buffioFdError error;
 };
 
 #endif
