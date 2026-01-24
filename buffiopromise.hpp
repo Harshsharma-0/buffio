@@ -2,20 +2,19 @@
 #define __BUFFIO_PROMISE_HPP__
 
 /*
-* Error codes range reserved for buffiothread
-*  [10000 - 11500]
-*  10000 <= errorcode <= 10500
-*/
+ * Error codes range reserved for buffiothread
+ *  [10000 - 11500]
+ *  10000 <= errorcode <= 10500
+ */
 
 #if !defined(BUFFIO_IMPLEMENTATION)
-   #include "buffioenum.hpp"
-   #include "buffiosock.hpp"
+#include "buffioFd.hpp"
+#include "buffioenum.hpp"
 #endif
 
+#include <atomic>
 #include <coroutine>
 #include <exception>
-#include <atomic>
-
 
 struct buffiopromise;
 using buffiohandleroutine = std::coroutine_handle<buffiopromise>;
@@ -25,12 +24,9 @@ using buffiohandleroutine = std::coroutine_handle<buffiopromise>;
 #define buffioreturn co_return
 #define buffiopush co_await
 
-
 struct buffioroutine : buffiohandleroutine {
   using promise_type = ::buffiopromise;
 };
-
-
 
 struct acceptreturn {
   int errorcode;
@@ -44,7 +40,7 @@ struct buffioawaiter {
   buffioroutine self;
 };
 
-struct buffiopushinfo{
+struct buffiopushinfo {
   buffioroutine task;
 };
 
@@ -69,8 +65,8 @@ struct buffiopromise {
     return self;
   };
 
-  std::suspend_always initial_suspend() noexcept { return {};};
-  std::suspend_always final_suspend() noexcept { return {};};
+  std::suspend_always initial_suspend() noexcept { return {}; };
+  std::suspend_always final_suspend() noexcept { return {}; };
 
   std::suspend_always yield_value(int value) {
     selfstatus.status = buffio_routine_status::yield;
@@ -90,7 +86,7 @@ struct buffiopromise {
   };
 
   // overload to submit I/O request via the promise to the sockbroker
-  buffioawaiter await_transform(buffiofd &sockview){
+  buffioawaiter await_transform(buffioFd &sockview) {
     selfstatus.status = buffio_routine_status::waiting_io;
     return {};
   }
@@ -106,7 +102,7 @@ struct buffiopromise {
         state < 0 ? buffio_routine_status::error : buffio_routine_status::done;
     return;
   };
-  void setstatus(buffio_routine_status stat){ selfstatus.status = stat; }
+  void setstatus(buffio_routine_status stat) { selfstatus.status = stat; }
   bool checkstatus() {
     return selfstatus.status == buffio_routine_status::error ||
                    selfstatus.returncode < 0
@@ -123,10 +119,10 @@ public:
   };
   void exceptionthrower() {
     switch (status.status) {
-      case buffio_routine_status::unhandled_exception:
+    case buffio_routine_status::unhandled_exception:
       std::rethrow_exception(status.routineexception);
       break;
-      case buffio_routine_status::error:
+    case buffio_routine_status::error:
       throw std::runtime_error(
           "error in execution of routine return code less than 0");
       break;
@@ -152,10 +148,11 @@ private:
   buffiopromisestatus status;
 };
 
-struct buffiotaskinfo{
-  std::atomic<int64_t> mask; // don't remove this mask as if tracks if there any request available; 
-  size_t id;  //mask track if the task have socket,bucket
+struct buffiotaskinfo {
+  std::atomic<int64_t> mask; // don't remove this mask as if tracks if there any
+                             // request available;
+  size_t id;                 // mask track if the task have socket,bucket
   buffioroutine task;
 };
 
-#endif 
+#endif

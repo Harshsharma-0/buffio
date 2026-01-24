@@ -1,5 +1,5 @@
 main:main.cpp *.hpp
-	 g++ -std=c++23 -O4 main.cpp -o main
+	 g++ -std=c++20 -g  main.cpp -o main
 
 run: main
 	./main

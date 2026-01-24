@@ -7,6 +7,7 @@
  *  4000 <= errorcode <= 5500
  */
 
+#include "buffiomemory.hpp"
 #if !defined(BUFFIO_IMPLEMENTATION)
 #include "buffiopromsie.hpp"
 #include "buffiosockbroker.hpp"
@@ -55,19 +56,20 @@ public:
     sockBrokerError ini_err = iopoller.init();
     if (ini_err != sockBrokerError::none)
       return static_cast<int>(ini_err);
+
     return 0;
   }
   int init(size_t _capinitial) {
     if (capinit != 0)
       return -1;
     capinit = _capinitial;
-    return schedmem.init(capinit);
+    return schedularMemory.init(10);
   }
 
   ~buffioschedular() {}
 
   int schedule(buffioroutine routine) {
-    struct __schedinternal *brk = schedmem.getfrag();
+    struct __schedinternal *brk = schedularMemory.getMemory();
     brk->fiber.task = routine;
     brk->waiters = nullptr;
     return scheduleptr(brk);
@@ -99,11 +101,11 @@ public:
       case buffio_routine_status::paused: {
       } break;
       case buffio_routine_status::waiting: {
-        struct __schedinternal *tsk = schedmem.getfrag();
+        struct __schedinternal *tsk = schedularMemory.getMemory();
         tsk->fiber.task = promise->waitingfor;
         tsk->waitercount += 1;
-        pushwaiter(tsk, cursor);
         replacecursor(tsk);
+        pushwaiter(tsk, cursor);
         cursor = cursor->next;
       } break;
       case buffio_routine_status::push_task: {
@@ -129,6 +131,7 @@ private:
     cursor->next->prev = from;
     from->next = cursor->next;
     from->prev = cursor->prev;
+
     cursor->next = cursor->prev = nullptr;
     cursor = from;
 
@@ -203,25 +206,26 @@ private:
     if (head == tail) {
       which->fiber.task.destroy();
       head = tail = nullptr;
-      schedmem.reclaim(which);
+      schedularMemory.retMemory(which);
       cursor = nullptr;
       active -= 1;
       return;
     }
     which->next->prev = which->prev;
     which->prev->next = which->next;
-    schedmem.reclaim(which);
-    which = which->next;
 
-    if (which == head)
-      head = which;
-    if (which == tail)
-      tail = which;
+    auto *tmpPtr = which->next;
+    schedularMemory.retMemory(which);
+
+    if (tmpPtr == head)
+      head = tmpPtr;
+    if (tmpPtr == tail)
+      tail = tmpPtr;
     active -= 1;
     return;
   }
 
-  buffiomemory<__schedinternal> schedmem;
+  buffioMemoryPool<__schedinternal> schedularMemory;
   size_t capinit;
   size_t active;
   struct __schedinternal *head;
