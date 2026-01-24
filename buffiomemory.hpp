@@ -16,101 +16,6 @@
 #include <new>
 #include <random>
 
-template <typename X> class buffiomemory {
-
-  struct __memory {
-    struct __memory *mem;
-    X data;
-  };
-
-public:
-  buffiomemory(size_t count) : mem(nullptr) { init(count); }
-  buffiomemory() : mem(nullptr) {}
-
-  ~buffiomemory() {
-    if (mem == nullptr)
-      return;
-    struct __memory *tmp = mem;
-    for (; tmp != nullptr; tmp = mem) {
-      mem = mem->mem;
-      delete tmp;
-    }
-  }
-
-  // can be used to reserve memory
-  int init(size_t count) {
-    if (count <= 0)
-      return -1;
-    struct __memory *tmp = nullptr;
-    for (size_t i = 0; i < count; i++) {
-      tmp = new struct __memory;
-      pushfrag(tmp);
-    }
-    return 0;
-  };
-
-  int retMemory(X *frag) {
-    if (frag == nullptr)
-      return -1;
-    struct __memory *brk =
-        (struct __memory *)(((uintptr_t)frag) - sizeof(struct __memory *));
-    pushfrag(brk);
-    return 0;
-  }
-
-  X *getMemory() {
-    struct __memory *tmp = popfrag();
-    return &tmp->data;
-  }
-
-private:
-  void pushfrag(struct __memory *frag) {
-    frag->mem = nullptr;
-    if (mem == nullptr) {
-      mem = frag;
-      frag->mem = nullptr;
-      return;
-    }
-    struct __memory *brk = mem;
-    mem = frag;
-    frag->mem = brk;
-  }; // push the reclaimed frag to the list;
-
-  struct __memory *popfrag() {
-    if (mem == nullptr)
-      init(5);
-    struct __memory *brk = mem;
-    mem = mem->mem;
-    return brk;
-  }; // return a existing frag of return new allocated frag;
-
-  struct __memory *mem;
-};
-
-class buffiopage {
-  struct page {
-    char *buffer;
-    size_t len;
-    struct page *next;
-  };
-
-public:
-  buffiopage() {}
-  ~buffiopage() {}
-
-  buffiopage &operator=(const buffiopage &) = delete;
-  buffiopage(const buffiopage &) = delete;
-  void pagewrite(char *data, size_t len) {} // get page length
-  char *getpage(size_t len) {}              // getpage lenght
-
-private:
-  struct page *pages;
-  struct page *next;
-  size_t pagecount;
-  size_t pagesize;
-};
-
-#include <iostream>
 // typiclly used by the user to get resource allocated
 template <typename T> class buffioMemoryPool {
 
@@ -200,6 +105,29 @@ private:
   buffioMemoryFragment *fragments;
   size_t reserveCount;
   uintptr_t chkSum;
+};
+
+class buffiopage {
+  struct page {
+    char *buffer;
+    size_t len;
+    struct page *next;
+  };
+
+public:
+  buffiopage() {}
+  ~buffiopage() {}
+
+  buffiopage &operator=(const buffiopage &) = delete;
+  buffiopage(const buffiopage &) = delete;
+  void pagewrite(char *data, size_t len) {} // get page length
+  char *getpage(size_t len) {}              // getpage lenght
+
+private:
+  struct page *pages;
+  struct page *next;
+  size_t pagecount;
+  size_t pagesize;
 };
 
 #endif
