@@ -7,230 +7,160 @@
  *  4000 <= errorcode <= 5500
  */
 
-#include "buffiomemory.hpp"
 #if !defined(BUFFIO_IMPLEMENTATION)
 #include "buffiopromsie.hpp"
 #include "buffiosockbroker.hpp"
 #endif
 
-// when value of mask < 0, all the read and write request are done
-// when value of mask == 0, the task has not registered any r/w
-// user can also make io_request with the fd directly without the fd
-
-/* bound to buffiotaskinfo;
- * create a circular buffer of the task using linked list.
- */
+#include <cstring>
+#include <exception>
 
 class buffioschedular {
 
-  struct __schedinternal {
-    buffiotaskinfo fiber; // check buffiopromise for this struct defination
-    struct __schedinternal *waiters;
-    struct __schedinternal
-        *wnxt;          // contains the next member of the waiter tree;
-    size_t waitercount; // the waiter are popped using this count, it should be
-                        // taken care of
-    __schedinternal *next;
-    __schedinternal *prev;
+  class blockQueue {
+  public:
+    bool haveInstance = false;
+    struct blockQueue *reserved;
+    struct blockQueue *waiter;
+    buffioroutine current;
+    ~blockQueue() {
+      if (haveInstance == true) {
+        current.destroy();
+      }
+    }
   };
 
 public:
-  // constructor of the schedular.
-  buffioschedular(size_t _capinitial)
-      : head(nullptr), tail(nullptr), cursor(nullptr), capinit(0), active(0) {
-    init(_capinitial);
-  };
   // constructor overload.
   buffioschedular()
-      : head(nullptr), tail(nullptr), cursor(nullptr), capinit(0), active(0) {};
+      : queue(nullptr), head(0), tail(0), order(0), queueFilled(0) {};
+  ~buffioschedular() { cleanUp(); };
 
+  void cleanUp() {
+    if (queue == nullptr)
+      return;
+
+    schedularMemory.release();
+    delete[] queue;
+    queue = nullptr;
+  };
   // initliser of the schedular
-  int init(buffioSockBrokerConfig _cfg, size_t _capinitial) {
-    int tmp_err = init(_capinitial);
-    if (tmp_err < 0)
-      return tmp_err;
+  int init(buffioSockBrokerConfig _cfg, size_t execQueueOrder = 6) {
+    if (execQueueOrder > 15)
+      return -1;
 
-    sockBrokerError poll_err = iopoller.configure(_cfg);
-    if (poll_err != sockBrokerError::none)
-      return static_cast<int>(poll_err);
-    sockBrokerError ini_err = iopoller.init();
-    if (ini_err != sockBrokerError::none)
-      return static_cast<int>(ini_err);
+    schedularMemory.init();
+    try {
+      queue = new blockQueue *[(1 << (execQueueOrder + 1))];
+      order = (1 << (execQueueOrder + 1));
+      ::memset(queue, '\0', (1 << order));
 
+    } catch (std::exception &e) {
+      return -1;
+    };
+    head = ~(0);
+    tail = ~(0);
+    queueFilled = 0;
     return 0;
   }
-  int init(size_t _capinitial) {
-    if (capinit != 0)
-      return -1;
-    capinit = _capinitial;
-    return schedularMemory.init(10);
-  }
-
-  ~buffioschedular() {}
 
   int schedule(buffioroutine routine) {
-    struct __schedinternal *brk = schedularMemory.getMemory();
-    brk->fiber.task = routine;
-    brk->waiters = nullptr;
-    return scheduleptr(brk);
+    if (queue == nullptr)
+      return -1;
+    if (schedulePtr(routine) != nullptr)
+      return 0;
+    return -1;
   };
 
   void run() {
-    while (active > 0) {
+    if (queue == nullptr || queueFilled == 0)
+      return;
 
-      if (cursor == nullptr)
-        return;
-      buffioroutine tsk = cursor->fiber.task;
-      buffiopromise *promise = &tsk.promise();
-      struct __schedinternal *cur = cursor;
+    blockQueue *entry = nullptr;
+    size_t tailLocal = 0;
+    buffioroutine routine;
+    buffiopromise *promise = nullptr;
+
+    while (queueFilled > 10) {
+      tailLocal = ++tail;
+      entry = queue[tailLocal & (order - 1)];
+      routine = entry->current;
+      queue[tailLocal] = nullptr;
+      promise = &routine.promise();
 
       if (promise->selfstatus.status == buffio_routine_status::executing)
-        tsk.resume();
+        routine.resume();
 
       switch (promise->selfstatus.status) {
       case buffio_routine_status::executing:
-        cursor = cursor->next;
         break;
       case buffio_routine_status::yield: {
-        cursor = cursor->next;
         promise->setstatus(buffio_routine_status::executing);
-
+        queue[((++head) & (order - 1))] = entry;
       } break;
       case buffio_routine_status::waiting_io: {
       } break;
       case buffio_routine_status::paused: {
       } break;
       case buffio_routine_status::waiting: {
-        struct __schedinternal *tsk = schedularMemory.getMemory();
-        tsk->fiber.task = promise->waitingfor;
-        tsk->waitercount += 1;
-        replacecursor(tsk);
-        pushwaiter(tsk, cursor);
-        cursor = cursor->next;
+        auto *task = schedulePtr(promise->handle);
+        task->waiter = entry;
+        queueFilled -= 1;
       } break;
       case buffio_routine_status::push_task: {
       } break;
       case buffio_routine_status::unhandled_exception:
       case buffio_routine_status::error:
-      case buffio_routine_status::done: {
-        if (cursor->waiters != nullptr) {
-          wakeup(cur, cursor->waitercount);
-          cursor->waitercount = 0;
-        }
-        cursor = cur->next;
-        poptask(cur);
-      } break;
-      }
+      case buffio_routine_status::done:
+        if (entry->waiter != nullptr) {
+          auto &routinePromise = entry->waiter->current.promise();
+          routinePromise.setstatus(buffio_routine_status::executing);
+          routinePromise.childstatus = promise->selfstatus;
+          schedulePtrInternal(entry->waiter);
+        };
+        entry->haveInstance = false;
+        entry->current.destroy();
+        schedularMemory.retMemory(entry);
+        queueFilled -= 1;
+        break;
+      };
     }
   };
 
 private:
-  void replacecursor(struct __schedinternal *from) {
+  inline blockQueue *schedulePtr(buffioroutine routine) {
+    if (queueFilled > order)
+      return nullptr;
 
-    cursor->prev->next = from;
-    cursor->next->prev = from;
-    from->next = cursor->next;
-    from->prev = cursor->prev;
+    auto *memory = schedularMemory.getMemory();
+    if (memory == nullptr)
+      return nullptr;
 
-    cursor->next = cursor->prev = nullptr;
-    cursor = from;
+    memory->current = routine;
+    memory->waiter = nullptr;
+    queue[(++head & (order - 1))] = memory;
+    queueFilled += 1;
+    memory->haveInstance = true;
 
-    if (from == head)
-      head = from;
-    if (from == tail)
-      tail = from;
-  }
+    return memory;
+  };
 
-  int scheduleptr(struct __schedinternal *brk) {
-    // the queue is empty
-    if (head == nullptr) {
-      head = tail = brk;
-      head->prev = head->next = brk; // cyclic chain
-      cursor = head;
-      active += 1;
+  inline int schedulePtrInternal(blockQueue *ptrBlock) {
+    if (queueFilled > order)
+      return -1;
 
-      return 0;
-    }
-
-    // cyclic chain of one element;
-    if (head == tail) {
-      head->prev = brk;
-      head->next = brk;
-      brk->prev = brk->next = tail;
-      tail = brk;
-      active += 1;
-      return 0;
-    }
-
-    // after checking both we now schedule w.r.t to the cursor of the schedular;
-    cursor->prev->next =
-        brk; // marking brk as next for the node before the cursor
-    brk->prev = cursor->prev; // makring brk previous to the cursor previous
-    brk->next = cursor;       // marking brk next to cursor
-    cursor->prev = brk;       // marking cursor prev to brk;
-    active += 1;
-
+    queue[++head & (order - 1)] = ptrBlock;
+    queueFilled += 1;
     return 0;
-  }
+  };
 
-  // call after checking you have a valid pointer, pass the waiters field for
-  // the structure
-  void wakeup(struct __schedinternal *parent, size_t waitercount) {
-    struct __schedinternal *waitinglist = parent->waiters;
-    buffiopromisestatus tmppromise = parent->fiber.task.promise().selfstatus;
-
-    for (size_t i = 0; i < waitercount; i--) {
-      buffiopromise *pro = &waitinglist->fiber.task.promise();
-      pro->setstatus(buffio_routine_status::executing);
-      pro->childstatus = tmppromise;
-      scheduleptr(waitinglist);
-      waitinglist = waitinglist->wnxt;
-    }
-    return;
-  }
-
-  // pass pointer to the raw task structure
-  void pushwaiter(struct __schedinternal *task, struct __schedinternal *wtsk) {
-    if (task->waiters == nullptr) {
-      wtsk->wnxt = nullptr;
-      task->waiters = wtsk;
-      task->waitercount += 1;
-      return;
-    }
-    wtsk->wnxt = task->waiters;
-    task->waiters = wtsk;
-    task->waitercount += 1;
-  }
-  void poptask(struct __schedinternal *which) {
-
-    if (head == tail) {
-      which->fiber.task.destroy();
-      head = tail = nullptr;
-      schedularMemory.retMemory(which);
-      cursor = nullptr;
-      active -= 1;
-      return;
-    }
-    which->next->prev = which->prev;
-    which->prev->next = which->next;
-
-    auto *tmpPtr = which->next;
-    schedularMemory.retMemory(which);
-
-    if (tmpPtr == head)
-      head = tmpPtr;
-    if (tmpPtr == tail)
-      tail = tmpPtr;
-    active -= 1;
-    return;
-  }
-
-  buffioMemoryPool<__schedinternal> schedularMemory;
-  size_t capinit;
-  size_t active;
-  struct __schedinternal *head;
-  struct __schedinternal *tail;
-  struct __schedinternal *cursor;
+  blockQueue **queue;
+  blockQueue *pulledOut;
+  size_t order;
+  size_t head;
+  size_t tail;
+  size_t queueFilled; // -1 if empty, (N - 1) if there is N tasks
+  buffioMemoryPool<blockQueue> schedularMemory;
   buffioSockBroker iopoller;
 };
 #endif

@@ -8,8 +8,8 @@
  */
 
 #if !defined(BUFFIO_IMPLEMENTATION)
-#include "buffioFd.hpp"
 #include "buffioenum.hpp"
+#include "buffiofd.hpp"
 #endif
 
 #include <atomic>
@@ -18,6 +18,8 @@
 
 struct buffiopromise;
 using buffiohandleroutine = std::coroutine_handle<buffiopromise>;
+
+using buffioRoutineHandle = buffiohandleroutine;
 
 #define buffiowait co_await
 #define buffioyeild co_yield
@@ -51,13 +53,10 @@ struct buffiopromisestatus {
 };
 
 struct buffiopromise {
-  buffioroutine waitingfor;
-  buffioroutine pushhandle;
+  buffioroutine handle;
   buffioroutine self;
   buffiopromisestatus childstatus;
   buffiopromisestatus selfstatus;
-
-  std::exception_ptr routineexception;
 
   buffioroutine get_return_object() {
     self = {buffioroutine::from_promise(*this)};
@@ -74,13 +73,13 @@ struct buffiopromise {
   };
 
   buffioawaiter await_transform(buffioroutine waitfor) {
-    waitingfor = waitfor;
+    handle = waitfor;
     selfstatus.status = buffio_routine_status::waiting;
     return {.self = self};
   };
 
   buffioawaiter await_transform(buffiopushinfo info) {
-    pushhandle = info.task;
+    handle = info.task;
     selfstatus.status = buffio_routine_status::push_task;
     return {.self = info.task};
   };
@@ -146,13 +145,6 @@ public:
 private:
   buffioroutine evalue;
   buffiopromisestatus status;
-};
-
-struct buffiotaskinfo {
-  std::atomic<int64_t> mask; // don't remove this mask as if tracks if there any
-                             // request available;
-  size_t id;                 // mask track if the task have socket,bucket
-  buffioroutine task;
 };
 
 #endif

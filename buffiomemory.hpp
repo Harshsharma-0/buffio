@@ -12,6 +12,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <exception>
 #include <iostream>
 #include <new>
 #include <random>
@@ -24,11 +25,29 @@ template <typename T> class buffioMemoryPool {
   struct buffioMemoryFragment {
     uintptr_t chksum; // can also be used as next ptr;
     T data;
+    ~buffioMemoryFragment() = default;
+  };
+  struct buffioMemoryPages {
+    struct buffioMemoryPages *next;
+    struct buffioMemoryFragment *data;
   };
 
 public:
-  buffioMemoryPool() : fragments(nullptr) {};
-  int init(size_t memReserve) {
+  buffioMemoryPool()
+      : fragments(nullptr), pageFragmentCount(0), pageHead(nullptr) {};
+  ~buffioMemoryPool() { release(); };
+
+  void release() {
+    buffioMemoryPages *tmpPage = nullptr;
+    while (pageHead != nullptr) {
+
+      delete[] pageHead->data;
+      tmpPage = pageHead;
+      pageHead = pageHead->next;
+      delete tmpPage;
+    };
+  }
+  int init(size_t fragmentCount = 250) {
     std::random_device rDev;
     std::mt19937::result_type seed =
         rDev() ^ (std::mt19937::result_type)
@@ -39,16 +58,15 @@ public:
     std::mt19937 gen(seed);
     std::uniform_int_distribution<size_t> randomNumber(0, UINT64_MAX);
     chkSum = randomNumber(gen); // creating the chkSum for data integrity;
-    reserveCount = memReserve != 0 ? memReserve : 10;
+    pageFragmentCount = fragmentCount;
     fragments = nullptr;
-    reserveMemory(reserveCount);
 
-    return 0; // TODO: error check
+    return makePage(); // TODO: error check
   }
 
   T *getMemory() {
     if (fragments == nullptr) {
-      if (reserveMemory(reserveCount) != 0)
+      if (makePage() != 0)
         return nullptr;
     };
     buffioMemoryFragment *tmpFrag = fragments;
@@ -61,49 +79,72 @@ public:
     if (data == nullptr)
       return;
     if (fragments == nullptr)
-      reserveMemory(reserveCount);
+      makePage();
 
-    uintptr_t *chkSumLocal = (uintptr_t *)((char *)data - sizeof(uintptr_t));
+    uintptr_t *chkSumLocal =
+        (uintptr_t *)((uintptr_t)data -
+                      offsetof(struct buffioMemoryFragment, data));
     if (*chkSumLocal == chkSum) {
       *chkSumLocal = (uintptr_t)nullptr;
-      pushFrag((buffioMemoryFragment *)data);
+      pushFragment((buffioMemoryFragment *)chkSumLocal);
     }
     return;
   };
 
-  ~buffioMemoryPool() { return; }
-
 private:
-  inline int reserveMemory(size_t count) {
+  inline int makePage() {
 
-    buffioMemoryFragment *tmp = nullptr;
-    tmp = new (std::nothrow) buffioMemoryFragment;
-    if (tmp == nullptr)
+    buffioMemoryPages *tmpPage;
+    try {
+      tmpPage = new buffioMemoryPages;
+    } catch (std::exception &e) {
       return -1;
+    };
 
-    tmp->chksum = (uintptr_t)nullptr;
-    fragments = tmp;
+    buffioMemoryFragment *tmpFragment;
+    try {
+      tmpFragment = new buffioMemoryFragment[pageFragmentCount];
+    } catch (std::exception &e) {
+      delete tmpPage;
+      return -1;
+    };
 
-    for (int i = 1; i < count; i++) {
-      tmp = new (std::nothrow) buffioMemoryFragment;
-      if (tmp == nullptr && count != 1)
-        return 0; // atleast we reserved some memory
+    tmpPage->data = tmpFragment;
+    tmpPage->next = nullptr;
+    makeFragementFromPage(tmpPage);
 
-      tmp->chksum = (uintptr_t)fragments;
-      fragments = tmp;
+    if (pageHead == nullptr) {
+      pageHead = tmpPage;
+      return 0;
     }
+
+    tmpPage->next = pageHead;
+    pageHead = tmpPage;
     return 0;
-  }
-  inline void pushFrag(buffioMemoryFragment *data) {
+  };
+
+  inline void makeFragementFromPage(buffioMemoryPages *fromPage) {
+    for (size_t i = 0; i < pageFragmentCount; i++) {
+      pushFragment(&fromPage->data[i]);
+    }
+  };
+
+  inline void pushFragment(buffioMemoryFragment *data) {
+
+    data->chksum = (uintptr_t)nullptr;
+
     if (fragments == nullptr) {
       fragments = data;
       return;
     }
+
     data->chksum = (uintptr_t)fragments;
     fragments = data;
   };
+
+  buffioMemoryPages *pageHead;
   buffioMemoryFragment *fragments;
-  size_t reserveCount;
+  size_t pageFragmentCount;
   uintptr_t chkSum;
 };
 

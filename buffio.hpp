@@ -3,15 +3,14 @@
 
 #include "./buffiolog.hpp"
 
-
 #if defined(BUFFIO_IMPLEMENTATION)
 
 #include "./buffioenum.hpp"
+#include "./buffiolfqueue.hpp"
 #include "./buffiomemory.hpp"
+#include "./buffiothread.hpp"
 #include "./buffiofd.hpp"
 #include "./buffiopromise.hpp"
-#include "./buffiolfqueue.hpp"
-#include "./buffiothread.hpp"
 #include "./buffiosockbroker.hpp"
 #include "./buffioschedular.hpp"
 

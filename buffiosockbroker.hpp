@@ -12,9 +12,10 @@
 
 #if !defined(BUFFIO_IMPLEMENTATION)
 #include "buffioenum.hpp"
+#include "buffiofd.hpp"
 #include "buffiolfqueue.hpp"
 #include "buffiopromise.hpp"
-#include "buffiosock.hpp"
+#include "buffiothread.hpp"
 #include <memory>
 #endif
 

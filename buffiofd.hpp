@@ -10,8 +10,10 @@
  */
 
 #include <arpa/inet.h>
+#include <cstddef>
 #include <cstring>
 #include <errno.h>
+#include <exception>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -93,13 +95,7 @@ public:
   int fds[2]; // additional space for pipe also;
   std::unique_ptr<char[]> address;
   buffioFdInfo() : address(nullptr) { family = buffioFdFamily::none; };
-  buffioFdInfo(int fd1, int fd2, std::unique_ptr<char[]> path,
-               buffioFdFamily acqFamily) {
-    fds[0] = fd1;
-    fds[1] = fd2;
-    address = std::move(path);
-    family = acqFamily;
-  }
+
   ~buffioFdInfo() {
     switch (family) {
     case buffioFdFamily::file:
@@ -144,10 +140,15 @@ public:
     if (portNumber <= 0 || portNumber > 65535)
       return buffioFdError::portnumber;
 
-    buffioFdView fdHolder = std::make_shared<buffioFdInfo>();
-    if (fdHolder.get() == nullptr) {
+    // when there is no ownership the count is  0
+    if (fdData.use_count() != 0)
+      return buffioFdError::occupied;
+
+    try {
+      fdData = std::make_shared<buffioFdInfo>();
+    } catch (std::exception &e) {
       return buffioFdError::makeShared;
-    };
+    }
 
     int domain = 0;
     int type = 0;
@@ -188,16 +189,24 @@ public:
 
       sockaddr_un *unAddrLoc = reinterpret_cast<sockaddr_un *>(&addr);
       len = ::strlen(address);
-      if (len >= sizeof(unAddrLoc->sun_path))
+      if (len >= sizeof(unAddrLoc->sun_path)) {
+        fdData.reset();
         return buffioFdError::socketAddress;
+      };
 
-      fdHolder->address = std::make_unique<char[]>(len + 5);
-      if (fdHolder->address != nullptr) {
-        ::memcpy(fdHolder->address.get(), address,
-                 (len + 1)); // +1 for nullptr;
-      }
+      try {
+        fdData->address = std::make_unique<char[]>(len + 1);
+      } catch (std::exception &e) {
+        fdData.reset();
+        return buffioFdError::makeUnique;
+      };
+
+      ::memcpy(fdData->address.get(), address, len);
+      fdData->address[len] = '\0';
+
       ::memcpy(unAddrLoc->sun_path, address, len + 1);
-      addrLen = sizeof(sockaddr_un);
+      addrLen = offsetof(struct sockaddr_un, sun_path) +
+                sizeof(sockaddr_un::sun_path);
     } break;
     case buffioFdFamily::raw:
       break;
@@ -210,47 +219,84 @@ public:
     if (socketFd < 0)
       return buffioFdError::socket;
 
-    if (::bind(socketFd, reinterpret_cast<sockaddr *>(&addr), addrLen) != 0)
+    if (::bind(socketFd, reinterpret_cast<sockaddr *>(&addr), addrLen) != 0) {
+      ::close(socketFd);
       return buffioFdError::bind;
+    }
 
-    if (len == 0)
-      len = ::strlen(address);
-
-    fdHolder->family = family;
-    fdHolder->fds[0] = socketFd;
-    fdHolder->fds[1] = portNumber;
-    fdData = fdHolder;
+    fdData->family = family;
+    fdData->fds[0] = socketFd;
+    fdData->fds[1] = portNumber;
     return buffioFdError::none;
   };
 
   [[nodiscard]]
   buffioFdError createPipe(bool block = true) {
+
+    if (fdData.use_count() != 0)
+      return buffioFdError::occupied;
+
     int fdTmp[2];
 
-    buffioFdView fdPtr = std::make_shared<buffioFdInfo>();
-    if (fdPtr.get() == nullptr)
+    try {
+      fdData = std::make_shared<buffioFdInfo>();
+    } catch (std::exception &e) {
       return buffioFdError::makeShared;
+    };
 
-    if (::pipe(fdTmp) != 0)
+    if (::pipe(fdTmp) != 0) {
+      fdData.reset();
       return buffioFdError::pipe;
+    }
 
-    fdPtr->family = buffioFdFamily::pipe;
-    fdPtr->fds[0] = fdTmp[0];
-    fdPtr->fds[1] = fdTmp[1];
-    fdData = fdPtr;
+    fdData->family = buffioFdFamily::pipe;
+    fdData->fds[0] = fdTmp[0];
+    fdData->fds[1] = fdTmp[1];
     return buffioFdError::none;
   };
 
   [[nodiscard]]
-  buffioFdError createfifo(const char *path = nullptr, mode_t mode = 0666) {
+  buffioFdError createfifo(const char *path = "/usr/home/buffioDefault",
+                           mode_t mode = 0666, bool onlyFifo = false) {
+
+    if (fdData.use_count() != 0)
+      return buffioFdError::occupied;
+
     if (::mkfifo(path, mode) != 0)
       return buffioFdError::fifo;
+
+    if (onlyFifo == true)
+      return buffioFdError::none;
+
+    try {
+      fdData = std::make_shared<buffioFdInfo>();
+      fdData->family = buffioFdFamily::fifo;
+    } catch (std::exception &e) {
+      return buffioFdError::makeShared;
+    }
+
+    /*
+    1 2 3 4 5 6 7
+    0 1 2 3 4 5 6
+    */
+
+    size_t len = ::strlen(path);
+
+    try {
+      fdData->address = std::make_unique<char[]>(len + 1);
+    } catch (std::exception &e) {
+      fdData.reset();
+      ::unlink(path);
+      return buffioFdError::makeUnique;
+    }
+    memcpy(fdData->address.get(), path, len);
+    fdData->address[len] = '\0';
 
     return buffioFdError::none;
   }
 
   /*
-  [[nodiscard]] buffioFdView openfile(const char *path = nullptr,
+  [[nodiscard]] buffioFdView openfile(const cha *path = nullptr,
                                       int mode = 0) {
     // TODO: add file support
     if (path == nullptr)
