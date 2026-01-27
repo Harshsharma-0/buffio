@@ -14,7 +14,6 @@
 #include <cstdint>
 #include <exception>
 #include <iostream>
-#include <new>
 #include <random>
 
 // typiclly used by the user to get resource allocated

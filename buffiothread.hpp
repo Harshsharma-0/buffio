@@ -135,7 +135,7 @@ private:
 };
 
 // thread termination is the user work
-class buffiothread {
+class buffioThread {
 
   struct threadinternal {
     void *resource;
@@ -147,14 +147,34 @@ class buffiothread {
     pthread_attr_t attr;
     pthread_t id;
     std::atomic<buffioThreadStatus> status;
+    std::atomic<size_t> *numThreads;
   };
 
 public:
-  buffiothread() : threads(nullptr), numThreads(0) {}
-  ~buffiothread() = default;
+  buffioThread() : threads(nullptr), numThreads(0), mutexEnabled(false) {
+    buffioMutex = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutexattr_t mutexAttr;
+
+    if (pthread_mutexattr_init(&mutexAttr) != 0)
+      return;
+    if (pthread_mutex_init(&buffioMutex, &mutexAttr) != 0)
+      return;
+    pthread_mutexattr_destroy(&mutexAttr);
+    mutexEnabled = true;
+  }
+  buffioThread(buffioThread const &) = delete;
+  buffioThread(buffioThread &&) = delete;
+  buffioThread &operator=(buffioThread const &) = delete;
+  buffioThread &operator=(buffioThread &&) = delete;
+
+  ~buffioThread() { threadfree(); }
   // only free the allocated resource for the thread not terminate it
   void threadfree() {
 
+    if (mutexEnabled == false)
+      return;
+
+    ::pthread_mutex_lock(&buffioMutex);
     struct threadinternal *tmp = nullptr;
     for (auto *loop = threads; loop != nullptr;) {
       if (loop->name != nullptr)
@@ -164,93 +184,110 @@ public:
       loop = loop->next;
       delete tmp;
     }
-    numThreads = 0;
     threads = nullptr;
+    ::pthread_mutex_unlock(&buffioMutex);
+    pthread_mutex_destroy(&buffioMutex);
     return;
   };
 
-  int add(const char *name = nullptr, int (*func)(void *) = nullptr,
-          void *data = nullptr, size_t stackSize = buffiothread::SD) {
+  int run(const char *name, int (*func)(void *), void *data,
+          size_t stackSize = buffioThread::SD) {
 
-    if (stackSize < buffiothread::S1KB || func == nullptr)
+    if (stackSize < buffioThread::S1KB || func == nullptr ||
+        mutexEnabled == false)
       return -1;
 
-    struct threadinternal *tmpThr = new struct threadinternal;
+    struct threadinternal *tmpThr = nullptr;
+    try {
+      tmpThr = new struct threadinternal;
+    } catch (std::exception &e) {
+      return -1;
+    };
+
     ::memset(tmpThr, '\0', sizeof(struct threadinternal));
     tmpThr->status = buffioThreadStatus::configOk;
 
-    if (::pthread_attr_init(&tmpThr->attr) != 0)
+    if (::pthread_attr_init(&tmpThr->attr) != 0) {
+      delete tmpThr;
       return -1;
+    }
 
     tmpThr->resource = data;
     tmpThr->name = nullptr;
     tmpThr->stackSize = stackSize;
-
+    tmpThr->numThreads = &numThreads;
+    tmpThr->next = nullptr;
     if (name != nullptr) {
       size_t len = std::strlen(name);
       if (len < 100) {
-        // TODO: error check;
-        char *name_tmp = new char[len + 1];
-        std::memcpy(name_tmp, name, len + 1);
-        tmpThr->name = name_tmp;
+        try {
+          char *name_tmp = new char[len + 1];
+          std::memcpy(name_tmp, name, len);
+          tmpThr->name = name_tmp;
+          name_tmp[len] = '\0';
+
+        } catch (std::exception &e) {
+          // whill run without name no error check needed
+        };
       }
     }
 
-    if (::posix_memalign(&tmpThr->stack, sysconf(_SC_PAGESIZE), stackSize) != 0)
-      return -1;
-    if (::pthread_attr_setstack(&tmpThr->attr, tmpThr->stack, stackSize) != 0)
-      return -1;
+    if (::posix_memalign(&tmpThr->stack, sysconf(_SC_PAGESIZE), stackSize) !=
+        0) {
+      if (tmpThr->name != nullptr)
+        delete tmpThr->name;
 
+      ::pthread_attr_destroy(&tmpThr->attr);
+      delete tmpThr;
+      return -1;
+    }
+    if (::pthread_attr_setstack(&tmpThr->attr, tmpThr->stack, stackSize) != 0) {
+      if (tmpThr->name != nullptr)
+        delete tmpThr->name;
+
+      ::pthread_attr_destroy(&tmpThr->attr);
+      ::free(tmpThr->stack);
+      delete tmpThr;
+      return -1;
+    }
+
+    tmpThr->status = buffioThreadStatus::configOk;
     tmpThr->stackSize = stackSize;
     tmpThr->func = func;
+
+    if (::pthread_create(&tmpThr->id, &tmpThr->attr, buffioFunc, tmpThr) != 0) {
+      if (tmpThr->name != nullptr)
+        delete tmpThr->name;
+
+      ::free(tmpThr->stack);
+      ::pthread_attr_destroy(&tmpThr->attr);
+      delete tmpThr;
+      return -1;
+    }
+
+    ::pthread_mutex_lock(&buffioMutex);
     if (threads == nullptr) {
       threads = tmpThr;
     } else {
       tmpThr->next = threads;
       threads = tmpThr;
     }
-    tmpThr->status = buffioThreadStatus::configOk;
-    numThreads += 1;
+    ::pthread_mutex_unlock(&buffioMutex);
+
     return 0;
-  };
-
-  // return array of ids of the thread
-  [[nodiscard]]
-  std::shared_ptr<pthread_t[]> run() {
-
-    if (threadsId != nullptr || threads == nullptr)
-      return nullptr;
-
-    threadsId = std::make_shared<pthread_t[]>(numThreads);
-
-    size_t count = 0;
-
-    for (auto *thr = threads; threads != nullptr; threads = threads->next) {
-
-      if (thr->status != buffioThreadStatus::configOk)
-        continue;
-      if (::pthread_create(&thr->id, &thr->attr, buffioFunc, thr) != 0)
-        return nullptr;
-
-      ::pthread_attr_destroy(&thr->attr);
-      threadsId[count] = thr->id;
-      count += 1;
-    }
-    return threadsId;
   };
 
   void wait(pthread_t threadId) { ::pthread_join(threadId, NULL); }
 
   static int setname(const char *name) {
-    return prctl(PR_SET_NAME, name, 0, 0, 0);
+    return ::prctl(PR_SET_NAME, name, 0, 0, 0);
   };
-  buffiothread(const buffiothread &) = delete;
 
   static constexpr size_t S1MB = 1024 * 1024;
   static constexpr size_t S4MB = 4 * (1024 * 1024);
   static constexpr size_t S9MB = 9 * (1024 * 1024);
   static constexpr size_t S10MB = 10 * (1024 * 1024);
-  static constexpr size_t SD = buffiothread::S9MB;
+  static constexpr size_t SD = buffioThread::S9MB;
   static constexpr size_t S1KB = 1024;
 
 private:
@@ -260,19 +297,45 @@ private:
     tmpThr->status.store(buffioThreadStatus::running,
                          std::memory_order_release);
 
+    tmpThr->numThreads->fetch_add(1, std::memory_order_acq_rel);
     if (tmpThr->name != nullptr)
       ::prctl(PR_SET_NAME, tmpThr->name, 0, 0, 0);
 
-    int error = tmpThr->func(tmpThr->resource);
+    int mutexEnabled = tmpThr->func(tmpThr->resource);
 
     tmpThr->status.store(buffioThreadStatus::done, std::memory_order_release);
+    tmpThr->numThreads->fetch_add(-1, std::memory_order_acq_rel);
+
     ::pthread_exit(nullptr);
     return nullptr;
   };
 
   struct threadinternal *threads;
-  std::shared_ptr<pthread_t[]> threadsId;
-  size_t numThreads;
+  pthread_mutex_t buffioMutex;
+  bool mutexEnabled;
+  std::atomic<size_t> numThreads;
 };
 
+class buffioThreadView {
+public:
+  buffioThreadView() = default;
+  ~buffioThreadView() = default;
+
+  void make() {
+    if (localInstance.use_count() == 0)
+      return;
+    localInstance = std::make_shared<buffioThread>();
+    return;
+  };
+  buffioThreadView &operator=(buffioThreadView const &view) {
+    if (view.localInstance.use_count() == 0)
+      return *this;
+    localInstance = view.localInstance;
+    return *this;
+  };
+  buffioThread *operator()() const { return localInstance.get(); };
+
+private:
+  std::shared_ptr<buffioThread> localInstance;
+};
 #endif

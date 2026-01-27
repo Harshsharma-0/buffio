@@ -23,7 +23,7 @@
 #include <unistd.h>
 
 #if !defined(BUFFIO_IMPLEMENTATION)
-#include "buffioenum.hpp" // header for opcode
+// #include "buffioenum.hpp" // header for opcode
 #include "buffiomemory.hpp"
 #endif
 
@@ -92,10 +92,28 @@ public:
   std::atomic<int> value; // mask that contain the type of request
   buffioFdReq request;
 
+  union {
+    struct {
+      int socketFd;
+      int portnumber;
+    } sock;
+    int fileFd;
+    int pipeFd[2];
+  };
+
   int fds[2]; // additional space for pipe also;
   std::unique_ptr<char[]> address;
-  buffioFdInfo() : address(nullptr) { family = buffioFdFamily::none; };
-
+  buffioFdInfo() : address(nullptr), count(0), token(0) {
+    family = buffioFdFamily::none;
+  };
+  size_t genReqToken() const { return token.load(std::memory_order_acquire); };
+  bool matchToken(size_t token) const {
+    return (token == count.load(std::memory_order_acquire));
+  }
+  inline void markCompletion() noexcept {
+    count.fetch_add(1, std::memory_order_acq_rel);
+    return;
+  };
   ~buffioFdInfo() {
     switch (family) {
     case buffioFdFamily::file:
@@ -110,11 +128,17 @@ public:
       ::close(fds[0]);
     } break;
     case buffioFdFamily::local: {
-      ::unlink((const char *)address.get());
+      if (address != nullptr) {
+        ::unlink((const char *)address.get());
+      };
       ::close(fds[0]);
     } break;
     };
   };
+
+private:
+  std::atomic<size_t> count;
+  std::atomic<size_t> token;
 };
 
 using buffioFdView = std::shared_ptr<buffioFdInfo>;
@@ -128,26 +152,25 @@ public:
   buffioFd &operator=(const buffioFd &) = default;
 
   [[nodiscard]]
-  buffioFdError
-  createSocket(const char *address = nullptr, int portNumber = 8080,
-               buffioFdFamily family = buffioFdFamily::ipv4,
-               buffioSocketProtocol protocol = buffioSocketProtocol::tcp,
-               bool blocking = true) {
+  int createSocket(const char *address = nullptr, int portNumber = 8080,
+                   buffioFdFamily family = buffioFdFamily::ipv4,
+                   buffioSocketProtocol protocol = buffioSocketProtocol::tcp,
+                   bool blocking = true) {
 
     if (address == nullptr)
-      return buffioFdError::socketAddress;
+      return (int)buffioErrorCode::socketAddress;
 
     if (portNumber <= 0 || portNumber > 65535)
-      return buffioFdError::portnumber;
+      return (int)buffioErrorCode::portnumber;
 
     // when there is no ownership the count is  0
     if (fdData.use_count() != 0)
-      return buffioFdError::occupied;
+      return (int)buffioErrorCode::occupied;
 
     try {
       fdData = std::make_shared<buffioFdInfo>();
     } catch (std::exception &e) {
-      return buffioFdError::makeShared;
+      return (int)buffioErrorCode::makeShared;
     }
 
     int domain = 0;
@@ -163,7 +186,7 @@ public:
 
       sockaddr_in *in4AddrLoc = reinterpret_cast<sockaddr_in *>(&addr);
       if (inet_pton(domain, address, &in4AddrLoc->sin_addr) != 1)
-        return buffioFdError::socketAddress;
+        return (int)buffioErrorCode::socketAddress;
 
       in4AddrLoc->sin_family = domain;
       in4AddrLoc->sin_port = htons(portNumber);
@@ -176,7 +199,7 @@ public:
 
       sockaddr_in6 *in6AddrLoc = reinterpret_cast<sockaddr_in6 *>(&addr);
       if (inet_pton(domain, address, &in6AddrLoc->sin6_addr) != 1)
-        return buffioFdError::socketAddress;
+        return (int)buffioErrorCode::socketAddress;
 
       in6AddrLoc->sin6_family = domain;
       in6AddrLoc->sin6_port = htons(portNumber);
@@ -191,14 +214,14 @@ public:
       len = ::strlen(address);
       if (len >= sizeof(unAddrLoc->sun_path)) {
         fdData.reset();
-        return buffioFdError::socketAddress;
+        return (int)buffioErrorCode::socketAddress;
       };
 
       try {
         fdData->address = std::make_unique<char[]>(len + 1);
       } catch (std::exception &e) {
         fdData.reset();
-        return buffioFdError::makeUnique;
+        return (int)buffioErrorCode::makeUnique;
       };
 
       ::memcpy(fdData->address.get(), address, len);
@@ -211,68 +234,68 @@ public:
     case buffioFdFamily::raw:
       break;
     default:
-      return buffioFdError::family;
+      return (int)buffioErrorCode::family;
       break;
     };
 
     int socketFd = ::socket(domain, type, 0);
     if (socketFd < 0)
-      return buffioFdError::socket;
+      return (int)buffioErrorCode::socket;
 
     if (::bind(socketFd, reinterpret_cast<sockaddr *>(&addr), addrLen) != 0) {
       ::close(socketFd);
-      return buffioFdError::bind;
+      return (int)buffioErrorCode::bind;
     }
 
     fdData->family = family;
     fdData->fds[0] = socketFd;
     fdData->fds[1] = portNumber;
-    return buffioFdError::none;
+    return (int)buffioErrorCode::none;
   };
 
   [[nodiscard]]
-  buffioFdError createPipe(bool block = true) {
+  int createPipe(bool block = true) {
 
     if (fdData.use_count() != 0)
-      return buffioFdError::occupied;
+      return (int)buffioErrorCode::occupied;
 
     int fdTmp[2];
 
     try {
       fdData = std::make_shared<buffioFdInfo>();
     } catch (std::exception &e) {
-      return buffioFdError::makeShared;
+      return (int)buffioErrorCode::makeShared;
     };
 
     if (::pipe(fdTmp) != 0) {
       fdData.reset();
-      return buffioFdError::pipe;
+      return (int)buffioErrorCode::pipe;
     }
 
     fdData->family = buffioFdFamily::pipe;
     fdData->fds[0] = fdTmp[0];
     fdData->fds[1] = fdTmp[1];
-    return buffioFdError::none;
+    return (int)buffioErrorCode::none;
   };
 
   [[nodiscard]]
-  buffioFdError createfifo(const char *path = "/usr/home/buffioDefault",
-                           mode_t mode = 0666, bool onlyFifo = false) {
+  int createfifo(const char *path = "/usr/home/buffioDefault",
+                 mode_t mode = 0666, bool onlyFifo = false) {
 
     if (fdData.use_count() != 0)
-      return buffioFdError::occupied;
+      return (int)buffioErrorCode::occupied;
 
     if (::mkfifo(path, mode) != 0)
-      return buffioFdError::fifo;
+      return (int)buffioErrorCode::fifo;
 
     if (onlyFifo == true)
-      return buffioFdError::none;
+      return (int)buffioErrorCode::none;
 
     try {
       fdData = std::make_shared<buffioFdInfo>();
       fdData->family = buffioFdFamily::fifo;
     } catch (std::exception &e) {
-      return buffioFdError::makeShared;
+      return (int)buffioErrorCode::makeShared;
     }
 
     /*
@@ -287,12 +310,12 @@ public:
     } catch (std::exception &e) {
       fdData.reset();
       ::unlink(path);
-      return buffioFdError::makeUnique;
+      return (int)buffioErrorCode::makeUnique;
     }
     memcpy(fdData->address.get(), path, len);
     fdData->address[len] = '\0';
 
-    return buffioFdError::none;
+    return (int)buffioErrorCode::none;
   }
 
   /*

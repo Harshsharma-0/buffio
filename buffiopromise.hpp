@@ -13,138 +13,82 @@
 #endif
 
 #include <atomic>
+#include <cassert>
 #include <coroutine>
 #include <exception>
-
-struct buffiopromise;
-using buffiohandleroutine = std::coroutine_handle<buffiopromise>;
-
-using buffioRoutineHandle = buffiohandleroutine;
-
 #define buffiowait co_await
 #define buffioyeild co_yield
 #define buffioreturn co_return
 #define buffiopush co_await
 
-struct buffioroutine : buffiohandleroutine {
-  using promise_type = ::buffiopromise;
-};
+template <typename T> struct buffioPromise {
 
-struct acceptreturn {
-  int errorcode;
-  buffioroutine handle;
-};
+  struct promise_type;
+  using coro_handle = std::coroutine_handle<promise_type>;
 
-struct buffioawaiter {
-  bool await_ready() const noexcept { return false; }
-  void await_suspend(std::coroutine_handle<> h) noexcept {};
-  buffioroutine await_resume() noexcept { return self; };
-  buffioroutine self;
-};
-
-struct buffiopushinfo {
-  buffioroutine task;
-};
-
-struct buffiopromisestatus {
-  buffio_routine_status status;
-  int returncode = 0;
-  std::exception_ptr routineexception;
-};
-
-struct buffiopromise {
-  buffioroutine handle;
-  buffioroutine self;
-  buffiopromisestatus childstatus;
-  buffiopromisestatus selfstatus;
-
-  buffioroutine get_return_object() {
-    self = {buffioroutine::from_promise(*this)};
-    selfstatus.status = buffio_routine_status::executing;
-    return self;
+  struct buffioAwaiter {
+    bool await_ready() const noexcept { return false; }
+    void await_suspend(std::coroutine_handle<> h) noexcept {};
+    coro_handle await_resume() noexcept { return self; };
+    coro_handle self;
   };
+  struct promise_type {
+    coro_handle handle;
+    coro_handle self;
+    buffioRoutineStatus status;
+    T returnData;
 
-  std::suspend_always initial_suspend() noexcept { return {}; };
-  std::suspend_always final_suspend() noexcept { return {}; };
+    coro_handle get_return_object() {
+      self = {coro_handle::from_promise(*this)};
+      return self;
+    };
 
-  std::suspend_always yield_value(int value) {
-    selfstatus.status = buffio_routine_status::yield;
-    return {};
-  };
+    // initially called when the routine is framed
+    std::suspend_always initial_suspend() noexcept {
+      status = buffioRoutineStatus::executing;
+      return {};
+    };
 
-  buffioawaiter await_transform(buffioroutine waitfor) {
-    handle = waitfor;
-    selfstatus.status = buffio_routine_status::waiting;
-    return {.self = self};
-  };
+    std::suspend_always final_suspend() noexcept { return {}; };
+    std::suspend_always yield_value(int value) {
+      status = buffioRoutineStatus::yield;
+      return {};
+    };
 
-  buffioawaiter await_transform(buffiopushinfo info) {
-    handle = info.task;
-    selfstatus.status = buffio_routine_status::push_task;
-    return {.self = info.task};
-  };
+    buffioAwaiter await_transform(buffioPromise instance) {
+      handle = instance.get();
+      status = buffioRoutineStatus::waiting;
+      return {.self = handle};
+    };
 
-  // overload to submit I/O request via the promise to the sockbroker
-  buffioawaiter await_transform(buffioFd &sockview) {
-    selfstatus.status = buffio_routine_status::waiting_io;
-    return {};
-  }
-  void unhandled_exception() {
-    selfstatus.status = buffio_routine_status::unhandled_exception;
-    selfstatus.returncode = -1;
-    selfstatus.routineexception = std::current_exception();
-  };
+    void unhandled_exception() {
+      status = buffioRoutineStatus::unhandledException;
+    };
 
-  void return_value(int state) {
-    selfstatus.returncode = state;
-    selfstatus.status =
-        state < 0 ? buffio_routine_status::error : buffio_routine_status::done;
-    return;
+    void return_value(T state) {
+      returnData = state;
+      status = buffioRoutineStatus::done;
+      return;
+    };
+    void setStatus(buffioRoutineStatus stat) { status = stat; }
+    bool checkStatus() const { return true; };
   };
-  void setstatus(buffio_routine_status stat) { selfstatus.status = stat; }
-  bool checkstatus() {
-    return selfstatus.status == buffio_routine_status::error ||
-                   selfstatus.returncode < 0
-               ? true
-               : false;
-  };
-};
-
-class buffiocatch {
-
-public:
-  buffiocatch(buffioroutine self) : evalue(self) {
-    status = self.promise().childstatus;
-  };
-  void exceptionthrower() {
-    switch (status.status) {
-    case buffio_routine_status::unhandled_exception:
-      std::rethrow_exception(status.routineexception);
-      break;
-    case buffio_routine_status::error:
-      throw std::runtime_error(
-          "error in execution of routine return code less than 0");
-      break;
-    }
-  }
-  buffiocatch &throwerror() {
-    exceptionthrower();
-    return *this;
-  };
-
-  void operator=(void (*handler)(const std::exception &e, int successcode)) {
-    if (evalue.promise().checkstatus()) {
-      try {
-        exceptionthrower();
-      } catch (const std::exception &e) {
-        handler(e, status.returncode);
-      }
-    }
-  };
+  buffioPromise(coro_handle _handle) : handle(_handle) { assert(_handle); }
+  coro_handle get() const { return handle; };
+  // For simplicity, declare these 4 special functions as deleted:
+  buffioPromise(buffioPromise const &) = delete;
+  buffioPromise(buffioPromise &&) = delete;
+  buffioPromise &operator=(buffioPromise const &) = delete;
+  buffioPromise &operator=(buffioPromise &&) = delete;
 
 private:
-  buffioroutine evalue;
-  buffiopromisestatus status;
+  coro_handle handle;
 };
+
+template <typename U>
+using buffioPromiseObject = buffioPromise<U>::promise_type;
+
+template <typename T>
+using buffioPromiseHandle = std::coroutine_handle<buffioPromiseObject<T>>;
 
 #endif
