@@ -161,7 +161,7 @@ public:
   buffiopage &operator=(const buffiopage &) = delete;
   buffiopage(const buffiopage &) = delete;
   void pagewrite(char *data, size_t len) {} // get page length
-  char *getpage(size_t len) {}              // getpage lenght
+  char *getpage(size_t len) { return 0; }   // getpage lenght
 
 private:
   struct page *pages;

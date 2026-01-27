@@ -43,24 +43,6 @@ enum class buffioFdFamily : int {
 
 enum class buffioSocketProtocol : int { none = 0, tcp = 1, udp = 2 };
 
-enum class buffioFdError : int {
-  none = 0,
-  socket = -101,
-  bind = -102,
-  open = -103,
-  file_path = -104,
-  socketAddress = -105,
-  portnumber = -106,
-  pipe = -107,
-  fifo = -108,
-  fifo_path = -109,
-  occupied = -110,
-  family = -112,
-  fcntl = -113,
-  makeShared = -114,
-  makeUnique = -115
-};
-
 struct buffioFdReq_rw {
   buffio_fd_opcode opcode;
   char *buffer;
