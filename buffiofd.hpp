@@ -21,6 +21,7 @@
 #include <sys/types.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <coroutine>
 
 #if !defined(BUFFIO_IMPLEMENTATION)
 // #include "buffioenum.hpp" // header for opcode
@@ -43,36 +44,11 @@ enum class buffioFdFamily : int {
 
 enum class buffioSocketProtocol : int { none = 0, tcp = 1, udp = 2 };
 
-struct buffioFdReq_rw {
-  buffio_fd_opcode opcode;
-  char *buffer;
-  size_t len;
-  void *data;
-};
-
-struct buffioFdReq_add {
-  buffio_fd_opcode opcode;
-  int fd;
-  void *data;
-};
-
-struct buffioFdReq_paged {
-  buffio_fd_opcode opcode;
-  buffiopage *page;
-};
-
-union buffioFdReq {
-  struct buffioFdReq_rw rw;
-  struct buffioFdReq_paged paged;
-  struct buffioFdReq_add add;
-};
-
 class buffioFdInfo {
 
 public:
   buffioFdFamily family;
   std::atomic<int> value; // mask that contain the type of request
-  buffioFdReq request;
 
   union {
     struct {
@@ -81,9 +57,8 @@ public:
     } sock;
     int fileFd;
     int pipeFd[2];
-  };
+  } fd;
 
-  int fds[2]; // additional space for pipe also;
   std::unique_ptr<char[]> address;
   buffioFdInfo() : address(nullptr), count(0), token(0) {
     family = buffioFdFamily::none;
@@ -101,19 +76,19 @@ public:
     case buffioFdFamily::file:
       break;
     case buffioFdFamily::pipe: {
-      ::close(fds[0]);
-      ::close(fds[1]);
+      ::close(fd.pipeFd[0]);
+      ::close(fd.pipeFd[1]);
     } break;
     case buffioFdFamily::ipv6:
       [[fallthrough]];
     case buffioFdFamily::ipv4: {
-      ::close(fds[0]);
+      ::close(fd.sock.socketFd);
     } break;
     case buffioFdFamily::local: {
       if (address != nullptr) {
         ::unlink((const char *)address.get());
       };
-      ::close(fds[0]);
+      ::close(fd.sock.socketFd);
     } break;
     };
   };
@@ -133,11 +108,23 @@ public:
   buffioFd() {}
   buffioFd &operator=(const buffioFd &) = default;
 
+  [[nodiscard("buffioFd errors must be handled")]]
+  int open(const char *protocol = nullptr) {
+    if (protocol == nullptr)
+      return (int)buffioErrorCode::protocolString;
+    size_t len = ::strlen(protocol);
+    if (len <= 7)
+      return (int)buffioErrorCode::protocol;
+
+    // todo add support for string based opening of fds;
+    return 0;
+  };
+
   [[nodiscard]]
-  int createSocket(const char *address = nullptr, int portNumber = 8080,
-                   buffioFdFamily family = buffioFdFamily::ipv4,
-                   buffioSocketProtocol protocol = buffioSocketProtocol::tcp,
-                   bool blocking = true) {
+  int socket(const char *address = nullptr, int portNumber = 8080,
+             buffioFdFamily family = buffioFdFamily::ipv4,
+             buffioSocketProtocol protocol = buffioSocketProtocol::tcp,
+             bool blocking = false) {
 
     if (address == nullptr)
       return (int)buffioErrorCode::socketAddress;
@@ -226,17 +213,21 @@ public:
 
     if (::bind(socketFd, reinterpret_cast<sockaddr *>(&addr), addrLen) != 0) {
       ::close(socketFd);
+      fdData.reset();
       return (int)buffioErrorCode::bind;
     }
 
     fdData->family = family;
-    fdData->fds[0] = socketFd;
-    fdData->fds[1] = portNumber;
+    fdData->fd.sock.socketFd = socketFd;
+    fdData->fd.sock.portnumber = portNumber;
+    if (blocking == false)
+      setNonBlocking(socketFd);
+
     return (int)buffioErrorCode::none;
   };
 
   [[nodiscard]]
-  int createPipe(bool block = true) {
+  int pipe(bool block = false) {
 
     if (fdData.use_count() != 0)
       return (int)buffioErrorCode::occupied;
@@ -255,14 +246,18 @@ public:
     }
 
     fdData->family = buffioFdFamily::pipe;
-    fdData->fds[0] = fdTmp[0];
-    fdData->fds[1] = fdTmp[1];
+    fdData->fd.pipeFd[0] = fdTmp[0];
+    fdData->fd.pipeFd[1] = fdTmp[1];
+    if (block == false) {
+      setNonBlocking(fdTmp[0]);
+      setNonBlocking(fdTmp[1]);
+    }
     return (int)buffioErrorCode::none;
   };
 
   [[nodiscard]]
-  int createfifo(const char *path = "/usr/home/buffioDefault",
-                 mode_t mode = 0666, bool onlyFifo = false) {
+  int mkfifo(const char *path = "/usr/home/buffioDefault", mode_t mode = 0666,
+             bool onlyFifo = false) {
 
     if (fdData.use_count() != 0)
       return (int)buffioErrorCode::occupied;
@@ -299,20 +294,80 @@ public:
 
     return (int)buffioErrorCode::none;
   }
+  int setNonBlocking(int fd) {
+    if (fd < 0)
+      return (int)buffioErrorCode::fd;
 
-  /*
-  [[nodiscard]] buffioFdView openfile(const cha *path = nullptr,
-                                      int mode = 0) {
-    // TODO: add file support
-    if (path == nullptr)
-      error = -1;
+    int flags = 0;
+    if ((flags = fcntl(fd, F_GETFL, 0)) == -1)
+      return (int)buffioErrorCode::fcntl;
+    flags |= O_NONBLOCK;
+    if (fcntl(fd, F_SETFL, flags) == -1)
+      return (int)buffioErrorCode::fcntl;
 
-    error = 0;
-    return 0;
+    return (int)buffioErrorCode::none;
   };
-*/
+  std::shared_ptr<buffioFdInfo> get() const { return fdData; }
 
+private:
   buffioFdView fdData;
 };
+
+typedef struct buffioHeader {
+  uint8_t opCode;
+  uint8_t buffioSyscall;
+  uint8_t handleType;
+  uint16_t relayid;
+  /*
+   * reserved for future use
+   */
+  uint8_t reserved;
+  uint8_t reserved_;
+  // buffioReservedFields
+} buffioHeader;
+
+typedef struct buffioBufferRequest {
+  buffioHeader header;
+  size_t len;
+  char *data; // must not be nullptr;
+  buffioFdViewWeak fdView;
+} buffioBufferRequest;
+
+typedef struct buffioBufferPagedRequest {
+  buffioHeader header;
+  size_t len;
+  buffioFdViewWeak fdView;
+  std::weak_ptr<buffiopage> page;
+} buffioBufferPagedRequest;
+
+/* supported protocol string format:
+ * tcp - "tcp://127.0.0.1:8080".
+ * udp - "udp://127.0.0.1:8081".
+ * file - "file://path:usr/mytype.txt".
+ * fifo - "fifo://path:/home/usr/fifo".
+ * pipe - "pipe://path:null".
+ */
+
+typedef struct buffioOpenReq {
+  buffioHeader header;
+  buffioFdViewWeak *fdView;
+  char *address; // must be a valid protocol string
+} buffioOpenReq;
+
+typedef struct buffioTimer{
+ uint64_t duration;
+ int repeat;
+ int self;
+ std::coroutine_handle<> handle;
+}buffioTimer;
+
+
+union buffioRequestMaxSize {
+  buffioOpenReq open;
+  buffioBufferPagedRequest paged;
+  buffioBufferRequest buffed;
+};
+
+
 
 #endif

@@ -1,5 +1,5 @@
-#ifndef __BUFFIO_LF_QUEUE__
-#define __BUFFIO_LF_QUEUE__
+#ifndef BUFFIO_LF_QUEUE
+#define BUFFIO_LF_QUEUE
 
 /*
  * Error codes range reserved for buffiothread
@@ -70,19 +70,15 @@ public:
     freequeue.data = nullptr;
   };
 
-  int lfstart(size_t _order, T _onEmpty) {
+  int lfstart(size_t _order) {
     if (_order <= buffioatomix_max_order && _order >= BUFFIO_RING_MIN &&
         data == nullptr) {
       queueorder = _order;
-      onEmpty = _onEmpty;
       try {
         data = new T[(1 << _order)];
       } catch (std::exception &e) {
         return -1;
       };
-
-      for (size_t i = 0; i < (1 << _order); i++)
-        data[i] = onEmpty;
 
       try {
         acqueue.data = new buffioatomix[(1 << (_order + 1))];
@@ -104,7 +100,8 @@ public:
       initempty(&acqueue, _order);
       initfull(&freequeue, _order);
       return 0;
-    }
+    };
+    std::cout << "fake" << std::endl;
     return -1;
   }
 
@@ -134,14 +131,13 @@ public:
     return acqueue.threshold.load(std::memory_order_acquire) < 0 ? true : false;
   }
 
-  T dequeue() {
+  T dequeue(T onEmpty) {
     size_t idx = lfdequeue(&acqueue, queueorder);
     if (idx == BUFFIO_EMPTY)
       return onEmpty;
-    T datatmp = data[idx];
-    data[idx] = onEmpty;
+    T tmp = data[idx];
     lfenqueue(&freequeue, queueorder, idx);
-    return datatmp;
+    return tmp;
   }
 
 private:
@@ -270,7 +266,6 @@ private:
   }
 
   T *data;
-  T onEmpty;
   size_t queueorder;
   struct queueconf acqueue;
   struct queueconf freequeue;

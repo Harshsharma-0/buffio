@@ -3,6 +3,7 @@
 #include <cstdint>
 
 enum class buffioRoutineStatus : uint32_t {
+  fresh = 20,
   waiting = 21,
   executing = 22,
   yield = 23,
@@ -11,18 +12,20 @@ enum class buffioRoutineStatus : uint32_t {
   pushTask = 26,
   done = 27,
   unhandledException = 28,
-  waitingsFd = 29,
+  waitingFd = 29,
+  zombie = 30,
+  wakeParent = 31,
+  waitingOp = 32,
+  waitingTimer = 33,
+
 };
 
 //[reservec enum 31 - 70]
 
 enum class buffioSockBrokerState : uint32_t {
-  inActive = 71,
-  error = 72,
-  epoll = 73,
-  ioUring = 74,
-  epollRunning = 75,
-  ioUringRunning = 76
+  active = 71,
+  none = 72,
+  error = 73,
 };
 
 enum class buffioThreadStatus : uint32_t {
@@ -34,13 +37,23 @@ enum class buffioThreadStatus : uint32_t {
   configOk = 86,
 };
 
-enum class buffio_fd_opcode : uint32_t {
-  read = 150,
-  write = 151,
-  start_poll = 152,
-  end_poll = 153,
-  page_read = 154,
-  page_write = 155
+enum class buffioOpCode : uint8_t { 
+  none = 0,
+  read = 1, 
+  write = 2,
+  abort = 3,
+};
+enum class buffioSyscall: uint8_t{
+ none = 0,
+ open = 1,
+ connect = 2,
+};
+
+enum class buffioHandleType: uint8_t{
+ buffered = 0,
+ buffio = 1,
+ paged = 2,
+ open = 3,
 };
 
 #define BUFFIO_ERROR_LIST                                                      \
@@ -64,19 +77,21 @@ enum class buffio_fd_opcode : uint32_t {
   X(epollWorks, -11, "epoll workQueue configuration failed")                   \
   X(occupied, -12, "instance is currently occupied")                           \
   X(fd, -13, "failed to create Fd")                                            \
-  X(socket, -14, "")                                                           \
-  X(bind, -15, "")                                                             \
-  X(open, -16, "")                                                             \
-  X(filePath, -17, "")                                                         \
-  X(socketAddress, -18, "")                                                    \
-  X(portnumber, 19, "")                                                        \
-  X(pipe, -20, "")                                                             \
-  X(fifo, -21, "")                                                             \
-  X(fifoPath, -22, "")                                                         \
-  X(family, -23, "")                                                           \
-  X(fcntl, -24, "")                                                            \
-  X(makeShared, -25, "")                                                       \
-  X(makeUnique, -26, "")
+  X(socket, -14, "failed to create socket")                                    \
+  X(bind, -15, "failed to bind socket to address")                             \
+  X(open, -16, "failed to open file")                                          \
+  X(filePath, -17, "error filepath not valid")                                 \
+  X(socketAddress, -18, "sockket address not valid")                           \
+  X(portnumber, 19, "port number not valid")                                   \
+  X(pipe, -20, "faild to create pipe")                                         \
+  X(fifo, -21, "failed to create fifo")                                        \
+  X(fifoPath, -22, "fifo path is not valid")                                   \
+  X(family, -23, "buffioFd protocl family not supported")                      \
+  X(fcntl, -24, "failed to set fd flags using fnctl,error")                    \
+  X(makeShared, -25, "failed to create a shared ptr")                          \
+  X(makeUnique, -26, "failed to create a unique ptr")                          \
+  X(protocol, -27, "error invalid protocol number")                            \
+  X(protocolString, -28, "error open, no protocol string")
 
 #define X(ERROR_ENUM, ERROR_CODE, MESSAGE) ERROR_ENUM = ERROR_CODE,
 enum class buffioErrorCode : int { BUFFIO_ERROR_LIST };
@@ -94,6 +109,9 @@ constexpr const char *buffioStrError(buffioErrorCode code) {
 #undef X
   };
   return "invalid error code";
+};
+constexpr const char *buffioStrErrno(int code) {
+  return buffioStrError((buffioErrorCode)code);
 };
 
 #endif

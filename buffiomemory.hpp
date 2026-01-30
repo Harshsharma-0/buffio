@@ -9,11 +9,11 @@
  *
  */
 
+#include <cassert>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
-#include <iostream>
 #include <random>
 
 // typiclly used by the user to get resource allocated
@@ -59,7 +59,6 @@ public:
     chkSum = randomNumber(gen); // creating the chkSum for data integrity;
     pageFragmentCount = fragmentCount;
     fragments = nullptr;
-
     return makePage(); // TODO: error check
   }
 
@@ -74,7 +73,18 @@ public:
     return &tmpFrag->data;
   };
 
-  void retMemory(T *data) {
+  T *pop() {
+    if (fragments == nullptr) {
+      if (makePage() != 0)
+        return nullptr;
+    };
+    buffioMemoryFragment *tmpFrag = fragments;
+    fragments = (buffioMemoryFragment *)fragments->chksum;
+    tmpFrag->chksum = chkSum;
+    return &tmpFrag->data;
+  };
+
+  void push(T *data) {
     if (data == nullptr)
       return;
     if (fragments == nullptr)
@@ -83,24 +93,23 @@ public:
     uintptr_t *chkSumLocal =
         (uintptr_t *)((uintptr_t)data -
                       offsetof(struct buffioMemoryFragment, data));
-    if (*chkSumLocal == chkSum) {
-      *chkSumLocal = (uintptr_t)nullptr;
-      pushFragment((buffioMemoryFragment *)chkSumLocal);
-    }
+    assert(*chkSumLocal == chkSum);
+    *chkSumLocal = (uintptr_t)nullptr;
+    pushFragment((buffioMemoryFragment *)chkSumLocal);
     return;
   };
 
 private:
   inline int makePage() {
 
-    buffioMemoryPages *tmpPage;
+    buffioMemoryPages *tmpPage = nullptr;
     try {
       tmpPage = new buffioMemoryPages;
     } catch (std::exception &e) {
       return -1;
     };
 
-    buffioMemoryFragment *tmpFragment;
+    buffioMemoryFragment *tmpFragment = nullptr;
     try {
       tmpFragment = new buffioMemoryFragment[pageFragmentCount];
     } catch (std::exception &e) {
@@ -131,12 +140,10 @@ private:
   inline void pushFragment(buffioMemoryFragment *data) {
 
     data->chksum = (uintptr_t)nullptr;
-
     if (fragments == nullptr) {
       fragments = data;
       return;
     }
-
     data->chksum = (uintptr_t)fragments;
     fragments = data;
   };

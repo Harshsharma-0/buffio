@@ -8,6 +8,7 @@
  */
 
 #include <atomic>
+#include <cassert>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
@@ -57,6 +58,8 @@ public:
       if ((*cmap).find(sig) != (*cmap).end()) {
         auto vec = (*cmap)[sig].get();
         for (auto itr = vec; vec != nullptr; vec = vec->next.get()) {
+          std::cout << "caught signal" << std::endl;
+
           vec->func(vec->data);
         }
         break;
@@ -87,7 +90,6 @@ public:
     if (::pthread_create(&threadHandler, NULL,
                          buffioSignalHandler::threadSigHandler, this) != 0)
       return -1;
-    pthread_join(threadHandler, NULL);
     return 0;
   };
   // function to unregister a mask
@@ -99,9 +101,8 @@ public:
     return 0;
   };
 
-  int registerHandler(int sigNum = 0, int (*func)(void *data) = nullptr,
-                      void *data = nullptr, bool exitAfterSignal = true,
-                      int id = 0) {
+  int registerHandler(int sigNum, int (*func)(void *data), void *data,
+                      bool exitAfterSignal, int id) {
 
     if (sigNum == 0 || func == nullptr)
       return -1;
@@ -167,7 +168,7 @@ public:
   buffioThread &operator=(buffioThread const &) = delete;
   buffioThread &operator=(buffioThread &&) = delete;
 
-  ~buffioThread() { threadfree(); }
+  ~buffioThread() {}
   // only free the allocated resource for the thread not terminate it
   void threadfree() {
 
@@ -193,6 +194,7 @@ public:
   int run(const char *name, int (*func)(void *), void *data,
           size_t stackSize = buffioThread::SD) {
 
+    assert(this != nullptr);
     if (stackSize < buffioThread::S1KB || func == nullptr ||
         mutexEnabled == false)
       return -1;
@@ -217,20 +219,6 @@ public:
     tmpThr->stackSize = stackSize;
     tmpThr->numThreads = &numThreads;
     tmpThr->next = nullptr;
-    if (name != nullptr) {
-      size_t len = std::strlen(name);
-      if (len < 100) {
-        try {
-          char *name_tmp = new char[len + 1];
-          std::memcpy(name_tmp, name, len);
-          tmpThr->name = name_tmp;
-          name_tmp[len] = '\0';
-
-        } catch (std::exception &e) {
-          // whill run without name no error check needed
-        };
-      }
-    }
 
     if (::posix_memalign(&tmpThr->stack, sysconf(_SC_PAGESIZE), stackSize) !=
         0) {
@@ -264,7 +252,14 @@ public:
       delete tmpThr;
       return -1;
     }
-
+    /*
+    if (name != nullptr) {
+      size_t len = std::strlen(name);
+      if (len < 14) {
+        ::pthread_setname_np(tmpThr->id,"thread");
+      }
+    }
+*/
     ::pthread_mutex_lock(&buffioMutex);
     if (threads == nullptr) {
       threads = tmpThr;
@@ -278,7 +273,7 @@ public:
   };
 
   void wait(pthread_t threadId) { ::pthread_join(threadId, NULL); }
-
+  size_t num() const { return numThreads.load(std::memory_order_acquire); }
   static int setname(const char *name) {
     return ::prctl(PR_SET_NAME, name, 0, 0, 0);
   };
@@ -298,8 +293,6 @@ private:
                          std::memory_order_release);
 
     tmpThr->numThreads->fetch_add(1, std::memory_order_acq_rel);
-    if (tmpThr->name != nullptr)
-      ::prctl(PR_SET_NAME, tmpThr->name, 0, 0, 0);
 
     int mutexEnabled = tmpThr->func(tmpThr->resource);
 
@@ -316,15 +309,20 @@ private:
   std::atomic<size_t> numThreads;
 };
 
+/*
 class buffioThreadView {
 public:
   buffioThreadView() = default;
   ~buffioThreadView() = default;
 
   void make() {
-    if (localInstance.use_count() == 0)
+    if (localInstance.use_count() != 0)
       return;
-    localInstance = std::make_shared<buffioThread>();
+    try {
+      localInstance = std::make_shared<buffioThread>();
+    } catch (std::exception &e) {
+      std::cout << e.what() << std::endl;
+    };
     return;
   };
   buffioThreadView &operator=(buffioThreadView const &view) {
@@ -333,9 +331,10 @@ public:
     localInstance = view.localInstance;
     return *this;
   };
-  buffioThread *operator()() const { return localInstance.get(); };
+  std::weak_ptr<buffioThread> get() const { return localInstance; };
 
 private:
   std::shared_ptr<buffioThread> localInstance;
 };
+*/
 #endif

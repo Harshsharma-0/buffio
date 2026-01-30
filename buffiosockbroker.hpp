@@ -10,111 +10,178 @@
  *
  */
 
-#include "buffioenum.hpp"
 #if !defined(BUFFIO_IMPLEMENTATION)
 // #include "buffioenum.hpp"
 #include "buffiofd.hpp"
 #include "buffiolfqueue.hpp"
 #include "buffiopromise.hpp"
 #include "buffiothread.hpp"
-#include <memory>
+
 #endif
 
+#include <semaphore.h>
 #include <sys/epoll.h>
 
-using buffioSockBrokerQueue = buffiolfqueue<buffioFdView>;
+#define BUFFIO_REQUEST_MAX_SIZE sizeof(union buffioRequestMaxSize)
+using buffioSockBrokerQueue = buffiolfqueue<buffioHeader *>;
 
 class buffioSockBroker {
+using buffioHeaderType = buffioHeader;
 
   // the main thread worker code inlined with the code to support hybrid arch
   // only call to register fd for read write.
 
-  __attribute__((used)) static int buffioWorker(void *data) { return 0; }
-  __attribute__((used)) static int buffioEpollPoller(void *data) {
+  __attribute__((used)) static int buffioWorker(void *data) {
+    buffioSockBroker *parent = (buffioSockBroker *)data;
+    buffioSockBrokerQueue *workQueue = &parent->epollWorks;
+    buffioSockBrokerQueue *consumeQueue = &parent->epollConsume;
+    int err = 0;
+    int count = 0;
+    bool exit = false;
+    buffioHeader *work[8];
+   
+  while(exit != true){
+    ::sem_wait(&parent->buffioWorkerSignal);
+    for (int i = 0; i < 4; i++) {
+      buffioHeader *tmpWork = workQueue->dequeue(nullptr);
+      if(tmpWork == nullptr) break;
+      if(tmpWork->opCode == (uint8_t)buffioOpCode::abort){
+          exit = true;
+          continue;
+        }
+      work[i] = tmpWork;
+      count += 1;
+    };
+   
+    if(count == 0) 
+       continue;
+    
+    for(int j = 0; j < count ; j++){
+     buffioHeader* header = work[j];
+     buffioOpCode opCode = (buffioOpCode)header->opCode;
+      switch(opCode){
+        case buffioOpCode::read: break;
+        case buffioOpCode::write: break;
+        default:
+        break;
+      };
+    };
 
-    struct epoll_event evnt[1024];
-
-    return 0;
+    count = 0; // reset count
   }
-
-public:
-  buffioSockBroker() : epollFd(-1), epollTotalFd(0), ioUringFd(-1) {
-
-    sockBrokerState = buffioSockBrokerState::inActive;
+    return 0;
   };
 
-  ~buffioSockBroker() {
-    switch (sockBrokerState) {
-    case buffioSockBrokerState::epollRunning:
-    case buffioSockBrokerState::epoll:
-      shutpoll();
-      break;
-    }
-    return;
-  }
+public:
+  buffioSockBroker(buffioSockBroker const &) = delete;
+  buffioSockBroker &operator=(buffioSockBroker const &) = delete;
+  buffioSockBroker(buffioSockBroker const &&) = delete;
+  buffioSockBroker &operator=(buffioSockBroker const &&) = delete;
+  buffioSockBroker() : epollFd(-1),count(0) {
+    sockBrokerState = buffioSockBrokerState::none;
+  };
+  ~buffioSockBroker() {}
 
-  int start(buffioThreadView &thread, int workerNum = 4, int queueOrder = 5) {
+  int start(buffioThread &thread, int workerNum = 2, size_t queueOrder = 5) {
 
     size_t queueSizeRel = 1 << queueOrder;
-
     if (workerNum > queueSizeRel)
       return (int)buffioErrorCode::workerNum;
     if (queueOrder < BUFFIO_RING_MIN || queueOrder > buffioatomix_max_order)
       return (int)buffioErrorCode::queueSize;
-    if (epollEntry.lfstart(queueSize, nullptr) < 0)
-      return (int)buffioErrorCode::epollEntry;
 
-    if (epollConsume.lfstart(queueSize, nullptr) < 0)
+    if (::sem_init(&buffioWorkerSignal, 0, 0) != 0)
+      return -1;
+
+    if (epollConsume.lfstart(queueOrder) < 0)
       goto outWithCleanUp;
 
-    if (epollWorks.lfstart(queueSize, nullptr) < 0)
+    if (epollWorks.lfstart(queueOrder) < 0)
       goto outWithCleanUp;
 
     if ((epollFd = ::epoll_create1(EPOLL_CLOEXEC)) < 0)
       goto outWithCleanUp;
 
+    sockBrokerState = buffioSockBrokerState::active;
+    thread.run("buffio-", buffioSockBroker::buffioWorker, this);
     return (int)buffioErrorCode::none;
 
   outWithEpoll:
     ::close(epollFd);
   outWithCleanUp:
-    epollEntry.~buffiolfqueue();
     epollConsume.~buffiolfqueue();
     epollWorks.~buffiolfqueue();
     return (int)buffioErrorCode::none;
+  };
+
+  inline int pushreq(buffioHeaderType *which) {
+    if (sockBrokerState == buffioSockBrokerState::active){
+      count += 1;
+      return epollWorks.enqueue(which);
+    }
+    return -1;
+  }
+  inline int push(buffioHeaderType *which) {
+    if (sockBrokerState == buffioSockBrokerState::active){
+      count += 1;
+      return epollWorks.enqueue(which);
+    }
+    return -1;
+  }
+  inline buffioHeaderType *pop() {
+    if (sockBrokerState == buffioSockBrokerState::active){
+      count -= 1;
+      return epollWorks.dequeue(nullptr);
+    }
+
+    return nullptr;
   }
 
-  int pushreq() const { return 0; }
-  int popreq() const { return 0; }
+  inline buffioHeaderType *popreq() {
+    if (sockBrokerState == buffioSockBrokerState::active){
+      count -= 1;
+      return epollWorks.dequeue(nullptr);
+    }
+
+    return nullptr;
+  }
 
   bool running() const {
-    return (sockBrokerState != buffioSockBrokerState::inActive &&
-            sockBrokerState != buffioSockBrokerState::error);
+    return (sockBrokerState == buffioSockBrokerState::active);
   };
-  int pollOp(int opCode) {
+  bool busy() const{ return (count != 0);}
+
+  int pollOp(int fd, uint32_t opCode, void *data) {
     if (!running())
       return (int)buffioErrorCode::epollInstance;
+
+    struct epoll_event evnt;
+    evnt.events = opCode | EPOLLET;
+    evnt.data.ptr = data;
+    int retcode = epoll_ctl(epollFd, EPOLL_CTL_ADD, fd, &evnt);
     return (int)buffioErrorCode::none;
   };
-  buffioSockBroker(buffioSockBroker const &) = delete;
-  buffioSockBroker &operator=(buffioSockBroker const &) = delete;
-  buffioSockBroker(buffioSockBroker const &&) = delete;
-  buffioSockBroker &operator=(buffioSockBroker const &&) = delete;
+  size_t poll(struct epoll_event *event, size_t size, uint64_t timeout) const {
+    if (!running())
+      return (int)buffioErrorCode::epollInstance;
+
+    return epoll_wait(epollFd, event, size, timeout);
+  };
+
+  int ping() {
+    if (!running())
+      return (int)buffioErrorCode::epollInstance;
+    ::sem_post(&buffioWorkerSignal);
+    return 0;
+  }
 
 private:
-  int setupIoUring() { return 0; }
-
-  buffioThreadView threadPool;
-  buffioSockBrokerQueue epollEntry;
   buffioSockBrokerQueue epollWorks;
   buffioSockBrokerQueue epollConsume;
-  size_t epollTotalFd;
-  std::atomic<int> epollEmpty;
   buffioSockBrokerState sockBrokerState;
   int epollFd;
-  int ioUringFd;
-  int workerNum; // number of the workers;
-  int queueSize;
+  size_t count;
+  sem_t buffioWorkerSignal;
 };
 
 #endif

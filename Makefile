@@ -1,5 +1,5 @@
 main:main.cpp *.hpp
-	 g++ -std=c++20 -O4   main.cpp -o main
+	 g++ -std=c++20 -O3 -g main.cpp -o main -lpthread
 
 run: main
 	./main
