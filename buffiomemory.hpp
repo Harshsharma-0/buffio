@@ -16,6 +16,17 @@
 #include <exception>
 #include <random>
 
+
+
+/*
+* ===============================================================================
+*
+*
+*  buffioPage
+*
+* ===============================================================================
+*/
+
 // typiclly used by the user to get resource allocated
 template <typename T> class buffioMemoryPool {
 
@@ -33,7 +44,8 @@ template <typename T> class buffioMemoryPool {
 
 public:
   buffioMemoryPool()
-      : fragments(nullptr), pageFragmentCount(0), pageHead(nullptr) {};
+      : fragments(nullptr), pageFragmentCount(0),
+        pageHead(nullptr),customDeleter(nullptr),inUse(nullptr){};
   ~buffioMemoryPool() { release(); };
 
   void release() {
@@ -46,7 +58,7 @@ public:
       delete tmpPage;
     };
   }
-  int init(size_t fragmentCount = 250) {
+  int init(size_t fragmentCount = 250 , void(*deleter)(T* data) = nullptr) {
     std::random_device rDev;
     std::mt19937::result_type seed =
         rDev() ^ (std::mt19937::result_type)
@@ -149,11 +161,20 @@ private:
   };
 
   buffioMemoryPages *pageHead;
+  buffioMemoryFragment *inUse;
   buffioMemoryFragment *fragments;
+  void(*customDeleter)(T* data);
   size_t pageFragmentCount;
   uintptr_t chkSum;
 };
 
+/*
+* ===============================================================================
+*
+* buffioPage
+*
+* ===============================================================================
+*/
 class buffiopage {
   struct page {
     char *buffer;

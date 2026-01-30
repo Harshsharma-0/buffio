@@ -24,9 +24,12 @@
 
 #define BUFFIO_REQUEST_MAX_SIZE sizeof(union buffioRequestMaxSize)
 using buffioSockBrokerQueue = buffiolfqueue<buffioHeader *>;
+using buffioRequestMemory =
+                buffioMemoryPool<char[sizeof(BUFFIO_REQUEST_MAX_SIZE)]>;
+
+using buffioHeaderType = buffioHeader;
 
 class buffioSockBroker {
-using buffioHeaderType = buffioHeader;
 
   // the main thread worker code inlined with the code to support hybrid arch
   // only call to register fd for read write.
@@ -82,7 +85,7 @@ public:
   };
   ~buffioSockBroker() {}
 
-  int start(buffioThread &thread, int workerNum = 2, size_t queueOrder = 5) {
+  int start(buffioThread &thread, int workerNum = 2, size_t queueOrder = 11) {
 
     size_t queueSizeRel = 1 << queueOrder;
     if (workerNum > queueSizeRel)

@@ -28,7 +28,6 @@ public:
 
     if(queue.empty() && timerClock.empty()) return -1;
 
-    memRequest reqMemoryPool;
     buffioThread threadPool;
 
     int error = 0;
@@ -52,14 +51,32 @@ public:
       if(nfd < 0) break;
       if(nfd != 0) 
          processEvents(evnt,nfd);
-
+      
       int error = yieldQueue(10);
     };
-   threadPool.threadfree();
+
+//    cleanEvents();
+    cleanQueue();
+    threadPool.threadfree();
     return 0;
   };
+
    int processEvents(struct epoll_event evnts[], int len){
+     for(int i = 0; i < len; i++){
+      buffioHeaderType *header =
+                          static_cast<buffioHeaderType*>(evnts[i].data.ptr);
+
+     };
     return 0;
+   };
+   void cleanEvents(){};
+   void cleanQueue(){
+    while(!queue.empty()){
+      auto handle = queue.get();
+      if(handle->waiter)
+         handle->waiter->current.destroy();
+      handle->current.destroy();
+    };
    };
    int getWakeTime(bool *flag){
     uint64_t startTime = timerClock.now();
@@ -145,7 +162,7 @@ public:
 
    int push(buffioPromiseHandle handle){
     auto *promise = getPromise<char>(handle);
-    promise->setInstance(&timerClock,&poller);
+    promise->setInstance(&timerClock,&poller,&reqMemoryPool);
     return queue.push(handle);
   };
 private:
@@ -153,6 +170,8 @@ private:
   buffioSockBroker poller;
   buffioClock timerClock;
   buffioTaskQueue <>queue;
+  buffioRequestMemory reqMemoryPool;
+
 };
 
 #endif

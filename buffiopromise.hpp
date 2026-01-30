@@ -55,6 +55,7 @@ template <typename T> struct buffioPromise {
     buffioHeaderType *pending = nullptr;
     buffioClock *clock = nullptr;
     buffioSockBroker *broker = nullptr;
+    buffioRequestMemory *memoryPool = nullptr;
     // declaration order-unlocked;
     void killChild(){
       if(handle_child){
@@ -97,7 +98,7 @@ template <typename T> struct buffioPromise {
          return {.self = voidSelf, .ready = false}; 
        } else if constexpr(std::is_same_v<P,std::coroutine_handle<>>) {
            auto *promise = getPromise<char>(handle);
-           promise->setInstance(clock,broker);
+           promise->setInstance(clock,broker,memoryPool);
            handle_child = handle;
            status = buffioRoutineStatus::waiting;
            return {.self = handle_child,.ready = false};
@@ -120,9 +121,11 @@ template <typename T> struct buffioPromise {
       return;
     };
   
-    void setInstance(buffioClock *clk , buffioSockBroker *brok){
+    void setInstance(buffioClock *clk , buffioSockBroker *brok,
+                      buffioRequestMemory *pool){
       this->clock = clk;
       this->broker = brok;
+      this->memoryPool = pool;
     };
     void setStatus(buffioRoutineStatus stat) { status = stat; }
     buffioRoutineStatus checkStatus() const { return status; };

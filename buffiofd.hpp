@@ -350,7 +350,7 @@ typedef struct buffioBufferPagedRequest {
 
 typedef struct buffioOpenReq {
   buffioHeader header;
-  buffioFdViewWeak *fdView;
+  buffioFdView *fdView;
   char *address; // must be a valid protocol string
 } buffioOpenReq;
 
@@ -361,13 +361,19 @@ typedef struct buffioTimer{
  std::coroutine_handle<> handle;
 }buffioTimer;
 
+typedef struct buffioPollReq{
+ buffioHeader header;
+ buffioFdView fdView;
+}buffioPollReq;
 
-union buffioRequestMaxSize {
+typedef union buffioUnifiedReq{
   buffioOpenReq open;
   buffioBufferPagedRequest paged;
   buffioBufferRequest buffed;
-};
+  buffioPollReq poll;
+}buffioUnifiedReq;
 
+using buffioRequestMaxSize = union buffioUnifiedReq;
 
 
 #endif
