@@ -2,46 +2,73 @@
 #define BUFFIO_QUEUE
 
 #include <cassert>
+#include <type_traits>
+
 class blockQueue {
 public:
-  struct blockQueue *next;
-  struct blockQueue *prev;
-  struct blockQueue *waiter;
+  blockQueue *next;
+  blockQueue *prev;
+  blockQueue *waiter;
   buffioPromiseHandle current;
 
-  ~blockQueue() {
-       assert(current == nullptr);
-  }
+  ~blockQueue() { assert(current == nullptr); }
 };
 
 
-template <typename C = blockQueue,typename V = buffioPromiseHandle> 
-class buffioTaskQueue {
-using memoryQueue = buffioMemoryPool<C>;
+template <typename C = blockQueue, typename V = buffioPromiseHandle>
+class buffioQueue {
+  using memoryQueue = buffioMemoryPool<C>;
 
 public:
-  buffioTaskQueue() : head(nullptr),tail(nullptr),
-                      count(0),poppedEntry(false){
+  buffioQueue()
+      : head(nullptr), tail(nullptr), count(0), poppedEntry(false) {
     assert(memory.init() == 0);
   };
-  ~buffioTaskQueue() = default;
+  ~buffioQueue() = default;
+ 
 
-  int push(V which,C *waiter = nullptr){ 
+  int push(V which, C *waiter = nullptr) {
     blockQueue *frag = nullptr;
-    if((frag = memory.pop()) == nullptr)
-       return -1;
-    frag->current = which;
-    frag->waiter = waiter;
+    if ((frag = memory.pop()) == nullptr)
+      return -1;
+   if constexpr (std::is_same_v<C , blockQueue> 
+        && std::is_same_v<V,buffioPromiseHandle>){
+     frag->current = which;
+     frag->waiter = waiter;
+    };
     frag->next = nullptr;
-     return push(frag);
+    frag->prev = nullptr;
+    return push(frag);
   };
 
- 
-  int push(C *frag){
+  int pop(C *frag) {
+    assert(count != 0 && head != nullptr);
+    count -= 1;
+
+    if (frag == frag->next) {
+      memory.push(head);
+      head = tail = nullptr;
+      return 0;
+    };
+
+    frag->prev->next = frag->next;
+    frag->next->prev = frag->prev;
+
+    if (head == frag){
+      poppedEntry = true;
+      head = frag->next;
+    };
+    if (tail == frag)
+      tail = frag->next;
+
+    memory.push(frag);
+    return 0;
+  };
+  int push(C *frag) {
     assert(frag != nullptr);
     count += 1;
 
-   if(head == nullptr){
+    if (head == nullptr) {
       head = frag;
       tail = frag;
       frag->next = frag;
@@ -49,68 +76,67 @@ public:
       return 0;
     }
 
-    frag->prev = tail->prev;    
+    frag->prev = tail->prev;
     frag->next = tail;
     tail->prev->next = frag;
     tail->prev = frag;
-     
+
     return 0;
   };
 
-  void erase(){
-    assert(count != 0 && head != nullptr); 
-     count -= 1;
-     poppedEntry = true;
-     if(head == head->next){
-        memory.push(head);
-        head = tail = nullptr;
-       return;
-     };
-      head->prev->next = head->next;
-      head->next->prev = head->prev;
-      auto tmpHead = head;
-
-      if(tail == head)
-         tail = head->next;
-      head = head->next;
-   };
-
-  void pop(){
-    assert(count != 0 && head != nullptr); 
-     count -= 1;
-     poppedEntry = true;
-     if(head == head->next){
-        memory.push(head);
-        head = tail = nullptr;
-       return;
-     };
-      head->prev->next = head->next;
-      head->next->prev = head->prev;
-      auto tmpHead = head;
-
-      if(tail == head)
-         tail = head->next;
-      head = head->next;
-
-     memory.push(tmpHead);
+  void erase() {
+    assert(count != 0 && head != nullptr);
+    count -= 1;
+    poppedEntry = true;
+    if (head == head->next) {
+      memory.push(head);
+      head = tail = nullptr;
+      return;
     };
+    head->prev->next = head->next;
+    head->next->prev = head->prev;
+    auto tmpHead = head;
 
-  C *get()const{ 
+    if (tail == head)
+      tail = head->next;
+    head = head->next;
+  };
+
+  void pop() {
+    assert(count != 0 && head != nullptr);
+    count -= 1;
+    poppedEntry = true;
+    if (head == head->next) {
+      memory.push(head);
+      head = tail = nullptr;
+      return;
+    };
+    head->prev->next = head->next;
+    head->next->prev = head->prev;
+    auto tmpHead = head;
+
+    if (tail == head)
+      tail = head->next;
+    head = head->next;
+
+    memory.push(tmpHead);
+  };
+
+  C *get() const {
     assert(head != nullptr && count != 0);
     return head;
   };
-  void mvNext(){
+  void mvNext() {
     assert(head != nullptr && count != 0);
-    if(poppedEntry){ 
+    if (poppedEntry) {
       poppedEntry = false;
       return;
     }
     head = head->next;
   };
 
-  bool empty()const{
-    return (count == 0);
-  };
+  bool empty() const { return (count == 0); };
+
 private:
   C *head;
   C *tail;

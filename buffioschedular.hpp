@@ -12,166 +12,169 @@
 #include "buffiosockbroker.hpp"
 #endif
 
+
 #include "buffioQueue.hpp"
 #include <cassert>
 
 class buffioScheduler {
 
-
 public:
   // constructor overload.
-  buffioScheduler() = default;
+  buffioScheduler():syncPipe(nullptr){}; 
   ~buffioScheduler() = default;
 
-  using memRequest = buffioMemoryPool<char[sizeof(BUFFIO_REQUEST_MAX_SIZE)]>;
   int run() {
 
-    if(queue.empty() && timerClock.empty()) return -1;
+    if (queue.empty() && timerClock.empty())
+      return -1;
 
     buffioThread threadPool;
 
     int error = 0;
 
-    if ((error = poller.start(threadPool)) != 0) return error;
-    if ((error = reqMemoryPool.init()) != 0) return error;
-    if ((error = syncPipe.pipe()) != 0) return error;
-    
-    auto pipe = syncPipe.get();
-    if ((error = poller.pollOp(pipe->fd.pipeFd[0], EPOLLIN, nullptr)) != 0)
+    if ((error = poller.start(threadPool)) != 0) return error;    
+    if ((syncPipe = fdPool.pop()) == nullptr) return -1; 
+    if ((error = syncPipe->pipe()) != 0)  return error;
+    if ((error = poller.pollOp(syncPipe->localfd.pipeFd[0], EPOLLIN, syncPipe)) != 0){
+      syncPipe->release();
       return error;
-
+    };
+    
     struct epoll_event evnt[1024];
     bool exit = false;
     int timeout = 0;
     while (exit != true) {
       timeout = getWakeTime(&exit);
-      if(exit == true) break;
+      if (exit == true)
+        break;
 
-      int nfd = poller.poll(evnt, 1024,timeout);
-      if(nfd < 0) break;
-      if(nfd != 0) 
-         processEvents(evnt,nfd);
-      
+      int nfd = poller.poll(evnt, 1024, timeout);
+      if (nfd < 0)
+        break;
+      if (nfd != 0)
+        processEvents(evnt, nfd);
+
       int error = yieldQueue(10);
     };
 
-//    cleanEvents();
+    fdPool.release();
     cleanQueue();
     threadPool.threadfree();
     return 0;
   };
 
-   int processEvents(struct epoll_event evnts[], int len){
-     for(int i = 0; i < len; i++){
-      buffioHeaderType *header =
-                          static_cast<buffioHeaderType*>(evnts[i].data.ptr);
-
-     };
+  int processEvents(struct epoll_event evnts[], int len) {
+    for (int i = 0; i < len; i++) {
+      buffioFd *fd = static_cast<buffioFd *>(evnts[i].data.ptr);
+    };
     return 0;
-   };
-   void cleanEvents(){};
-   void cleanQueue(){
-    while(!queue.empty()){
+  };
+  void cleanQueue() {
+    while (!queue.empty()) {
       auto handle = queue.get();
-      if(handle->waiter)
-         handle->waiter->current.destroy();
+      if (handle->waiter)
+        handle->waiter->current.destroy();
       handle->current.destroy();
     };
-   };
-   int getWakeTime(bool *flag){
+  };
+
+  int getWakeTime(bool *flag) {
     uint64_t startTime = timerClock.now();
-    int looptime = timerClock.getNext(startTime); 
-    while(looptime == 0){
-          auto clkWork = timerClock.get();
-          auto *promise = getPromise<char>(clkWork);
-          promise->setStatus(buffioRoutineStatus::executing);
-          queue.push(clkWork);
-          timerClock.pop();
-          looptime = timerClock.getNext(startTime);
-       };
-      if(!queue.empty()) return 0;
-      if(queue.empty() && timerClock.empty() && !poller.busy()){
-          *flag = true;
-          return 0;
-      };
-      return looptime;
-   };
-
-   int yieldQueue(int chunk){
-     if(queue.empty()) return -1;
-
-    for(int i = chunk; 0 < i; i--){
-       auto handle = queue.get();
-       auto promise = getPromise<char>(handle->current); 
-       if(promise->checkStatus() == buffioRoutineStatus::executing)
-           handle->current.resume();
-
-       switch (promise->checkStatus()) {
-       case buffioRoutineStatus::executing:
-         break;
-       case buffioRoutineStatus::yield: {
-          promise->setStatus(buffioRoutineStatus::executing);
-        } break;
-       case buffioRoutineStatus::waitingFd:{
-        } break;
-       case buffioRoutineStatus::paused: {
-        } break;
-       case buffioRoutineStatus::waiting: {
-          queue.push(promise->getChild(),handle);
-          queue.erase();
-        } break;
-       case buffioRoutineStatus::waitingTimer:{
-          handle->current = nullptr;
-          queue.pop();
-        }break;
-       case buffioRoutineStatus::pushTask: {
-        } break;
-       case buffioRoutineStatus::unhandledException:
-        [[fallthrough]];
-
-       case buffioRoutineStatus::error: 
-        [[fallthrough]];
-
-       case buffioRoutineStatus::wakeParent:{
-          if(handle->waiter != nullptr){
-              auto promiseP = getPromise<char>(handle->waiter->current);
-              promiseP->setStatus(buffioRoutineStatus::executing);    
-              queue.push(handle->waiter);
-              promise->setStatus(buffioRoutineStatus::paused);
-             break;
-          };
-        }
-
-        [[fallthrough]];
-
-       case buffioRoutineStatus::zombie:
-        [[fallthrough]];
-
-       case buffioRoutineStatus::done:{
-          handle->current.destroy();
-          handle->current = nullptr;
-          queue.pop();
-          break;
-        }
-       };
-        if(queue.empty())break;
-         queue.mvNext();
+    int looptime = timerClock.getNext(startTime);
+    while (looptime == 0) {
+      auto clkWork = timerClock.get();
+      auto *promise = getPromise<char>(clkWork);
+      promise->setStatus(buffioRoutineStatus::executing);
+      queue.push(clkWork);
+      timerClock.pop();
+      looptime = timerClock.getNext(startTime);
     };
-     return 0;
-   };
+    if (!queue.empty())
+      return 0;
+    if (queue.empty() && timerClock.empty() && !poller.busy()) {
+      *flag = true;
+      return 0;
+    };
+    return looptime;
+  };
 
-   int push(buffioPromiseHandle handle){
+  int yieldQueue(int chunk) {
+    if (queue.empty())
+      return -1;
+
+    for (int i = chunk; 0 < i; i--) {
+      auto handle = queue.get();
+      auto promise = getPromise<char>(handle->current);
+      if (promise->checkStatus() == buffioRoutineStatus::executing)
+        handle->current.resume();
+
+      switch (promise->checkStatus()) {
+      case buffioRoutineStatus::executing:
+        break;
+      case buffioRoutineStatus::yield: {
+        promise->setStatus(buffioRoutineStatus::executing);
+      } break;
+      case buffioRoutineStatus::waitingFd: {
+      } break;
+      case buffioRoutineStatus::paused: {
+      } break;
+      case buffioRoutineStatus::waiting: {
+        queue.push(promise->getChild(), handle);
+        queue.erase();
+      } break;
+      case buffioRoutineStatus::waitingTimer: {
+        handle->current = nullptr;
+        queue.pop();
+      } break;
+      case buffioRoutineStatus::pushTask: {
+      } break;
+      case buffioRoutineStatus::unhandledException:
+        [[fallthrough]];
+
+      case buffioRoutineStatus::error:
+        [[fallthrough]];
+
+      case buffioRoutineStatus::wakeParent: {
+        if (handle->waiter != nullptr) {
+          auto promiseP = getPromise<char>(handle->waiter->current);
+          promiseP->setStatus(buffioRoutineStatus::executing);
+          queue.push(handle->waiter);
+          promise->setStatus(buffioRoutineStatus::paused);
+          break;
+        };
+      }
+
+        [[fallthrough]];
+
+      case buffioRoutineStatus::zombie:
+        [[fallthrough]];
+
+      case buffioRoutineStatus::done: {
+        handle->current.destroy();
+        handle->current = nullptr;
+        queue.pop();
+        break;
+      }
+      };
+      if (queue.empty())
+        break;
+      queue.mvNext();
+    };
+    return 0;
+  };
+
+  int push(buffioPromiseHandle handle) {
     auto *promise = getPromise<char>(handle);
-    promise->setInstance(&timerClock,&poller,&reqMemoryPool);
+    promise->setInstance(&timerClock, &poller,&fdPool);
     return queue.push(handle);
   };
+
 private:
-  buffioFd syncPipe;
+  buffioFd *syncPipe;
   buffioSockBroker poller;
   buffioClock timerClock;
-  buffioTaskQueue <>queue;
-  buffioRequestMemory reqMemoryPool;
-
+  buffioFdPool fdPool;
+  buffioQueue<> queue;
 };
 
 #endif

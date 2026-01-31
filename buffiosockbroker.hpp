@@ -22,10 +22,9 @@
 #include <semaphore.h>
 #include <sys/epoll.h>
 
-#define BUFFIO_REQUEST_MAX_SIZE sizeof(union buffioRequestMaxSize)
-using buffioSockBrokerQueue = buffiolfqueue<buffioHeader *>;
-using buffioRequestMemory =
-                buffioMemoryPool<char[sizeof(BUFFIO_REQUEST_MAX_SIZE)]>;
+#define BUFFIO_REQUEST_MAX_SIZE sizeof(buffioRequestMaxSize)
+using buffioSockBrokerQueue = buffiolfqueue<buffioHeader>;
+
 
 using buffioHeaderType = buffioHeader;
 
@@ -41,37 +40,40 @@ class buffioSockBroker {
     int err = 0;
     int count = 0;
     bool exit = false;
-    buffioHeader *work[8];
-   
-  while(exit != true){
-    ::sem_wait(&parent->buffioWorkerSignal);
-    for (int i = 0; i < 4; i++) {
-      buffioHeader *tmpWork = workQueue->dequeue(nullptr);
-      if(tmpWork == nullptr) break;
-      if(tmpWork->opCode == (uint8_t)buffioOpCode::abort){
+    buffioHeader work[8];
+
+    while (exit != true) {
+      ::sem_wait(&parent->buffioWorkerSignal);
+      for (int i = 0; i < 4; i++) {
+        buffioHeader tmpWork = workQueue->dequeue({0});
+        if (tmpWork.opCode == (uint8_t)buffioOpCode::none )
+          break;
+        if (tmpWork.opCode == (uint8_t)buffioOpCode::abort) {
           exit = true;
           continue;
         }
-      work[i] = tmpWork;
-      count += 1;
-    };
-   
-    if(count == 0) 
-       continue;
-    
-    for(int j = 0; j < count ; j++){
-     buffioHeader* header = work[j];
-     buffioOpCode opCode = (buffioOpCode)header->opCode;
-      switch(opCode){
-        case buffioOpCode::read: break;
-        case buffioOpCode::write: break;
-        default:
-        break;
+        work[i] = tmpWork;
+        count += 1;
       };
-    };
 
-    count = 0; // reset count
-  }
+      if (count == 0)
+        continue;
+
+      for (int j = 0; j < count; j++) {
+        buffioHeader header = work[j];
+        buffioOpCode opCode = (buffioOpCode)header.opCode;
+        switch (opCode) {
+        case buffioOpCode::read:
+          break;
+        case buffioOpCode::write:
+          break;
+        default:
+          break;
+        };
+      };
+
+      count = 0; // reset count
+    }
     return 0;
   };
 
@@ -80,7 +82,7 @@ public:
   buffioSockBroker &operator=(buffioSockBroker const &) = delete;
   buffioSockBroker(buffioSockBroker const &&) = delete;
   buffioSockBroker &operator=(buffioSockBroker const &&) = delete;
-  buffioSockBroker() : epollFd(-1),count(0) {
+  buffioSockBroker() : epollFd(-1), count(0) {
     sockBrokerState = buffioSockBrokerState::none;
   };
   ~buffioSockBroker() {}
@@ -117,42 +119,42 @@ public:
     return (int)buffioErrorCode::none;
   };
 
-  inline int pushreq(buffioHeaderType *which) {
-    if (sockBrokerState == buffioSockBrokerState::active){
+  inline int pushreq(buffioHeaderType which) {
+    if (sockBrokerState == buffioSockBrokerState::active) {
       count += 1;
       return epollWorks.enqueue(which);
     }
     return -1;
   }
-  inline int push(buffioHeaderType *which) {
-    if (sockBrokerState == buffioSockBrokerState::active){
+  inline int push(buffioHeaderType which) {
+    if (sockBrokerState == buffioSockBrokerState::active) {
       count += 1;
       return epollWorks.enqueue(which);
     }
     return -1;
   }
-  inline buffioHeaderType *pop() {
-    if (sockBrokerState == buffioSockBrokerState::active){
+  inline buffioHeaderType pop() {
+    if (sockBrokerState == buffioSockBrokerState::active) {
       count -= 1;
-      return epollWorks.dequeue(nullptr);
+      return epollWorks.dequeue({0});
     }
 
-    return nullptr;
+    return {0};
   }
 
-  inline buffioHeaderType *popreq() {
-    if (sockBrokerState == buffioSockBrokerState::active){
+  inline buffioHeaderType popreq() {
+    if (sockBrokerState == buffioSockBrokerState::active) {
       count -= 1;
-      return epollWorks.dequeue(nullptr);
+      return epollWorks.dequeue({0});
     }
 
-    return nullptr;
+    return {0};
   }
 
   bool running() const {
     return (sockBrokerState == buffioSockBrokerState::active);
   };
-  bool busy() const{ return (count != 0);}
+  bool busy() const { return (count != 0); }
 
   int pollOp(int fd, uint32_t opCode, void *data) {
     if (!running())
@@ -161,9 +163,20 @@ public:
     struct epoll_event evnt;
     evnt.events = opCode | EPOLLET;
     evnt.data.ptr = data;
+    //TODO: check ERROR
     int retcode = epoll_ctl(epollFd, EPOLL_CTL_ADD, fd, &evnt);
     return (int)buffioErrorCode::none;
   };
+
+  int pollDel(int fd) {
+    if (!running())
+      return (int)buffioErrorCode::epollInstance;
+
+    //TODO: check ERROR
+    int retcode = epoll_ctl(epollFd, EPOLL_CTL_DEL, fd, NULL);
+    return (int)buffioErrorCode::none;
+  };
+
   size_t poll(struct epoll_event *event, size_t size, uint64_t timeout) const {
     if (!running())
       return (int)buffioErrorCode::epollInstance;

@@ -45,7 +45,18 @@ template <typename T> struct buffioPromise {
      using buffioPromiseObject = buffioPromise<Y>::promise_type;
      template <typename U>
      using buffioTypedHandle = std::coroutine_handle<buffioPromiseObject<U>>;
-     using buffioHeaderType = buffioHeader;
+
+
+     using buffioPromiseHandle = std::coroutine_handle<>;
+     template <typename D>
+   
+     inline buffioPromiseObject<D> *getPromise(buffioPromiseHandle handle) {
+      void *tmp_ptr = handle.address();
+      buffioTypedHandle<D> typed = buffioTypedHandle<D>::from_address(tmp_ptr);
+      return &typed.promise();
+     };
+   
+    using buffioHeaderType = buffioHeader;
 
   private:
     // declaration order-locked
@@ -55,7 +66,8 @@ template <typename T> struct buffioPromise {
     buffioHeaderType *pending = nullptr;
     buffioClock *clock = nullptr;
     buffioSockBroker *broker = nullptr;
-    buffioRequestMemory *memoryPool = nullptr;
+    buffioFdPool *fdPool = nullptr;
+    buffioHeaderType header;
     // declaration order-unlocked;
     void killChild(){
       if(handle_child){
@@ -98,14 +110,20 @@ template <typename T> struct buffioPromise {
          return {.self = voidSelf, .ready = false}; 
        } else if constexpr(std::is_same_v<P,std::coroutine_handle<>>) {
            auto *promise = getPromise<char>(handle);
-           promise->setInstance(clock,broker,memoryPool);
+           promise->setInstance(clock,broker,fdPool);
            handle_child = handle;
            status = buffioRoutineStatus::waiting;
            return {.self = handle_child,.ready = false};
-      }else{
+      }else if constexpr (std::is_same_v<P,buffioFd*>){
+        static_assert(false,"don't support fd not");
+        return {};
+      }else if constexpr(std::is_same_v<P,buffioFd**>){
+        *handle = fdPool->pop();
+        return {.self = nullptr,.ready = true};
+       }else{
         static_assert(false,"we don't support this type");
-       };
-       
+        return {};
+       }
     };
 
    
@@ -121,11 +139,10 @@ template <typename T> struct buffioPromise {
       return;
     };
   
-    void setInstance(buffioClock *clk , buffioSockBroker *brok,
-                      buffioRequestMemory *pool){
+    void setInstance(buffioClock *clk , buffioSockBroker *brok,buffioFdPool *fdPool){
       this->clock = clk;
       this->broker = brok;
-      this->memoryPool = pool;
+      this->fdPool = fdPool;
     };
     void setStatus(buffioRoutineStatus stat) { status = stat; }
     buffioRoutineStatus checkStatus() const { return status; };
@@ -143,6 +160,16 @@ private:
   void_handle handle;
 };
 
+
+/*
+*============================================================================
+*
+*
+* global defination of types to use to get return value / promise object
+*
+*
+* ===========================================================================
+*/
 template <typename Y>
 using buffioPromiseObject = buffioPromise<Y>::promise_type;
 template <typename U>
