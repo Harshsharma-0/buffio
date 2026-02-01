@@ -1,11 +1,6 @@
 #ifndef __BUFFIO_PROMISE_HPP__
 #define __BUFFIO_PROMISE_HPP__
 
-/*
- * Error codes range reserved for buffiothread
- *  [10000 - 11500]
- *  10000 <= errorcode <= 10500
- */
 
 #if !defined(BUFFIO_IMPLEMENTATION)
 #include "buffioenum.hpp"
@@ -15,15 +10,13 @@
 #include <atomic>
 #include <cassert>
 #include <coroutine>
-#include <type_traits>
 #include <exception>
+#include <type_traits>
 
 #define buffiowait co_await
 #define buffioyeild co_yield
 #define buffioreturn co_return
 #define buffiopush co_await
-
-
 
 struct buffioAwaiter {
   bool await_ready() const noexcept { return ready; }
@@ -41,22 +34,20 @@ template <typename T> struct buffioPromise {
 
   struct promise_type {
 
-     template <typename Y>
-     using buffioPromiseObject = buffioPromise<Y>::promise_type;
-     template <typename U>
-     using buffioTypedHandle = std::coroutine_handle<buffioPromiseObject<U>>;
+    template <typename Y>
+    using buffioPromiseObject = buffioPromise<Y>::promise_type;
+    template <typename U>
+    using buffioTypedHandle = std::coroutine_handle<buffioPromiseObject<U>>;
 
+    using buffioPromiseHandle = std::coroutine_handle<>;
+    template <typename D>
 
-     using buffioPromiseHandle = std::coroutine_handle<>;
-     template <typename D>
-   
-     inline buffioPromiseObject<D> *getPromise(buffioPromiseHandle handle) {
+    inline buffioPromiseObject<D> *getPromise(buffioPromiseHandle handle) {
       void *tmp_ptr = handle.address();
       buffioTypedHandle<D> typed = buffioTypedHandle<D>::from_address(tmp_ptr);
       return &typed.promise();
-     };
-   
-    using buffioHeaderType = buffioHeader;
+    };
+
 
   private:
     // declaration order-locked
@@ -67,16 +58,18 @@ template <typename T> struct buffioPromise {
     buffioClock *clock = nullptr;
     buffioSockBroker *broker = nullptr;
     buffioFdPool *fdPool = nullptr;
-    buffioHeaderType header;
+    buffioMemoryPool<buffioHeader> *headerPool = nullptr;
     // declaration order-unlocked;
-    void killChild(){
-      if(handle_child){
+    void killChild() {
+      if (handle_child) {
         auto *tmp = handle_child.address();
-        buffioTypedHandle<char> handle = buffioTypedHandle<char>::from_address(tmp);
+        buffioTypedHandle<char> handle =
+            buffioTypedHandle<char>::from_address(tmp);
         handle.promise().setStatus(buffioRoutineStatus::done);
         handle_child = nullptr;
       }
     };
+
   public:
     T returnData;
 
@@ -84,7 +77,7 @@ template <typename T> struct buffioPromise {
       voidSelf = {coro_handle::from_promise(*this)};
       return voidSelf;
     };
-    void_handle getChild() const {return handle_child;}
+    void_handle getChild() const { return handle_child; }
     // initially called when the routine is framed
     std::suspend_always initial_suspend() noexcept {
       status = buffioRoutineStatus::executing;
@@ -98,35 +91,73 @@ template <typename T> struct buffioPromise {
       return {};
     };
 
-    template <typename P> buffioAwaiter await_transform(P handle) {
+    template <typename P> buffioAwaiter await_transform(P handle){
       killChild();
-       if constexpr (std::is_same_v<P, buffioTimer*>) {
-          clock->push(handle->duration,voidSelf);
-          status = buffioRoutineStatus::waitingTimer;
-          return {.self = voidSelf, .ready = false}; 
+      std::coroutine_handle<> handleTmp = voidSelf;
+      bool wait = false;
 
-       } else if constexpr (std::is_same_v<P, buffioHeader*>) {
-         broker->push(handle);
-         return {.self = voidSelf, .ready = false}; 
-       } else if constexpr(std::is_same_v<P,std::coroutine_handle<>>) {
-           auto *promise = getPromise<char>(handle);
-           promise->setInstance(clock,broker,fdPool);
-           handle_child = handle;
-           status = buffioRoutineStatus::waiting;
-           return {.self = handle_child,.ready = false};
-      }else if constexpr (std::is_same_v<P,buffioFd*>){
-        static_assert(false,"don't support fd not");
+      if constexpr (std::is_same_v<P, buffioTimer *>) {
+        if (handle->then) {
+          auto *promise = getPromise<char>(handle->then);
+          promise->setInstance(clock, broker, fdPool,headerPool);
+          clock->push(handle->duration, handle->then);
+          wait = true;
+        } else {
+          clock->push(handle->duration, voidSelf);
+        };
+        status = buffioRoutineStatus::waitingTimer;
+       
+      }else if constexpr (std::is_same_v<P, buffioHeader **>){
+        *handle = headerPool->pop();
+         wait = true;
+
+      } else if constexpr (std::is_same_v<P, buffioHeader *>) { 
+        
+        assert(handle != nullptr);
+
+        switch(handle->opCode){
+         case buffioOpCode::release:
+          headerPool->push(handle);
+         break;
+         case buffioOpCode::poll:
+          fdPool->pushUse(handle->fd);
+          broker->pollOp(handle->reqToken.fd,handle->fd);
+          break;
+         case buffioOpCode::syncFd:
+          handle->fd->mountPool(headerPool);
+          break;
+         case buffioOpCode::rmPoll:
+          fdPool->push(handle->fd);
+          broker->pollDel(handle->reqToken.fd);
+          break;
+        };
+         wait = true;
+        
+      } else if constexpr (std::is_same_v<P, std::coroutine_handle<>>) {
+
+        auto *promise = getPromise<char>(handle);
+        promise->setInstance(clock, broker, fdPool,headerPool);
+        handle_child = handle;
+        status = buffioRoutineStatus::waiting;
+        handleTmp = handle_child;
+
+      } else if constexpr (std::is_same_v<P, buffioFd *>) {
+
+        static_assert(false, "don't support fd not");
         return {};
-      }else if constexpr(std::is_same_v<P,buffioFd**>){
-        *handle = fdPool->pop();
-        return {.self = nullptr,.ready = true};
-       }else{
-        static_assert(false,"we don't support this type");
+
+      } else if constexpr (std::is_same_v<P, buffioFd **>) {
+        *handle = fdPool->get();
+         wait = true;
+
+      } else {
+        static_assert(false, "we don't support this type");
         return {};
-       }
+      }
+       return {.self = handleTmp, .ready = wait};
+
     };
 
-   
     void unhandled_exception() {
       status = buffioRoutineStatus::unhandledException;
       killChild();
@@ -138,11 +169,15 @@ template <typename T> struct buffioPromise {
       killChild();
       return;
     };
-  
-    void setInstance(buffioClock *clk , buffioSockBroker *brok,buffioFdPool *fdPool){
+
+    void setInstance(buffioClock *clk, buffioSockBroker *brok,
+                     buffioFdPool *fdPool,
+                     buffioMemoryPool<buffioHeader> *headerPool
+                     ) {
       this->clock = clk;
       this->broker = brok;
       this->fdPool = fdPool;
+      this->headerPool = headerPool;
     };
     void setStatus(buffioRoutineStatus stat) { status = stat; }
     buffioRoutineStatus checkStatus() const { return status; };
@@ -160,23 +195,22 @@ private:
   void_handle handle;
 };
 
-
 /*
-*============================================================================
-*
-*
-* global defination of types to use to get return value / promise object
-*
-*
-* ===========================================================================
-*/
+ *============================================================================
+ *
+ *
+ * global defination of types to use to get return value / promise object
+ *
+ *
+ * ===========================================================================
+ */
+
 template <typename Y>
 using buffioPromiseObject = buffioPromise<Y>::promise_type;
 template <typename U>
 using buffioTypedHandle = std::coroutine_handle<buffioPromiseObject<U>>;
 
 using buffioPromiseHandle = std::coroutine_handle<>;
-
 
 template <typename D>
 inline buffioPromiseObject<D> *getPromise(buffioPromiseHandle handle) {
@@ -185,9 +219,8 @@ inline buffioPromiseObject<D> *getPromise(buffioPromiseHandle handle) {
   return &typed.promise();
 };
 
-template <typename G>
-constexpr G getReturn(buffioPromiseHandle handle) {
-  auto tmp = getPromise<G>(handle);  
+template <typename G> constexpr G getReturn(buffioPromiseHandle handle) {
+  auto tmp = getPromise<G>(handle);
   G data = tmp->returnData;
   tmp->setStatus(buffioRoutineStatus::done);
   return data;

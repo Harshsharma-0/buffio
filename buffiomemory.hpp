@@ -1,13 +1,6 @@
 #ifndef __BUFFIO_MEMORY_HPP__
 #define __BUFFIO_MEMORY_HPP__
 
-/*
- * Error codes range reserved for buffioqueue
- *  [2500 - 3500]
- *  [Note] Errorcodes are negative value in this range.
- *  2500 <= errorcode <= 3500
- *
- */
 
 #include <cassert>
 #include <chrono>
@@ -16,16 +9,14 @@
 #include <exception>
 #include <random>
 
-
-
 /*
-* ===============================================================================
-*
-*
-*  buffioPage
-*
-* ===============================================================================
-*/
+ * ===============================================================================
+ *
+ *
+ *  buffioPage
+ *
+ * ===============================================================================
+ */
 
 // typiclly used by the user to get resource allocated
 template <typename T> class buffioMemoryPool {
@@ -44,21 +35,20 @@ template <typename T> class buffioMemoryPool {
 
 public:
   buffioMemoryPool()
-      : fragments(nullptr), pageFragmentCount(0),
-        pageHead(nullptr),customDeleter(nullptr),inUse(nullptr){};
+      : fragments(nullptr), pageFragmentCount(0), pageHead(nullptr),
+        customDeleter(nullptr), inUse(nullptr) {};
   ~buffioMemoryPool() { release(); };
 
   void release() {
     buffioMemoryPages *tmpPage = nullptr;
     while (pageHead != nullptr) {
-
       delete[] pageHead->data;
       tmpPage = pageHead;
       pageHead = pageHead->next;
       delete tmpPage;
     };
   }
-  int init(size_t fragmentCount = 250 , void(*deleter)(T* data) = nullptr) {
+  int init(size_t fragmentCount = 250, void (*deleter)(T *data) = nullptr) {
     std::random_device rDev;
     std::mt19937::result_type seed =
         rDev() ^ (std::mt19937::result_type)
@@ -163,18 +153,18 @@ private:
   buffioMemoryPages *pageHead;
   buffioMemoryFragment *inUse;
   buffioMemoryFragment *fragments;
-  void(*customDeleter)(T* data);
+  void (*customDeleter)(T *data);
   size_t pageFragmentCount;
   uintptr_t chkSum;
 };
 
 /*
-* ===============================================================================
-*
-* buffioPage
-*
-* ===============================================================================
-*/
+ * ===============================================================================
+ *
+ * buffioPage
+ *
+ * ===============================================================================
+ */
 class buffiopage {
   struct page {
     char *buffer;

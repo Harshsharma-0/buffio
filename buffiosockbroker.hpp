@@ -23,14 +23,14 @@
 #include <sys/epoll.h>
 
 #define BUFFIO_REQUEST_MAX_SIZE sizeof(buffioRequestMaxSize)
-using buffioSockBrokerQueue = buffiolfqueue<buffioHeader>;
+using buffioSockBrokerQueue = buffiolfqueue<buffioHeader*>;
 
 
-using buffioHeaderType = buffioHeader;
 
 class buffioSockBroker {
 
-  // the main thread worker code inlined with the code to support hybrid arch
+  // the main thread worker code inlined with the code to
+  // support hybrid arch
   // only call to register fd for read write.
 
   __attribute__((used)) static int buffioWorker(void *data) {
@@ -40,15 +40,14 @@ class buffioSockBroker {
     int err = 0;
     int count = 0;
     bool exit = false;
-    buffioHeader work[8];
+    buffioHeader *work[8];
 
     while (exit != true) {
       ::sem_wait(&parent->buffioWorkerSignal);
       for (int i = 0; i < 4; i++) {
-        buffioHeader tmpWork = workQueue->dequeue({0});
-        if (tmpWork.opCode == (uint8_t)buffioOpCode::none )
-          break;
-        if (tmpWork.opCode == (uint8_t)buffioOpCode::abort) {
+        buffioHeader *tmpWork = workQueue->dequeue(nullptr);
+        if (tmpWork == nullptr) break;
+        if (tmpWork->opCode == buffioOpCode::abort) {
           exit = true;
           continue;
         }
@@ -60,8 +59,8 @@ class buffioSockBroker {
         continue;
 
       for (int j = 0; j < count; j++) {
-        buffioHeader header = work[j];
-        buffioOpCode opCode = (buffioOpCode)header.opCode;
+        buffioHeader *header = work[j];
+        buffioOpCode opCode = header->opCode;
         switch (opCode) {
         case buffioOpCode::read:
           break;
@@ -119,36 +118,36 @@ public:
     return (int)buffioErrorCode::none;
   };
 
-  inline int pushreq(buffioHeaderType which) {
+  inline int pushreq(buffioHeaderType *which) {
     if (sockBrokerState == buffioSockBrokerState::active) {
       count += 1;
       return epollWorks.enqueue(which);
     }
     return -1;
   }
-  inline int push(buffioHeaderType which) {
+  inline int push(buffioHeaderType *which) {
     if (sockBrokerState == buffioSockBrokerState::active) {
       count += 1;
       return epollWorks.enqueue(which);
     }
     return -1;
   }
-  inline buffioHeaderType pop() {
+  inline buffioHeaderType *pop() {
     if (sockBrokerState == buffioSockBrokerState::active) {
       count -= 1;
-      return epollWorks.dequeue({0});
+      return epollWorks.dequeue(nullptr);
     }
 
-    return {0};
+    return nullptr;
   }
 
-  inline buffioHeaderType popreq() {
+  inline buffioHeaderType *popreq() {
     if (sockBrokerState == buffioSockBrokerState::active) {
       count -= 1;
-      return epollWorks.dequeue({0});
+      return epollWorks.dequeue(nullptr);
     }
 
-    return {0};
+    return nullptr;
   }
 
   bool running() const {
@@ -156,14 +155,15 @@ public:
   };
   bool busy() const { return (count != 0); }
 
-  int pollOp(int fd, uint32_t opCode, void *data) {
+  int pollOp(int fd, void *data,uint32_t opCode = 0) {
     if (!running())
       return (int)buffioErrorCode::epollInstance;
 
     struct epoll_event evnt;
-    evnt.events = opCode | EPOLLET;
+    evnt.events = (EPOLLIN | EPOLLOUT| EPOLLET);
     evnt.data.ptr = data;
     //TODO: check ERROR
+    //
     int retcode = epoll_ctl(epollFd, EPOLL_CTL_ADD, fd, &evnt);
     return (int)buffioErrorCode::none;
   };

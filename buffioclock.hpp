@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <queue>
 #include <time.h>
-#include <coroutine>
+
 
 struct buffioTimerInfo {
   uint64_t expires;
@@ -23,29 +23,32 @@ class buffioClock {
                           buffioTimerCmp>;
 
 public:
-  buffioClock():count(0){};
+  buffioClock() : count(0) {};
   ~buffioClock() = default;
 
-  int getNext(uint64_t looptime) const {
-    if(count == 0) return -1;
+  int getNext(uint64_t looptime) {
+    if (count == 0)
+      return -1;
 
-    uint64_t offset = timerTree.top().expires < looptime
-                          ? 0
-                          : timerTree.top().expires - looptime;
+    auto timerOf = timerTree.top();
+    uint64_t offset =
+        timerOf.expires < looptime ? 0 : timerOf.expires - looptime;
+    if (offset == 0) {
+      timerTree.pop();
+        count -= 1;
+    };
+    nextWork = timerOf.task;
     return static_cast<int>(offset);
   };
-  inline std::coroutine_handle<> get() const { return timerTree.top().task; }
+
+  inline std::coroutine_handle<> get() const { return nextWork; }
   inline void push(uint64_t ms, std::coroutine_handle<> task) {
-    count += 1;
-    timerTree.push({ms + now(), task});
+    assert(this != nullptr);
+    this->count += 1;
+    timerTree.push({ms + now(),task});
   };
 
-  void pop(){ 
-    assert(count != 0); 
-    --count;
-    return timerTree.pop();
-  };
-  bool empty()const{ return (count == 0);}
+  bool empty() const { return (count == 0); }
 
   uint64_t now() noexcept {
     struct timespec tv;
@@ -56,6 +59,7 @@ public:
 
 private:
   buffioClockTree timerTree;
+  std::coroutine_handle<> nextWork;
   size_t count;
 };
 #endif

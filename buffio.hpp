@@ -6,6 +6,7 @@
 #if defined(BUFFIO_IMPLEMENTATION)
 
 #include "./buffioenum.hpp"
+#include "./buffiocommon.hpp"
 #include "./buffiomemory.hpp"
 #include "./buffiolfqueue.hpp"
 #include "./buffiofd.hpp"

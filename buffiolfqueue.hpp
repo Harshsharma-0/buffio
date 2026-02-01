@@ -1,11 +1,6 @@
 #ifndef BUFFIO_LF_QUEUE
 #define BUFFIO_LF_QUEUE
 
-/*
- * Error codes range reserved for buffiothread
- *  [8000 - 9500]
- *  8000 <= errorcode <= 9500
- */
 
 /*
  * IMPLEMENTAION BASED ON:

@@ -20,6 +20,11 @@ enum class buffioRoutineStatus : uint32_t {
 
 };
 
+enum class buffioOrigin : uint32_t {
+  none = 0,
+  routine = 1,
+  pool = 2,
+};
 //[reservec enum 31 - 70]
 
 enum class buffioSockBrokerState : uint32_t {
@@ -37,24 +42,66 @@ enum class buffioThreadStatus : uint32_t {
   configOk = 86,
 };
 
-enum class buffioOpCode : uint8_t { 
+enum class buffioOpCode : uint8_t {
+/*
+ * none: define no operation
+ */
   none = 0,
-  read = 1, 
+/* 
+ * read and write opcode to used for pipe,fifo,and tcp socket
+ */
+
+  read = 1,
   write = 2,
+
+/* opcode to signal shutdowm of the eventloop
+ */
   abort = 3,
-};
-enum class buffioSyscall: uint8_t{
- none = 0,
- open = 1,
- connect = 2,
+
+/* opcode to write to file so it can be 
+ * relayed to the worked thread.
+ */
+
+  readFile = 4,
+  writeFle = 5,
+
+/* required as we want to also give back the address from 
+ * where the message use received.
+ */
+  readUdp = 6, 
+  writeUdp = 7,
+
+  /*
+  * request to connect to a specific socket
+  */
+  connect = 8,
+
+  /*
+  * opCode to release the header memory back to the memoryPool
+  */
+   release = 9,
+  /*
+  * use this opCode to add the fd to for polling;
+  */
+   poll = 10,
+  /*
+  * 
+  * syncFd : opCode to sync the fd class to the current event loop
+  * and configure the header request pool in the fd class so it can
+  * be used, any fd, must be first synchronised with the event loop
+  * before any opration on it, as it can fail, if not done.
+  *
+  */
+   syncFd = 11,
+  /*
+  * rmPoll : opCode used to remove a fd from the poller, and user owned fd,
+  * created by the used locally, not pulled from the eventloop,
+  * must be unpolled. after completion.
+  *
+  */
+   rmPoll = 12,
 };
 
-enum class buffioHandleType: uint8_t{
- buffered = 0,
- buffio = 1,
- paged = 2,
- open = 3,
-};
 
 #define BUFFIO_ERROR_LIST                                                      \
   X(none, 0, "buffio no error")                                                \

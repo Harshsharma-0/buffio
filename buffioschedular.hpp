@@ -1,26 +1,17 @@
 #ifndef BUFFIO_SCHEDULAR
 #define BUFFIO_SCHEDULAR
 
-/*
- * Error codes range reserved for buffioschedular
- *  [4000 - 5500]
- *  4000 <= errorcode <= 5500
- */
 
-#if !defined(BUFFIO_IMPLEMENTATION)
-#include "buffiopromsie.hpp"
-#include "buffiosockbroker.hpp"
-#endif
-
-
+#include "buffioclock.hpp"
 #include "buffioQueue.hpp"
-#include <cassert>
 
 class buffioScheduler {
 
 public:
   // constructor overload.
-  buffioScheduler():syncPipe(nullptr){}; 
+  buffioScheduler() : syncPipe(nullptr) {
+    fdPool.mountPool(&headerPool);
+  };
   ~buffioScheduler() = default;
 
   int run() {
@@ -28,18 +19,19 @@ public:
     if (queue.empty() && timerClock.empty())
       return -1;
 
-    buffioThread threadPool;
-
     int error = 0;
-
-    if ((error = poller.start(threadPool)) != 0) return error;    
-    if ((syncPipe = fdPool.pop()) == nullptr) return -1; 
-    if ((error = syncPipe->pipe()) != 0)  return error;
-    if ((error = poller.pollOp(syncPipe->localfd.pipeFd[0], EPOLLIN, syncPipe)) != 0){
+    if((error = headerPool.init()) != 0) return error;
+    if ((error = poller.start(threadPool)) != 0)
+      return error;
+    if ((syncPipe = fdPool.get()) == nullptr)
+      return -1;
+    if ((error = buffioMakeFd::pipe(syncPipe)) != 0)
+      return error;
+    if ((error = poller.pollOp(syncPipe->getPipeRead(),syncPipe)) != 0) {
       syncPipe->release();
       return error;
     };
-    
+
     struct epoll_event evnt[1024];
     bool exit = false;
     int timeout = 0;
@@ -51,21 +43,23 @@ public:
       int nfd = poller.poll(evnt, 1024, timeout);
       if (nfd < 0)
         break;
-      if (nfd != 0)
+      if (nfd != 0){
         processEvents(evnt, nfd);
-
-      int error = yieldQueue(10);
+        getWakeTime(&exit);
+      };
+       int error = yieldQueue(10);
     };
-
     fdPool.release();
     cleanQueue();
     threadPool.threadfree();
     return 0;
   };
 
-  int processEvents(struct epoll_event evnts[], int len) {
-    for (int i = 0; i < len; i++) {
+  int processEvents(struct epoll_event evnts[], int len){
+    for(int i = 0; i < len; i++) {
       buffioFd *fd = static_cast<buffioFd *>(evnts[i].data.ptr);
+       
+     
     };
     return 0;
   };
@@ -86,7 +80,6 @@ public:
       auto *promise = getPromise<char>(clkWork);
       promise->setStatus(buffioRoutineStatus::executing);
       queue.push(clkWork);
-      timerClock.pop();
       looptime = timerClock.getNext(startTime);
     };
     if (!queue.empty())
@@ -145,7 +138,6 @@ public:
       }
 
         [[fallthrough]];
-
       case buffioRoutineStatus::zombie:
         [[fallthrough]];
 
@@ -165,7 +157,7 @@ public:
 
   int push(buffioPromiseHandle handle) {
     auto *promise = getPromise<char>(handle);
-    promise->setInstance(&timerClock, &poller,&fdPool);
+    promise->setInstance(&timerClock, &poller, &fdPool,&headerPool);
     return queue.push(handle);
   };
 
@@ -175,6 +167,9 @@ private:
   buffioClock timerClock;
   buffioFdPool fdPool;
   buffioQueue<> queue;
+  buffioMemoryPool <buffioHeader> headerPool;
+  buffioThread threadPool;
+
 };
 
 #endif
