@@ -25,6 +25,7 @@ enum class buffioOrigin : uint32_t {
   routine = 1,
   pool = 2,
 };
+
 //[reservec enum 31 - 70]
 
 enum class buffioSockBrokerState : uint32_t {
@@ -43,65 +44,119 @@ enum class buffioThreadStatus : uint32_t {
 };
 
 enum class buffioOpCode : uint8_t {
-/*
- * none: define no operation
- */
+  /*
+   * none: define no operation
+   */
   none = 0,
-/* 
- * read and write opcode to used for pipe,fifo,and tcp socket
- */
+  /*
+   * read and write opcode to used for pipe,fifo,and tcp socket
+   */
 
   read = 1,
   write = 2,
 
-/* opcode to signal shutdowm of the eventloop
- */
+  /* opcode to signal shutdowm of the eventloop
+   */
   abort = 3,
 
-/* opcode to write to file so it can be 
- * relayed to the worked thread.
- */
+  /* opcode to write to file so it can be
+   * relayed to the worked thread.
+   */
 
   readFile = 4,
   writeFle = 5,
 
-/* required as we want to also give back the address from 
- * where the message use received.
- */
-  readUdp = 6, 
+  /* required as we want to also give back the address from
+   * where the message use received.
+   */
+  readUdp = 6,
   writeUdp = 7,
 
   /*
-  * request to connect to a specific socket
-  */
+   * request to connect to a specific socket
+   */
   connect = 8,
 
   /*
-  * opCode to release the header memory back to the memoryPool
-  */
-   release = 9,
+   * opCode to release the header memory back to the memoryPool
+   */
+  release = 9,
   /*
-  * use this opCode to add the fd to for polling;
-  */
-   poll = 10,
+   * use this opCode to add the fd to for polling;
+   */
+  poll = 10,
   /*
-  * 
-  * syncFd : opCode to sync the fd class to the current event loop
-  * and configure the header request pool in the fd class so it can
-  * be used, any fd, must be first synchronised with the event loop
-  * before any opration on it, as it can fail, if not done.
+   *
+   * syncFd : opCode to sync the fd class to the current event loop
+   * and configure the header request pool in the fd class so it can
+   * be used, any fd, must be first synchronised with the event loop
+   * before any opration on it, as it can fail, if not done.
+   * [deprecated];
+   */
+  syncFd = 11,
+  /*
+   * rmPoll : opCode used to remove a fd from the poller, and user owned fd,
+   * created by the used locally, not pulled from the eventloop,
+   * must be unpolled. after completion.
+   *
+   */
+  rmPoll = 12,
+  /*
+   *
+   *
+   */
+   asyncConnect = 13,
+   asyncAccept = 14,
+
+   asyncRead = 15,
+   asyncWrite = 16,
+
+   waitAccept = 17,
+   waitConnect = 18,
+   
+ };
+enum class buffioReadWriteType : uint8_t {
+
+ /*
+  * read/write types maps normal linux read/write
+  * system call that can be used for any fd.
   *
   */
-   syncFd = 11,
-  /*
-  * rmPoll : opCode used to remove a fd from the poller, and user owned fd,
-  * created by the used locally, not pulled from the eventloop,
-  * must be unpolled. after completion.
-  *
+ read = 0, 
+ write = 1,
+
+  /* recv/recvFrom maps to linux recv/recvfrom
+   * system call, the and must only be used for,
+   * sockets, not on files,
+   *
+   * difference between revc and recvfrom, is that
+   * recvfrom takes struct sockaddr as arguement,and
+   * it's len, so, from where the data was, received from
+   * can be known.
+   *
+   */
+
+ recv = 2,
+ recvfrom = 3,
+
+ /* send/sentto maps to linux send/sendto system call,
+  * send/sendto is used to write data, to sockets,
+  * and sendto can be used when sending msg to specific,
+  * address is required,
+  * and takes the struct sockaddr as arguement, and the 
+  * len of the socket aslo.
   */
-   rmPoll = 12,
+
+ send = 4,
+ sendto = 5,
+
 };
 
+
+/*
+* BUFFIO_ERROR_LIST: x-macro defination for error codes mapping
+*     and string for the error code.
+*/
 
 #define BUFFIO_ERROR_LIST                                                      \
   X(none, 0, "buffio no error")                                                \

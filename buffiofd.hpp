@@ -49,103 +49,234 @@ enum class buffioSocketProtocol : int { none = 0, tcp = 1, udp = 2 };
 class buffioFd {
 
 public:
-/*
-  buffioFd() : count(0), token(0), next(nullptr), prev(nullptr) {
-    fdFamily = buffioFdFamily::none;
-    origin = buffioOrigin::routine;
-    requests = nullptr;
-    address = nullptr;
-    localfd = {0};
+
+  /*
+   * operator overload to set bits in the mask
+   * of fd.
+   */
+
+  void operator|(int bit){ rwmask |= bit;}
+  /* 
+   * operator overload to check if the bit field
+   * is set or not.
+   *
+   */
+  bool operator == (int bit)const{
+    return (rwmask & bit);
   };
-  */
-  buffioFd() : next(nullptr), prev(nullptr),headerPool(nullptr){
+
+  /*
+   * bitSet, method set a specific bit in 
+   * the rwmask.
+   */ 
+
+  void bitSet(int bit)noexcept{
+    rwmask |= bit;
+  };
+
+  /*
+   * isBitsSet, checks if the specific bit is
+   * set or not.
+   *
+   */
+
+  bool isBitSet(int bit)const{
+    return (rwmask & bit);
+  };
+
+  /*
+   * function to unset the bit in the rwmask.
+   */
+
+  void unsetBit(int bit)noexcept{ 
+    rwmask &= ~(bit);
+  };
+
+  /*
+   * constructor of the buffiofd
+   */
+
+  buffioFd() : next(nullptr), prev(nullptr){
     fdFamily = buffioFdFamily::none;
     origin = buffioOrigin::routine;
-    requests = nullptr;
     address = nullptr;
+    rwmask = 0;
     reserveHeader.fd = this;
-
+    readReq = writeReq = nullptr;
+    prev = next = nullptr; 
     localfd = {0};
   };
-  void mountPool(buffioMemoryPool<buffioHeader> *pool){
-    assert(pool != nullptr);
-    assert(headerPool == nullptr);
-    headerPool = pool;
+
+   buffioHeader *getHeader()const{
+    return nullptr; 
+   };
+   buffioHeader *getReadReq()const{
+     return readReq; 
+   };
+   buffioHeader *getWriteReq()const{
+     return writeReq;
+   };
+   const buffioHeader *getReserveHeader()const{
+    return &reserveHeader;
+   };
+   inline void popReq()noexcept{ 
+    return;
+   }
+
+   int listen(int backlog)const{ 
+    return ::listen(localfd.fd[0],backlog);
+   };
+
+   int accept(struct sockaddr *addr,socklen_t *socklen)const{
+    return ::accept(localfd.fd[0],addr,socklen);
+   };
+
+   int connect(struct sockaddr *addr,socklen_t socklen)const{
+    return ::connect(localfd.fd[0],addr,socklen);
+   };
+    
+   buffioHeader *asyncAccept(struct sockaddr *addr,socklen_t socklen,
+                             buffioOnAsyncAccept then){
+   
+    /*
+     * header is copied via the the promise object internal machanism
+     */
+
+     reserveHeader.opCode = buffioOpCode::asyncAccept;
+     reserveHeader.reqToken.fd = localfd.fd[0];
+     reserveHeader.len.socklen = socklen;
+     reserveHeader.data.socketaddr = addr;
+     reserveHeader.onAsyncDone.onAsyncAccept = then;
+     
+     return &reserveHeader;
+   };
+
+   buffioHeader *asyncConnect(struct sockaddr *addr,socklen_t socklen,
+                              buffioOnAsyncConnect then){
+    reserveHeader.opCode = buffioOpCode::asyncConnect;
+    reserveHeader.reqToken.fd = localfd.fd[0];
+    reserveHeader.len.socklen = socklen;
+    reserveHeader.data.socketaddr = addr;
+    reserveHeader.onAsyncDone.onAsyncConnect = then;
+    return &reserveHeader;
+   };
+
+   buffioHeader *waitAccept(struct sockaddr *addr,socklen_t socklen){ 
+     reserveHeader.opCode = buffioOpCode::waitAccept;
+     reserveHeader.reqToken.fd = localfd.fd[0];
+     reserveHeader.len.socklen = socklen;
+     reserveHeader.data.socketaddr = addr;
+     return &reserveHeader;
+   };
+
+   buffioHeader *waitConnect(struct sockaddr *addr,socklen_t socklen){ 
+     reserveHeader.opCode = buffioOpCode::waitConnect;
+     reserveHeader.reqToken.fd = localfd.fd[0];
+     reserveHeader.len.socklen = socklen;
+     reserveHeader.data.socketaddr = addr;
+     return &reserveHeader;
+   };
+
+  /*
+   * generic read/write methods for buffiofd, if user want to 
+   * read in the routine, not depending on the eventloop.
+   *
+   */
+
+  ssize_t read(char *buffer, size_t len) const{ 
+    return ::read(localfd.fd[0],buffer,len); 
+  };
+  ssize_t write(char *buffer, size_t len) const{
+    return ::write(localfd.fd[0],buffer,len); 
   };
 
-  int read(char *buffer,size_t len){ 
-    return 0;
+
+  /*
+   * waitRead/waitWrite returns back if there is data available to read 
+   * from the fd, or it there not any data read or fd is not ready to write
+   * then the request is queued in the fd class and when there event 
+   * available, it is serrved.
+   */
+
+  buffioHeader *waitRead(char *buffer, size_t len) {
+     reserveHeader.opCode = buffioOpCode::read;
+     reserveHeader.reqToken.fd = localfd.fd[0];
+     reserveHeader.len.len = len;
+     reserveHeader.data.buffer = buffer;
+     return &reserveHeader;
   };
-  int write(char *buffer,size_t len){
-    return 0;
+  buffioHeader *waitWrite(char *buffer, size_t len) {
+     reserveHeader.opCode = buffioOpCode::read;
+     reserveHeader.reqToken.fd = localfd.fd[0];
+     reserveHeader.len.len = len;
+     reserveHeader.data.buffer = buffer;
+     return &reserveHeader;
   };
 
-  buffioFd *asyncRead(char *buffer,size_t len,
-                         buffioPromiseHandle then){
-    assert(headerPool != nullptr);
+ /*
+   * asyncRead/asyncWrite behaves same as the waitRead/waitWrite, the difference is that
+   * asyncRead/asyncWrite, let you push task/routine handle that should be run after, the
+   * operation is done.
+   *
+   */
 
-    return this;
-  };
-  buffioFd *asyncWrite(char *buffer,size_t len,
-                          buffioPromiseHandle then){
-    assert(headerPool != nullptr);
 
-    return this;
-  };
-
-  buffioFd *waitRead(char *buffer,size_t len){
-     assert(headerPool != nullptr);
- 
-    return this;
-
-  };
-  buffioFd *waitWrite(char *buffer,size_t len){
-    assert(headerPool != nullptr);
-
-    return this;
-  };
-  buffioHeader *syncFd(){ 
-    reserveHeader.opCode = buffioOpCode::syncFd;
+  buffioHeader *asyncRead(char *buffer, size_t len,
+                          buffioOnAsyncRead then) {
+    reserveHeader.opCode = buffioOpCode::asyncRead;
+    reserveHeader.reqToken.fd = localfd.fd[0];
+    reserveHeader.len.len = len;
+    reserveHeader.data.buffer = buffer;
+    reserveHeader.onAsyncDone.onAsyncRead = then;
     return &reserveHeader;
   };
-  buffioHeader *poll(){
+
+  buffioHeader *asyncWrite(char *buffer, size_t len,
+                           buffioOnAsyncWrite then) {
+
+    reserveHeader.opCode = buffioOpCode::asyncWrite;
+    reserveHeader.reqToken.fd = localfd.fd[0];
+    reserveHeader.len.len = len;
+    reserveHeader.data.buffer = buffer;
+    reserveHeader.onAsyncDone.onAsyncWrite = then;
+
+    return &reserveHeader;
+  };
+
+ 
+
+  buffioHeader *rmPoll() {
     assert(fdFamily != buffioFdFamily::none);
-    reserveHeader.opCode = buffioOpCode::poll;
+    reserveHeader.opCode = buffioOpCode::rmPoll;
     reserveHeader.reqToken.fd = localfd.fd[0];
     return &reserveHeader;
   };
-  buffioHeader *rmPoll(){
-   assert(fdFamily != buffioFdFamily::none);
-   reserveHeader.opCode = buffioOpCode::rmPoll;
-   reserveHeader.reqToken.fd = localfd.fd[0];
-   return &reserveHeader;
-  };
 
-  int getPipeRead()const{ return localfd.pipeFd[0];}
-  int getPipeWrite()const{ return localfd.pipeFd[1];}
+  int getPipeRead() const { return localfd.pipeFd[0]; }
+  int getPipeWrite() const { return localfd.pipeFd[1]; }
 
-/*
-  uint32_t genReqToken()noexcept{
-    return token.fetch_add(1,std::memory_order_acq_rel); 
-  };
-  bool matchToken(uint32_t token) const {
-    return (token == count.load(std::memory_order_acquire));
-  }
-  inline void markCompletion() noexcept {
-    count.fetch_add(1, std::memory_order_acq_rel);
-    return;
-  };
-*/
+  /*
+    uint32_t genReqToken()noexcept{
+      return token.fetch_add(1,std::memory_order_acq_rel);
+    };
+    bool matchToken(uint32_t token) const {
+      return (token == count.load(std::memory_order_acquire));
+    }
+    inline void markCompletion() noexcept {
+      count.fetch_add(1, std::memory_order_acq_rel);
+      return;
+    };
+  */
 
   void release() {
     auto family = this->fdFamily;
     this->fdFamily = buffioFdFamily::none;
-    switch (family){
+    switch (family) {
     case buffioFdFamily::none:
-      assert(family != buffioFdFamily::none);
-    break;
+       assert(family != buffioFdFamily::none);
+      break;
     case buffioFdFamily::file:
-      //TODO: add support for files
+      // TODO: add support for files
       break;
     case buffioFdFamily::pipe: {
       ::close(localfd.pipeFd[0]);
@@ -163,61 +294,73 @@ public:
       };
       ::close(localfd.sock.socketFd);
     } break;
-    case buffioFdFamily::fifo:{
-        if(this->address != nullptr){
-          ::unlink(this->address);
-          delete[] this->address;
-        }
-    }break;
+    case buffioFdFamily::fifo: {
+      if (this->address != nullptr) {
+        ::unlink(this->address);
+        delete[] this->address;
+      }
+    } break;
     };
-    
   };
   ~buffioFd() { release(); };
-/*
-  [[nodiscard("buffioFd errors must be handled")]]
-  int open(const char *protocol = nullptr) {
-    if (protocol == nullptr)
-      return (int)buffioErrorCode::protocolString;
-    size_t len = ::strlen(protocol);
-    if (len <= 7)
-      return (int)buffioErrorCode::protocol;
+  /*
+    [[nodiscard("buffioFd errors must be handled")]]
+    int open(const char *protocol = nullptr) {
+      if (protocol == nullptr)
+        return (int)buffioErrorCode::protocolString;
+      size_t len = ::strlen(protocol);
+      if (len <= 7)
+        return (int)buffioErrorCode::protocol;
 
-    // todo add support for string based opening of fds;
-    return 0;
-  };
+      // todo add support for string based opening of fds;
+      return 0;
+    };
 
-*/
+  */
   friend class buffioFdPool;
-  friend class buffioMakeFd;   
+  friend class buffioMakeFd;
 private:
-
-  void mountSocket(char *address,int socketfd,int portnumber)noexcept{
+  void mountSocket(char *address, int socketfd, int portnumber) noexcept {
     localfd.sock.socketFd = socketfd;
     localfd.sock.portnumber = portnumber;
     this->address = address;
     return;
   };
-  void mountPipe(int read,int write){
+  void mountPipe(int read, int write) {
     localfd.pipeFd[0] = read;
     localfd.pipeFd[1] = write;
   };
-  void mountFifo(char *address){
-   this->address = address;
-  };
+  void mountFifo(char *address) { this->address = address; };
   buffioFdFamily fdFamily;
   buffioOrigin origin;
-  buffioFd *next;
-  buffioFd *prev;
-
-protected:
-  std::atomic<int> rwmask;
 
   /*
-  std::atomic<uint32_t> token;
-  std::atomic<size_t> count;
-  */
-  char *address;
+   * fields to support fdpool
+   */
+  buffioFd *next; 
+  buffioFd *prev;
+  
+protected:
  
+
+ /*
+   * rwmask define the readyness of the file descriptor.
+   * see buffiocommon.hpp to see the mask defined for readyness
+   * of the fd,
+   * 
+   * - BUFFIO_READ_READY: if masked with this, it means the fd is
+   *          ready for read operation.
+   *
+   * - BUFFIO_WRITE_READY: if masked with this, it means the fd is
+   *          ready for write operation.
+   * 
+   */
+
+  int rwmask; 
+ 
+
+  char *address;
+
   union {
     struct {
       int socketFd;
@@ -228,21 +371,32 @@ protected:
     int fd[2];
   } localfd;
 
-  buffioHeader *requests;
-  buffioHeader reserveHeader;
-  buffioMemoryPool<buffioHeader> *headerPool;
-};
+  //never goes to the batch
+  buffioHeader  reserveHeader; 
 
-class buffioMakeFd{
- public:
+  /*Are dequeued and given out to batch;
+   *only one read/write is supported at any instance of time;
+   *when request is done the read/write Req field are marked nullptr
+   */
 
+  buffioHeader *readReq;
+  buffioHeader *writeReq;
+ };
+
+class buffioMakeFd {
+public:
   [[nodiscard]]
-  static int createSocket(buffioFd *fdCore,const char *address, int portNumber = 8080,
-                   buffioFdFamily family = buffioFdFamily::ipv4,
-                   buffioSocketProtocol protocol = buffioSocketProtocol::tcp,
-                   bool blocking = false) {
+  static int
+  createSocket(buffioFd *fdCore,
+               struct sockaddr *lsocket,
+               const char *address, 
+               int portNumber = 8080,
+               buffioFdFamily family = buffioFdFamily::ipv4,
+               buffioSocketProtocol protocol = buffioSocketProtocol::tcp,
+               bool blocking = false){
 
     assert(fdCore != nullptr);
+    assert(lsocket != nullptr);
     assert(address != nullptr || portNumber > 0);
     assert(fdCore->fdFamily == buffioFdFamily::none);
 
@@ -268,7 +422,8 @@ class buffioMakeFd{
       in4AddrLoc->sin_family = domain;
       in4AddrLoc->sin_port = htons(portNumber);
       addrLen = sizeof(sockaddr_in);
-    } break;
+      ::memcpy(lsocket,in4AddrLoc,addrLen);
+     } break;
 
     case buffioFdFamily::ipv6: {
       domain = AF_INET6;
@@ -281,6 +436,8 @@ class buffioMakeFd{
       in6AddrLoc->sin6_family = domain;
       in6AddrLoc->sin6_port = htons(portNumber);
       addrLen = sizeof(sockaddr_in6);
+
+      ::memcpy(lsocket,in6AddrLoc,addrLen);
 
     } break;
     case buffioFdFamily::local: {
@@ -313,9 +470,11 @@ class buffioMakeFd{
 
       ::memcpy(addressfd, address, len);
       addressfd[len] = '\0';
+      ::memcpy(unAddrLoc->sun_path, addressfd, len + 1);
 
-      ::memcpy(unAddrLoc->sun_path,addressfd, len + 1);
       addrLen = offsetof(struct sockaddr_un, sun_path) + len + 1;
+      ::memcpy(lsocket,unAddrLoc,addrLen);
+
     } break;
     case buffioFdFamily::raw:
       break;
@@ -334,7 +493,7 @@ class buffioMakeFd{
     }
 
     fdCore->fdFamily = family;
-    fdCore->mountSocket(addressfd,socketFd,portNumber);
+    fdCore->mountSocket(addressfd, socketFd, portNumber);
     if (blocking == false)
       buffioMakeFd::setNonBlocking(socketFd);
 
@@ -342,7 +501,7 @@ class buffioMakeFd{
   };
 
   [[nodiscard]]
- static int pipe(buffioFd *fdCore,bool block = false) {
+  static int pipe(buffioFd *fdCore, bool block = false) {
 
     assert(fdCore != nullptr);
     assert(fdCore->fdFamily == buffioFdFamily::none);
@@ -354,7 +513,7 @@ class buffioMakeFd{
     }
 
     fdCore->fdFamily = buffioFdFamily::pipe;
-    fdCore->mountPipe(fdTmp[0],fdTmp[1]);
+    fdCore->mountPipe(fdTmp[0], fdTmp[1]);
 
     if (block == false) {
       buffioMakeFd::setNonBlocking(fdTmp[0]);
@@ -364,8 +523,9 @@ class buffioMakeFd{
   };
 
   [[nodiscard]]
- static int mkfifo(buffioFd *fdCore,const char *path = "/usr/home/buffioDefault", mode_t mode = 0666,
-             bool onlyFifo = false) {
+  static int mkfifo(buffioFd *fdCore,
+                    const char *path = "/usr/home/buffioDefault",
+                    mode_t mode = 0666, bool onlyFifo = false) {
 
     assert(fdCore != nullptr);
     assert(fdCore->fdFamily == buffioFdFamily::none);
@@ -390,7 +550,6 @@ class buffioMakeFd{
     return (int)buffioErrorCode::none;
   }
 
-
   static int setNonBlocking(int fd) {
     if (fd < 0)
       return (int)buffioErrorCode::fd;
@@ -404,7 +563,6 @@ class buffioMakeFd{
 
     return (int)buffioErrorCode::none;
   };
-
 };
 
 class buffioFdPool {
@@ -412,10 +570,8 @@ class buffioFdPool {
 public:
   buffioFdPool() : free(nullptr), inUse(nullptr) {}
   ~buffioFdPool() {}
-  void mountPool(buffioMemoryPool<buffioHeader> *pool){
-    this->pool = pool; 
-  }
-  buffioFd *get() {
+  void mountPool(buffioMemoryPool<buffioHeader> *pool) { this->pool = pool; }
+  buffioFd *get(){
 
     buffioFd *tmp = nullptr;
     if (free == nullptr) {
@@ -432,15 +588,15 @@ public:
     free = free->next;
     return tmp;
   };
-  
+
   void release() {
     _release(inUse);
     _release(free);
   };
   void push(buffioFd *tmp) {
-    if(tmp->origin != buffioOrigin::pool){
-        popInUse(tmp);
-        return;
+    if (tmp->origin != buffioOrigin::pool) {
+      popInUse(tmp);
+      return;
     };
     tmp->release();
     pushFree(tmp);
@@ -454,14 +610,14 @@ public:
     inUse->prev = tmp;
     inUse = tmp;
   };
- 
+
 private:
   void _release(buffioFd *from) {
     auto tmp = from;
     while (from != nullptr) {
       from = from->next;
-      if(tmp->origin == buffioOrigin::pool)
-              delete tmp;
+      if (tmp->origin == buffioOrigin::pool)
+        delete tmp;
       tmp = from;
     }
   };
@@ -490,7 +646,5 @@ private:
   buffioFd *inUse;
   buffioMemoryPool<buffioHeader> *pool;
 };
-
-
 
 #endif

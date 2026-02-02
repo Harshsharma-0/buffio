@@ -23,9 +23,7 @@
 #include <sys/epoll.h>
 
 #define BUFFIO_REQUEST_MAX_SIZE sizeof(buffioRequestMaxSize)
-using buffioSockBrokerQueue = buffiolfqueue<buffioHeader*>;
-
-
+using buffioSockBrokerQueue = buffiolfqueue<buffioHeader *>;
 
 class buffioSockBroker {
 
@@ -46,7 +44,8 @@ class buffioSockBroker {
       ::sem_wait(&parent->buffioWorkerSignal);
       for (int i = 0; i < 4; i++) {
         buffioHeader *tmpWork = workQueue->dequeue(nullptr);
-        if (tmpWork == nullptr) break;
+        if (tmpWork == nullptr)
+          break;
         if (tmpWork->opCode == buffioOpCode::abort) {
           exit = true;
           continue;
@@ -155,14 +154,14 @@ public:
   };
   bool busy() const { return (count != 0); }
 
-  int pollOp(int fd, void *data,uint32_t opCode = 0) {
+  int pollOp(int fd, void *data, uint32_t opCode = 0) {
     if (!running())
       return (int)buffioErrorCode::epollInstance;
 
     struct epoll_event evnt;
-    evnt.events = (EPOLLIN | EPOLLOUT| EPOLLET);
+    evnt.events = (EPOLLIN | EPOLLOUT);
     evnt.data.ptr = data;
-    //TODO: check ERROR
+    // TODO: check ERROR
     //
     int retcode = epoll_ctl(epollFd, EPOLL_CTL_ADD, fd, &evnt);
     return (int)buffioErrorCode::none;
@@ -172,7 +171,7 @@ public:
     if (!running())
       return (int)buffioErrorCode::epollInstance;
 
-    //TODO: check ERROR
+    // TODO: check ERROR
     int retcode = epoll_ctl(epollFd, EPOLL_CTL_DEL, fd, NULL);
     return (int)buffioErrorCode::none;
   };

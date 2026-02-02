@@ -4,6 +4,7 @@
 #include <cassert>
 #include <type_traits>
 
+enum class buffioQueueNoMem : int { no = 1 };
 class blockQueue {
 public:
   blockQueue *next;
@@ -14,32 +15,34 @@ public:
   ~blockQueue() { assert(current == nullptr); }
 };
 
-
-template <typename C = blockQueue, typename V = buffioPromiseHandle>
+template <typename C = blockQueue,
+          typename V = buffioPromiseHandle,
+          typename D = void>
 class buffioQueue {
   using memoryQueue = buffioMemoryPool<C>;
 
 public:
-  buffioQueue()
-      : head(nullptr), tail(nullptr), count(0), poppedEntry(false) {
+  buffioQueue() : head(nullptr), tail(nullptr), count(0), poppedEntry(false) {
     assert(memory.init() == 0);
   };
   ~buffioQueue() = default;
- 
 
+  template<typename Z = V>
+  requires std::is_same_v<Z,buffioPromiseHandle> 
   int push(V which, C *waiter = nullptr) {
     blockQueue *frag = nullptr;
     if ((frag = memory.pop()) == nullptr)
       return -1;
-   if constexpr (std::is_same_v<C , blockQueue> 
-        && std::is_same_v<V,buffioPromiseHandle>){
-     frag->current = which;
-     frag->waiter = waiter;
+    if constexpr (std::is_same_v<C, blockQueue> &&
+                  std::is_same_v<V, buffioPromiseHandle>) {
+      frag->current = which;
+      frag->waiter = waiter;
     };
     frag->next = nullptr;
     frag->prev = nullptr;
     return push(frag);
   };
+
 
   int pop(C *frag) {
     assert(count != 0 && head != nullptr);
@@ -54,16 +57,19 @@ public:
     frag->prev->next = frag->next;
     frag->next->prev = frag->prev;
 
-    if (head == frag){
+    if (head == frag) {
       poppedEntry = true;
       head = frag->next;
     };
     if (tail == frag)
       tail = frag->next;
 
-    memory.push(frag);
-    return 0;
+    if constexpr (std::is_same_v<D, void>) {
+       memory.push(frag);
+     };
+      return 0;
   };
+
   int push(C *frag) {
     assert(frag != nullptr);
     count += 1;
@@ -107,7 +113,9 @@ public:
     count -= 1;
     poppedEntry = true;
     if (head == head->next) {
+    if constexpr (std::is_same_v<D, void>) {    
       memory.push(head);
+     };
       head = tail = nullptr;
       return;
     };
@@ -119,7 +127,9 @@ public:
       tail = head->next;
     head = head->next;
 
-    memory.push(tmpHead);
+    if constexpr (std::is_same_v<D, void>) {
+       memory.push(tmpHead);
+     };
   };
 
   C *get() const {

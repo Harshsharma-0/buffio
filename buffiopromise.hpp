@@ -123,13 +123,6 @@ template <typename T> struct buffioPromise {
           fdPool->pushUse(handle->fd);
           broker->pollOp(handle->reqToken.fd,handle->fd);
           break;
-         case buffioOpCode::syncFd:
-          handle->fd->mountPool(headerPool);
-          break;
-         case buffioOpCode::rmPoll:
-          fdPool->push(handle->fd);
-          broker->pollDel(handle->reqToken.fd);
-          break;
         };
          wait = true;
         
