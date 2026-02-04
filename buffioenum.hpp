@@ -26,7 +26,7 @@ enum class buffioOrigin : uint32_t {
   pool = 2,
 };
 
-//[reservec enum 31 - 70]
+//[reserved enum 31 - 70]
 
 enum class buffioSockBrokerState : uint32_t {
   active = 71,
@@ -54,7 +54,6 @@ enum class buffioOpCode : uint8_t {
 
   read = 1,
   write = 2,
-
   /* opcode to signal shutdowm of the eventloop
    */
   abort = 3,
@@ -64,7 +63,7 @@ enum class buffioOpCode : uint8_t {
    */
 
   readFile = 4,
-  writeFle = 5,
+  writeFile = 5,
 
   /* required as we want to also give back the address from
    * where the message use received.
@@ -105,25 +104,29 @@ enum class buffioOpCode : uint8_t {
    *
    *
    */
-   asyncConnect = 13,
-   asyncAccept = 14,
+  asyncConnect = 13,
+  asyncAcceptlocal = 14,
+  asyncAcceptin = 15,
+  asyncAcceptin6 = 16,
 
-   asyncRead = 15,
-   asyncWrite = 16,
+  asyncRead = 17,
+  asyncWrite = 18,
 
-   waitAccept = 17,
-   waitConnect = 18,
-   
- };
+  waitAccept = 19,
+  waitConnect = 20,
+
+  done = 21,
+  dequeueThread = 22,
+};
 enum class buffioReadWriteType : uint8_t {
 
- /*
-  * read/write types maps normal linux read/write
-  * system call that can be used for any fd.
-  *
-  */
- read = 0, 
- write = 1,
+  /*
+   * read/write types maps normal linux read/write
+   * system call that can be used for any fd.
+   *
+   */
+  read = 0,
+  write = 1,
 
   /* recv/recvFrom maps to linux recv/recvfrom
    * system call, the and must only be used for,
@@ -136,27 +139,27 @@ enum class buffioReadWriteType : uint8_t {
    *
    */
 
- recv = 2,
- recvfrom = 3,
+  recv = 2,
+  recvfrom = 3,
 
- /* send/sentto maps to linux send/sendto system call,
-  * send/sendto is used to write data, to sockets,
-  * and sendto can be used when sending msg to specific,
-  * address is required,
-  * and takes the struct sockaddr as arguement, and the 
-  * len of the socket aslo.
-  */
+  /* send/sentto maps to linux send/sendto system call,
+   * send/sendto is used to write data, to sockets,
+   * and sendto can be used when sending msg to specific,
+   * address is required,
+   * and takes the struct sockaddr as arguement, and the
+   * len of the socket aslo.
+   */
 
- send = 4,
- sendto = 5,
+  send = 4,
+  sendto = 5,
 
+  rwEnd = 6,
 };
 
-
 /*
-* BUFFIO_ERROR_LIST: x-macro defination for error codes mapping
-*     and string for the error code.
-*/
+ * BUFFIO_ERROR_LIST: x-macro defination for error codes mapping
+ *     and string for the error code.
+ */
 
 #define BUFFIO_ERROR_LIST                                                      \
   X(none, 0, "buffio no error")                                                \

@@ -1,7 +1,7 @@
 #ifndef __BUFFIO_PROMISE_HPP__
 #define __BUFFIO_PROMISE_HPP__
 
-
+#include "buffiocommon.hpp"
 #if !defined(BUFFIO_IMPLEMENTATION)
 #include "buffioenum.hpp"
 #include "buffiofd.hpp"
@@ -48,7 +48,6 @@ template <typename T> struct buffioPromise {
       return &typed.promise();
     };
 
-
   private:
     // declaration order-locked
     buffioRoutineStatus status = buffioRoutineStatus::fresh;
@@ -91,7 +90,7 @@ template <typename T> struct buffioPromise {
       return {};
     };
 
-    template <typename P> buffioAwaiter await_transform(P handle){
+    template <typename P> buffioAwaiter await_transform(P handle) {
       killChild();
       std::coroutine_handle<> handleTmp = voidSelf;
       bool wait = false;
@@ -99,37 +98,46 @@ template <typename T> struct buffioPromise {
       if constexpr (std::is_same_v<P, buffioTimer *>) {
         if (handle->then) {
           auto *promise = getPromise<char>(handle->then);
-          promise->setInstance(clock, broker, fdPool,headerPool);
+          promise->setInstance(clock, broker, fdPool, headerPool);
           clock->push(handle->duration, handle->then);
           wait = true;
         } else {
           clock->push(handle->duration, voidSelf);
         };
         status = buffioRoutineStatus::waitingTimer;
-       
-      }else if constexpr (std::is_same_v<P, buffioHeader **>){
-        *handle = headerPool->pop();
-         wait = true;
 
-      } else if constexpr (std::is_same_v<P, buffioHeader *>) { 
-        
+      } else if constexpr (std::is_same_v<P, buffioHeader **>) {
+        *handle = headerPool->pop();
+        wait = true;
+
+      } else if constexpr (std::is_same_v<P, buffioHeader *>) {
+
         assert(handle != nullptr);
 
-        switch(handle->opCode){
-         case buffioOpCode::release:
+        switch (handle->opCode) {
+        case buffioOpCode::release:
           headerPool->push(handle);
-         break;
-         case buffioOpCode::poll:
-          fdPool->pushUse(handle->fd);
-          broker->pollOp(handle->reqToken.fd,handle->fd);
+          break;
+        case buffioOpCode::poll:
+          if (broker->pollOp(handle->reqToken.fd, handle->fd,
+                             handle->len.mask) == 0) {
+            handle->fd->bitSet(BUFFIO_FD_POLLED);
+            fdPool->pushUse(handle->fd);
+          } else {
+            std::cout << "poll uncesfull" << std::endl;
+          };
+          break;
+        case buffioOpCode::rmPoll:
+          if (*(handle->fd) == BUFFIO_FD_POLLED)
+            broker->pollDel(handle->fd->getFd());
           break;
         };
-         wait = true;
-        
+        wait = true;
+
       } else if constexpr (std::is_same_v<P, std::coroutine_handle<>>) {
 
         auto *promise = getPromise<char>(handle);
-        promise->setInstance(clock, broker, fdPool,headerPool);
+        promise->setInstance(clock, broker, fdPool, headerPool);
         handle_child = handle;
         status = buffioRoutineStatus::waiting;
         handleTmp = handle_child;
@@ -141,14 +149,13 @@ template <typename T> struct buffioPromise {
 
       } else if constexpr (std::is_same_v<P, buffioFd **>) {
         *handle = fdPool->get();
-         wait = true;
+        wait = true;
 
       } else {
         static_assert(false, "we don't support this type");
         return {};
       }
-       return {.self = handleTmp, .ready = wait};
-
+      return {.self = handleTmp, .ready = wait};
     };
 
     void unhandled_exception() {
@@ -165,8 +172,7 @@ template <typename T> struct buffioPromise {
 
     void setInstance(buffioClock *clk, buffioSockBroker *brok,
                      buffioFdPool *fdPool,
-                     buffioMemoryPool<buffioHeader> *headerPool
-                     ) {
+                     buffioMemoryPool<buffioHeader> *headerPool) {
       this->clock = clk;
       this->broker = brok;
       this->fdPool = fdPool;

@@ -154,15 +154,14 @@ public:
   };
   bool busy() const { return (count != 0); }
 
-  int pollOp(int fd, void *data, uint32_t opCode = 0) {
+  int pollOp(int fd, void *data, int32_t mask = EPOLLIN | EPOLLOUT) {
     if (!running())
       return (int)buffioErrorCode::epollInstance;
 
-    struct epoll_event evnt;
-    evnt.events = (EPOLLIN | EPOLLOUT);
+    struct epoll_event evnt = {0};
+    evnt.events |= mask;
     evnt.data.ptr = data;
-    // TODO: check ERROR
-    //
+
     int retcode = epoll_ctl(epollFd, EPOLL_CTL_ADD, fd, &evnt);
     return (int)buffioErrorCode::none;
   };
