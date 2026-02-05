@@ -1,0 +1,9 @@
+/home/harsh/Desktop/cpp/buffio/build/CMakeFiles/buffio.dir
+/home/harsh/Desktop/cpp/buffio/build/CMakeFiles/async_example.dir
+/home/harsh/Desktop/cpp/buffio/build/CMakeFiles/test.dir
+/home/harsh/Desktop/cpp/buffio/build/CMakeFiles/edit_cache.dir
+/home/harsh/Desktop/cpp/buffio/build/CMakeFiles/rebuild_cache.dir
+/home/harsh/Desktop/cpp/buffio/build/tests/CMakeFiles/buffio_tests.dir
+/home/harsh/Desktop/cpp/buffio/build/tests/CMakeFiles/test.dir
+/home/harsh/Desktop/cpp/buffio/build/tests/CMakeFiles/edit_cache.dir
+/home/harsh/Desktop/cpp/buffio/build/tests/CMakeFiles/rebuild_cache.dir
