@@ -1,7 +1,7 @@
 DEBUG = BUFDEBUG 
 
 main:main.cpp *.hpp
-	 g++ -std=c++20  main.cpp -o main -lpthread -D${DEBUG}
+	 g++ -std=c++20  main.cpp -O3 -o main -lpthread -D${DEBUG}
 
 run: main
 	./main

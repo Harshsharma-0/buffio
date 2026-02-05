@@ -125,8 +125,6 @@ Public Member Functions</h2></td></tr>
 <tr class="memdesc:a6d4283f5882f524fd613eaccf24bc994"><td class="mdescLeft">&#160;</td><td class="mdescRight">Processes epoll events and dispatches work.  <br /></td></tr>
 <tr class="memitem:a846ae3510bdbe7c626c9a35e7c3737ed" id="r_a846ae3510bdbe7c626c9a35e7c3737ed"><td class="memItemLeft">int&#160;</td><td class="memItemRight"><a class="el" href="#a846ae3510bdbe7c626c9a35e7c3737ed">dispatchHandle</a> (int errorCode, <a class="el" href="classbuffioFd.html">buffioFd</a> *fd, <a class="el" href="structbuffioHeader.html">buffioHeader</a> *header)</td></tr>
 <tr class="memdesc:a846ae3510bdbe7c626c9a35e7c3737ed"><td class="mdescLeft">&#160;</td><td class="mdescRight">It's a helper function, to enqueue task in execution queue to run.  <br /></td></tr>
-<tr class="memitem:a5747f6a988ffd9845211e70531999c94" id="r_a5747f6a988ffd9845211e70531999c94"><td class="memItemLeft">int&#160;</td><td class="memItemRight"><a class="el" href="#a5747f6a988ffd9845211e70531999c94">consumeEntry</a> (<a class="el" href="structbuffioHeader.html">buffioHeader</a> *req)</td></tr>
-<tr class="memdesc:a5747f6a988ffd9845211e70531999c94"><td class="mdescLeft">&#160;</td><td class="mdescRight">consumeEntry is used to process the events received from the epoll and that are not edge-triggered.  <br /></td></tr>
 <tr class="memitem:aa30d90e4aea2dcdce8648fc028198530" id="r_aa30d90e4aea2dcdce8648fc028198530"><td class="memItemLeft">int&#160;</td><td class="memItemRight"><a class="el" href="#aa30d90e4aea2dcdce8648fc028198530">consumeBatch</a> (int cycle=8)</td></tr>
 <tr class="memdesc:aa30d90e4aea2dcdce8648fc028198530"><td class="mdescLeft">&#160;</td><td class="mdescRight">Executes a fixed number of fd events. only called when any fd is used with epoll edge-triggered.  <br /></td></tr>
 <tr class="memitem:a27f687f94b8cf3650679019a2f7a18a8" id="r_a27f687f94b8cf3650679019a2f7a18a8"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a27f687f94b8cf3650679019a2f7a18a8">cleanQueue</a> ()</td></tr>
@@ -273,44 +271,6 @@ Public Member Functions</h2></td></tr>
 
 </div>
 </div>
-<a id="a5747f6a988ffd9845211e70531999c94" name="a5747f6a988ffd9845211e70531999c94"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a5747f6a988ffd9845211e70531999c94">&#9670;&#160;</a></span>consumeEntry()</h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">int buffioScheduler::consumeEntry </td>
-          <td>(</td>
-          <td class="paramtype"><a class="el" href="structbuffioHeader.html">buffioHeader</a> *</td>          <td class="paramname"><span class="paramname"><em>req</em></span></td><td>)</td>
-          <td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>consumeEntry is used to process the events received from the epoll and that are not edge-triggered. </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">req</td><td>pointer to the request Header that need to be processed.</td></tr>
-  </table>
-  </dd>
-</dl>
-<dl class="section return"><dt>Returns</dt><dd>0 on an entry is done, </dd>
-<dd>
-1 if the entry is not fully consumed; </dd>
-<dd>
--1 if there error occured and errno is set. </dd></dl>
-
-</div>
-</div>
 <a id="a846ae3510bdbe7c626c9a35e7c3737ed" name="a846ae3510bdbe7c626c9a35e7c3737ed"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a846ae3510bdbe7c626c9a35e7c3737ed">&#9670;&#160;</a></span>dispatchHandle()</h2>
 
@@ -425,7 +385,7 @@ Public Member Functions</h2></td></tr>
 </div><div class="memdoc">
 
 <p>Processes epoll events and dispatches work. </p>
-<p>Each epoll event contains a pointer to a <a class="el" href="classbuffioFd.html">buffioFd</a> instance. Based on the event type (read/write/error), the fd is routed to the appropriate internal queue.</p>
+<p>Each epoll event contains a pointer to a <a class="el" href="classbuffioFd.html" title="Fd wrapper for buffio.">buffioFd</a> instance. Based on the event type (read/write/error), the fd is routed to the appropriate internal queue.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramdir">[in]</td><td class="paramname">evnts</td><td>Array of epoll events </td></tr>

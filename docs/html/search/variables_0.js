@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['current_0',['current',['../classblockQueue.html#affbfa04e22116a80ca0de8510cb157dd',1,'blockQueue']]]
+  ['address_0',['address',['../classbuffioFd.html#a55aa86b080aa967c1f54c70eb6f8e3fd',1,'buffioFd']]]
 ];

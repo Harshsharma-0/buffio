@@ -1,7 +1,6 @@
 #ifndef __BUFFIO_MEMORY_HPP__
 #define __BUFFIO_MEMORY_HPP__
 
-
 #include <cassert>
 #include <chrono>
 #include <cstddef>
@@ -9,16 +8,38 @@
 #include <exception>
 #include <random>
 
-/*
- * ===============================================================================
+/**
+ * @file buffiomemory.hpp
+ * @author Harsh Sharma
+ * @brief Core Memory allocator and deallocator of buffio
  *
+ * buffioMemoryPool is a memory manager and allocator for a specific,
+ * data types, and provide memory for that type when ever needed.
  *
- *  buffioPage
- *
- * ===============================================================================
  */
 
-// typiclly used by the user to get resource allocated
+/**
+ * @class buffioMemoryPool
+ * @brief Core Memory allocator for buffio memory needs.
+ *
+ * @details
+ * buffioMemoryPool:
+ * - Owns every memory allocated within it self
+ * - CheckSum based verification to verify the memory given back
+ * - Allocated memory in pages, to reduce fragmentation, and each page have
+ * memory fragments that is given out
+ *
+ * checksum is used to check, if the memory has maintained, it integrity after use,
+ * and is usefull to find memorybugs for buffers, as if one buffer overflows, it's invalidates
+ * the checksum of other memory region, corrupting other memory regions.
+ *
+ * Typical Usage:
+ * 1. Create buffioMemoryPool instance, with the memory type in the template arg
+ * 2. use get() to get memory and push() to give memory back.
+ * 3. If the instance of buffioMemoryPool goes out of scope of the function,
+ * that owns it, all the memory allocated is freed.
+ */
+
 template <typename T> class buffioMemoryPool {
 
   // can give benefit as the data and next is decoupled form each other and can
@@ -34,11 +55,24 @@ template <typename T> class buffioMemoryPool {
   };
 
 public:
+  /**
+   * @brief Construct a new instance, with default initlization of parameters
+   *
+   */
   buffioMemoryPool()
       : fragments(nullptr), pageFragmentCount(0), pageHead(nullptr),
         customDeleter(nullptr), inUse(nullptr) {};
+  /**
+   * @brief Destroys the instance, if the instance goes out of scope
+   *
+   */
   ~buffioMemoryPool() { release(); };
 
+  /**
+   * @brief method used to release all the pages and deallocate memory allocated by the pool.
+   *
+   * @returns void
+   */
   void release() {
     buffioMemoryPages *tmpPage = nullptr;
     while (pageHead != nullptr) {
@@ -47,8 +81,14 @@ public:
       pageHead = pageHead->next;
       delete tmpPage;
     };
-  }
-  int init(size_t fragmentCount = 250, void (*deleter)(T *data) = nullptr) {
+  };
+
+  /**
+   * @brief static method used for check sum generation
+   *
+   * @return uintptr_t - generated number;
+   */
+  static uintptr_t genChkSum() {
     std::random_device rDev;
     std::mt19937::result_type seed =
         rDev() ^ (std::mt19937::result_type)
@@ -58,22 +98,40 @@ public:
 
     std::mt19937 gen(seed);
     std::uniform_int_distribution<size_t> randomNumber(0, UINT64_MAX);
-    chkSum = randomNumber(gen); // creating the chkSum for data integrity;
+    return static_cast<uintptr_t>(randomNumber(gen));
+  };
+  /**
+   * @brief method used to initlise the pool with pages
+   *
+   * init must me called before using memorypoll, as to initlise the page,
+   * with the pagesize.
+   *
+   * @param[in] fragmentCount number of memory chunk per page
+   * @param[in] void(*deleter)(T *data) - custom deleter to call for all the fagments in the page.
+   *
+   * @return 0 on success , -1 on error. Any value below 0 is treated as error.
+   *
+   */
+  int init(size_t fragmentCount = 25, void (*deleter)(T *data) = nullptr) {
+
+    chkSum = buffioMemoryPool::genChkSum(); // creating the chkSum for data
+// integrity;
     pageFragmentCount = fragmentCount;
     fragments = nullptr;
     return makePage(); // TODO: error check
   }
 
-  T *getMemory() {
-    if (fragments == nullptr) {
-      if (makePage() != 0)
-        return nullptr;
-    };
-    buffioMemoryFragment *tmpFrag = fragments;
-    fragments = (buffioMemoryFragment *)fragments->chksum;
-    tmpFrag->chksum = chkSum;
-    return &tmpFrag->data;
-  };
+  /**
+   * @brief method to get memory from the pool
+   * 
+   * pop() method is used to get the memory from the pool.
+   * - pop workings:
+   *   1. if there memory available, it immediately return with the memory
+   *   2. if there is no memory availabe, a new page is allocated and memory is returned.
+   *
+   * @return pointer to the memoryfragment, or nullptr if there any error occured.
+   *
+   */
 
   T *pop() {
     if (fragments == nullptr) {
@@ -85,6 +143,18 @@ public:
     tmpFrag->chksum = chkSum;
     return &tmpFrag->data;
   };
+
+/**
+ * @brief method to push back the memory after use
+ *
+ * push() method accepts only the memory that was obtained from the memory pool,
+ * any other memory from other sources(user allocated memory), causes the assertion to
+ * fail. 
+ * 
+ *
+ * @param[in] data memory fragment to push back.
+ *
+ */
 
   void push(T *data) {
     if (data == nullptr)

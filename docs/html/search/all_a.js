@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['o_20library_20with_20c_20coroutine_0',['Async I/O library with c++ coroutine.',['..//home/harsh/Desktop/cpp/buffio/README.md#autotoc_md1',1,'']]]
+  ['next_0',['next',['../classblockQueue.html#a1239ea4ef0ba4be5e868b2f38b2f87ae',1,'blockQueue']]]
 ];

@@ -27,7 +27,7 @@
     #include "./buffio.hpp"
     #include <iostream>
     
-    buffiopromise task(int val){
+    buffioPromise<int> task(int val){
      std::cout<<"Hello World! - "<<val<<std::endl;
      buffioreturn 0;
     }

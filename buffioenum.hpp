@@ -117,6 +117,8 @@ enum class buffioOpCode : uint8_t {
 
   done = 21,
   dequeueThread = 22,
+  asyncReadFile = 23,
+  asyncWriteFile = 24,
 };
 enum class buffioReadWriteType : uint8_t {
 

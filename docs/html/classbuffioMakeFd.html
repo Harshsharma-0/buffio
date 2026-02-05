@@ -107,18 +107,242 @@ $(function() {
   <div class="headertitle"><div class="title">buffioMakeFd Class Reference</div></div>
 </div><!--header-->
 <div class="contents">
+
+<p>Fd maker for buffio.  
+ <a href="#details">More...</a></p>
+
+<p><code>#include &lt;<a class="el" href="buffiofd_8hpp_source.html">buffiofd.hpp</a>&gt;</code></p>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-pub-static-methods" class="groupheader"><a id="pub-static-methods" name="pub-static-methods"></a>
 Static Public Member Functions</h2></td></tr>
-<tr class="memitem:a7d954279ffa2d699b726640231085c4f" id="r_a7d954279ffa2d699b726640231085c4f"><td class="memItemLeft"><a id="a7d954279ffa2d699b726640231085c4f" name="a7d954279ffa2d699b726640231085c4f"></a>
-static int&#160;</td><td class="memItemRight"><b>createSocket</b> (<a class="el" href="classbuffioFd.html">buffioFd</a> *fdCore, struct sockaddr *lsocket, const char *address, int portNumber=8080, buffioFdFamily family=buffioFdFamily::ipv4, buffioSocketProtocol protocol=buffioSocketProtocol::tcp, bool blocking=false)</td></tr>
-<tr class="memitem:a937737758bb41e684d617ec8d7e4bf6b" id="r_a937737758bb41e684d617ec8d7e4bf6b"><td class="memItemLeft"><a id="a937737758bb41e684d617ec8d7e4bf6b" name="a937737758bb41e684d617ec8d7e4bf6b"></a>
-static int&#160;</td><td class="memItemRight"><b>pipe</b> (<a class="el" href="classbuffioFd.html">buffioFd</a> *fdCore, bool block=false)</td></tr>
-<tr class="memitem:a36798dc8b57fa0bcf40a47ba35d0f00e" id="r_a36798dc8b57fa0bcf40a47ba35d0f00e"><td class="memItemLeft"><a id="a36798dc8b57fa0bcf40a47ba35d0f00e" name="a36798dc8b57fa0bcf40a47ba35d0f00e"></a>
-static int&#160;</td><td class="memItemRight"><b>mkfifo</b> (<a class="el" href="classbuffioFd.html">buffioFd</a> *fdCore, const char *path=&quot;/usr/home/buffioDefault&quot;, mode_t mode=0666, bool onlyFifo=false)</td></tr>
-<tr class="memitem:af658951845f1439c3abfb6fc3e5a6f7b" id="r_af658951845f1439c3abfb6fc3e5a6f7b"><td class="memItemLeft"><a id="af658951845f1439c3abfb6fc3e5a6f7b" name="af658951845f1439c3abfb6fc3e5a6f7b"></a>
-static int&#160;</td><td class="memItemRight"><b>setNonBlocking</b> (int fd)</td></tr>
+<tr class="memitem:a7d954279ffa2d699b726640231085c4f" id="r_a7d954279ffa2d699b726640231085c4f"><td class="memItemLeft">static int&#160;</td><td class="memItemRight"><a class="el" href="#a7d954279ffa2d699b726640231085c4f">createSocket</a> (<a class="el" href="classbuffioFd.html">buffioFd</a> *fdCore, struct sockaddr *lsocket, const char *address, int portNumber=8080, buffioFdFamily family=buffioFdFamily::ipv4, buffioSocketProtocol protocol=buffioSocketProtocol::tcp, bool blocking=false)</td></tr>
+<tr class="memdesc:a7d954279ffa2d699b726640231085c4f"><td class="mdescLeft">&#160;</td><td class="mdescRight">create network socket and puts the fd in the <a class="el" href="classbuffioFd.html" title="Fd wrapper for buffio.">buffioFd</a> instance  <br /></td></tr>
+<tr class="memitem:a80f69df6400d34948cbda3cd5e09cfe6" id="r_a80f69df6400d34948cbda3cd5e09cfe6"><td class="memItemLeft">static int&#160;</td><td class="memItemRight"><a class="el" href="#a80f69df6400d34948cbda3cd5e09cfe6">pipe</a> (<a class="el" href="classbuffioFd.html">buffioFd</a> *fdCore, bool blocking=false)</td></tr>
+<tr class="memdesc:a80f69df6400d34948cbda3cd5e09cfe6"><td class="mdescLeft">&#160;</td><td class="mdescRight">pipe communication channel maker function  <br /></td></tr>
+<tr class="memitem:a36798dc8b57fa0bcf40a47ba35d0f00e" id="r_a36798dc8b57fa0bcf40a47ba35d0f00e"><td class="memItemLeft">static int&#160;</td><td class="memItemRight"><a class="el" href="#a36798dc8b57fa0bcf40a47ba35d0f00e">mkfifo</a> (<a class="el" href="classbuffioFd.html">buffioFd</a> *fdCore, const char *path=&quot;/usr/home/buffioDefault&quot;, mode_t mode=0666, bool onlyFifo=false)</td></tr>
+<tr class="memdesc:a36798dc8b57fa0bcf40a47ba35d0f00e"><td class="mdescLeft">&#160;</td><td class="mdescRight">create a fifo communication channel  <br /></td></tr>
+<tr class="memitem:af658951845f1439c3abfb6fc3e5a6f7b" id="r_af658951845f1439c3abfb6fc3e5a6f7b"><td class="memItemLeft">static int&#160;</td><td class="memItemRight"><a class="el" href="#af658951845f1439c3abfb6fc3e5a6f7b">setNonBlocking</a> (int fd)</td></tr>
+<tr class="memdesc:af658951845f1439c3abfb6fc3e5a6f7b"><td class="mdescLeft">&#160;</td><td class="mdescRight">set a fd to non-blocking mode from blocking mode  <br /></td></tr>
 </table>
+<a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>Fd maker for buffio. </p>
+<p><a class="el" href="classbuffioMakeFd.html" title="Fd maker for buffio.">buffioMakeFd</a> is a helper wrapper to create socket, pipe,fifo or opening files easily, without dealing with low level stuff.</p>
+<p>Supported type of FD in <a class="el" href="classbuffioMakeFd.html" title="Fd maker for buffio.">buffioMakeFd</a></p><ul>
+<li>Network socket<ul>
+<li>local</li>
+<li>ipv4</li>
+<li>ipv6</li>
+</ul>
+</li>
+<li>pipe</li>
+<li><p class="startli">fifo</p>
+<dl class="todo"><dt><b><a class="el" href="todo.html#_todo000001">Todo</a></b></dt><dd><ol type="1">
+<li>To add supoport to opening a regular file</li>
+<li>To add protocol string fromat for opening </li>
+</ol>
+</dd></dl>
+</li>
+</ul>
+</div><a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Member Function Documentation</h2>
+<a id="a7d954279ffa2d699b726640231085c4f" name="a7d954279ffa2d699b726640231085c4f"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a7d954279ffa2d699b726640231085c4f">&#9670;&#160;</a></span>createSocket()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">int buffioMakeFd::createSocket </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="classbuffioFd.html">buffioFd</a> *</td>          <td class="paramname"><span class="paramname"><em>fdCore</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">struct sockaddr *</td>          <td class="paramname"><span class="paramname"><em>lsocket</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const char *</td>          <td class="paramname"><span class="paramname"><em>address</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>portNumber</em></span><span class="paramdefsep"> = </span><span class="paramdefval">8080</span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">buffioFdFamily</td>          <td class="paramname"><span class="paramname"><em>family</em></span><span class="paramdefsep"> = </span><span class="paramdefval">buffioFdFamily::ipv4</span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">buffioSocketProtocol</td>          <td class="paramname"><span class="paramname"><em>protocol</em></span><span class="paramdefsep"> = </span><span class="paramdefval">buffioSocketProtocol::tcp</span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool</td>          <td class="paramname"><span class="paramname"><em>blocking</em></span><span class="paramdefsep"> = </span><span class="paramdefval">false</span>&#160;)</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span><span class="mlabel static">static</span><span class="mlabel nodiscard">nodiscard</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>create network socket and puts the fd in the <a class="el" href="classbuffioFd.html" title="Fd wrapper for buffio.">buffioFd</a> instance </p>
+<p>createSocket function provide an easy way to create sockets on linux</p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[out]</td><td class="paramname">fdCode</td><td>pointer to the instance of the <a class="el" href="classbuffioFd.html" title="Fd wrapper for buffio.">buffioFd</a> </td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">lsocket</td><td>pointer to struct sockaddr_(un/in/in6) based on the family of socket used </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">address</td><td>address of the socket to bind it to </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">portNumber</td><td>portnumber to bind the socket to, ignored for local socket </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">family</td><td>family of socket to create, see buffioFdFamily for list of supported family </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">protocol</td><td>protocol for the socket, see buffioSocketProtocol for list of supported protocol </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">blocking</td><td>set's the socket to blocking or non-blocking based on boolean value, if true socket is blocking</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>returns buffioErrorCode, and any value below 0 must be treated as error and taken proper action on Success return buffioErrorCode::none that is 0. </dd></dl>
+<dl class="section note"><dt>Note</dt><dd>The return value must not be discarded </dd></dl>
+<dl class="todo"><dt><b><a class="el" href="todo.html#_todo000002">Todo</a></b></dt><dd>add generic type fd support, to suport returning fd via int not <a class="el" href="classbuffioFd.html" title="Fd wrapper for buffio.">buffioFd</a> so this class can be used by any program</dd></dl>
+
+</div>
+</div>
+<a id="a36798dc8b57fa0bcf40a47ba35d0f00e" name="a36798dc8b57fa0bcf40a47ba35d0f00e"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a36798dc8b57fa0bcf40a47ba35d0f00e">&#9670;&#160;</a></span>mkfifo()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">int buffioMakeFd::mkfifo </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="classbuffioFd.html">buffioFd</a> *</td>          <td class="paramname"><span class="paramname"><em>fdCore</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const char *</td>          <td class="paramname"><span class="paramname"><em>path</em></span><span class="paramdefsep"> = </span><span class="paramdefval">&quot;/usr/home/buffioDefault&quot;</span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">mode_t</td>          <td class="paramname"><span class="paramname"><em>mode</em></span><span class="paramdefsep"> = </span><span class="paramdefval">0666</span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool</td>          <td class="paramname"><span class="paramname"><em>onlyFifo</em></span><span class="paramdefsep"> = </span><span class="paramdefval">false</span>&#160;)</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span><span class="mlabel static">static</span><span class="mlabel nodiscard">nodiscard</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>create a fifo communication channel </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[out]</td><td class="paramname">pointer</td><td>to instance of buffiofd </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">path</td><td>path of the fifo, default: /usr/home/buffioDefault </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">mode</td><td>mode for the fifo, default: 0666 </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">onlyFifo</td><td>constrol whether to put fifo data in fdCore or not</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>returns buffioErrorCode::none, and on error value below 0 </dd></dl>
+<dl class="section note"><dt>Note</dt><dd>return value by this function must not be discarded </dd></dl>
+
+</div>
+</div>
+<a id="a80f69df6400d34948cbda3cd5e09cfe6" name="a80f69df6400d34948cbda3cd5e09cfe6"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a80f69df6400d34948cbda3cd5e09cfe6">&#9670;&#160;</a></span>pipe()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">int buffioMakeFd::pipe </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="classbuffioFd.html">buffioFd</a> *</td>          <td class="paramname"><span class="paramname"><em>fdCore</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool</td>          <td class="paramname"><span class="paramname"><em>blocking</em></span><span class="paramdefsep"> = </span><span class="paramdefval">false</span>&#160;)</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span><span class="mlabel static">static</span><span class="mlabel nodiscard">nodiscard</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>pipe communication channel maker function </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">fdCode</td><td>pointer to instance of <a class="el" href="classbuffioFd.html" title="Fd wrapper for buffio.">buffioFd</a> </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">blocking</td><td>set's the socket to blocking and non-blocking mode based on boolean value</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>returns buffioErrorCode::none on Success, onError return errorcode below 0 </dd></dl>
+<dl class="section note"><dt>Note</dt><dd>return value by this must not be ignored </dd></dl>
+
+</div>
+</div>
+<a id="af658951845f1439c3abfb6fc3e5a6f7b" name="af658951845f1439c3abfb6fc3e5a6f7b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#af658951845f1439c3abfb6fc3e5a6f7b">&#9670;&#160;</a></span>setNonBlocking()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">int buffioMakeFd::setNonBlocking </td>
+          <td>(</td>
+          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>fd</em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span><span class="mlabel static">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>set a fd to non-blocking mode from blocking mode </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">fd</td><td>the fd to change mode </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>return buffioErrorCode::none,on Error value below 0 </dd></dl>
+<dl class="section note"><dt>Note</dt><dd>return value must not be discarded </dd></dl>
+
+</div>
+</div>
 <hr/>The documentation for this class was generated from the following file:<ul>
 <li>/home/harsh/Desktop/cpp/buffio/<a class="el" href="buffiofd_8hpp_source.html">buffiofd.hpp</a></li>
 </ul>

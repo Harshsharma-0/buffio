@@ -28,19 +28,22 @@ struct buffioAwaiter;
 struct buffioHeader;
 template <typename T> struct buffioPromise;
 
-
 using buffioPromiseHandle = std::coroutine_handle<>;
 
-typedef buffioPromise<int> (*asyncAccept_local)(int fd, struct sockaddr_un, socklen_t );
-typedef buffioPromise<int> (*asyncAccept_in)(int fd, struct sockaddr_in , socklen_t );
-typedef buffioPromise<int> (*asyncAccept_in6)(int fd, struct sockaddr_in6, socklen_t );
+typedef buffioPromise<int> (*asyncAccept_local)(int fd, struct sockaddr_un,
+                                                socklen_t);
+typedef buffioPromise<int> (*asyncAccept_in)(int fd, struct sockaddr_in,
+                                             socklen_t);
+typedef buffioPromise<int> (*asyncAccept_in6)(int fd, struct sockaddr_in6,
+                                              socklen_t);
 
 typedef buffioPromise<int> (*asyncConnect)(int errorCode, buffioFd *fd,
-                                                   struct sockaddr *);
+                                           struct sockaddr *);
 typedef buffioPromise<int> (*asyncWrite)(int errorCode, char *buffer,
-                                                 size_t len, buffioFd *fd,buffioHeader *);
-typedef buffioPromise<int> (*asyncRead)(int errorCode, char *buffer,
-                                                size_t len, buffioFd *fd,buffioHeader *);
+                                         size_t len, buffioFd *fd,
+                                         buffioHeader *);
+typedef buffioPromise<int> (*asyncRead)(int errorCode, char *buffer, size_t len,
+                                        buffioFd *fd, buffioHeader *);
 
 typedef struct buffioHeader {
 
@@ -113,6 +116,7 @@ typedef struct buffioHeader {
   ssize_t reserved;
   char *bufferCursor;
   int unsetBit;
+  int opError;
   /*
    * routine contain the handle of the routine to run after
    * the operation is competed. if not an async request
@@ -127,11 +131,11 @@ typedef struct buffioHeader {
 
   union {
     asyncConnect onAsyncConnect;
-    asyncRead    onAsyncRead;
-    asyncWrite   onAsyncWrite;
-    asyncAccept_local    asyncAcceptlocal;
-    asyncAccept_in       asyncAcceptin;
-    asyncAccept_in6      asyncAcceptin6;
+    asyncRead onAsyncRead;
+    asyncWrite onAsyncWrite;
+    asyncAccept_local asyncAcceptlocal;
+    asyncAccept_in asyncAcceptin;
+    asyncAccept_in6 asyncAcceptin6;
   } onAsyncDone;
 
   struct buffioHeader *next;

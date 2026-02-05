@@ -107,20 +107,224 @@ $(function() {
   <div class="headertitle"><div class="title">buffioMemoryPool&lt; T &gt; Class Template Reference</div></div>
 </div><!--header-->
 <div class="contents">
+
+<p>Core Memory allocator for buffio memory needs.  
+ <a href="#details">More...</a></p>
+
+<p><code>#include &lt;<a class="el" href="buffiomemory_8hpp_source.html">buffiomemory.hpp</a>&gt;</code></p>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-pub-methods" class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a01b7258f2ad63d0cf3ed8518edf6d94a" id="r_a01b7258f2ad63d0cf3ed8518edf6d94a"><td class="memItemLeft"><a id="a01b7258f2ad63d0cf3ed8518edf6d94a" name="a01b7258f2ad63d0cf3ed8518edf6d94a"></a>
-void&#160;</td><td class="memItemRight"><b>release</b> ()</td></tr>
-<tr class="memitem:a1d759fd16cc36e72533e128c742723b2" id="r_a1d759fd16cc36e72533e128c742723b2"><td class="memItemLeft"><a id="a1d759fd16cc36e72533e128c742723b2" name="a1d759fd16cc36e72533e128c742723b2"></a>
-int&#160;</td><td class="memItemRight"><b>init</b> (size_t fragmentCount=250, void(*deleter)(T *data)=nullptr)</td></tr>
-<tr class="memitem:acb054a42eeaaabed67dbc846f1c7c1d9" id="r_acb054a42eeaaabed67dbc846f1c7c1d9"><td class="memItemLeft"><a id="acb054a42eeaaabed67dbc846f1c7c1d9" name="acb054a42eeaaabed67dbc846f1c7c1d9"></a>
-T *&#160;</td><td class="memItemRight"><b>getMemory</b> ()</td></tr>
-<tr class="memitem:a429848d6b535f2f1e11c8a02b951ce19" id="r_a429848d6b535f2f1e11c8a02b951ce19"><td class="memItemLeft"><a id="a429848d6b535f2f1e11c8a02b951ce19" name="a429848d6b535f2f1e11c8a02b951ce19"></a>
-T *&#160;</td><td class="memItemRight"><b>pop</b> ()</td></tr>
-<tr class="memitem:abaf7d0e5e3e4f09fb38058ef1e4bee66" id="r_abaf7d0e5e3e4f09fb38058ef1e4bee66"><td class="memItemLeft"><a id="abaf7d0e5e3e4f09fb38058ef1e4bee66" name="abaf7d0e5e3e4f09fb38058ef1e4bee66"></a>
-void&#160;</td><td class="memItemRight"><b>push</b> (T *data)</td></tr>
+<tr class="memitem:ab687b686e89405b95c1dd180c354fb81" id="r_ab687b686e89405b95c1dd180c354fb81"><td class="memItemLeft"><a id="ab687b686e89405b95c1dd180c354fb81" name="ab687b686e89405b95c1dd180c354fb81"></a>
+&#160;</td><td class="memItemRight"><b>buffioMemoryPool</b> ()</td></tr>
+<tr class="memdesc:ab687b686e89405b95c1dd180c354fb81"><td class="mdescLeft">&#160;</td><td class="mdescRight">Construct a new instance, with default initlization of parameters. <br /></td></tr>
+<tr class="memitem:a519dad842ab6b93387c95b52f7e1340b" id="r_a519dad842ab6b93387c95b52f7e1340b"><td class="memItemLeft"><a id="a519dad842ab6b93387c95b52f7e1340b" name="a519dad842ab6b93387c95b52f7e1340b"></a>
+&#160;</td><td class="memItemRight"><b>~buffioMemoryPool</b> ()</td></tr>
+<tr class="memdesc:a519dad842ab6b93387c95b52f7e1340b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Destroys the instance, if the instance goes out of scope. <br /></td></tr>
+<tr class="memitem:a01b7258f2ad63d0cf3ed8518edf6d94a" id="r_a01b7258f2ad63d0cf3ed8518edf6d94a"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a01b7258f2ad63d0cf3ed8518edf6d94a">release</a> ()</td></tr>
+<tr class="memdesc:a01b7258f2ad63d0cf3ed8518edf6d94a"><td class="mdescLeft">&#160;</td><td class="mdescRight">method used to release all the pages and deallocate memory allocated by the pool.  <br /></td></tr>
+<tr class="memitem:ac47ed91c659b029be788a59058f3af21" id="r_ac47ed91c659b029be788a59058f3af21"><td class="memItemLeft">int&#160;</td><td class="memItemRight"><a class="el" href="#ac47ed91c659b029be788a59058f3af21">init</a> (size_t fragmentCount=25, void(*deleter)(T *data)=nullptr)</td></tr>
+<tr class="memdesc:ac47ed91c659b029be788a59058f3af21"><td class="mdescLeft">&#160;</td><td class="mdescRight">method used to initlise the pool with pages  <br /></td></tr>
+<tr class="memitem:a429848d6b535f2f1e11c8a02b951ce19" id="r_a429848d6b535f2f1e11c8a02b951ce19"><td class="memItemLeft">T *&#160;</td><td class="memItemRight"><a class="el" href="#a429848d6b535f2f1e11c8a02b951ce19">pop</a> ()</td></tr>
+<tr class="memdesc:a429848d6b535f2f1e11c8a02b951ce19"><td class="mdescLeft">&#160;</td><td class="mdescRight">method to get memory from the pool  <br /></td></tr>
+<tr class="memitem:abaf7d0e5e3e4f09fb38058ef1e4bee66" id="r_abaf7d0e5e3e4f09fb38058ef1e4bee66"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#abaf7d0e5e3e4f09fb38058ef1e4bee66">push</a> (T *data)</td></tr>
+<tr class="memdesc:abaf7d0e5e3e4f09fb38058ef1e4bee66"><td class="mdescLeft">&#160;</td><td class="mdescRight">method to push back the memory after use  <br /></td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 id="header-pub-static-methods" class="groupheader"><a id="pub-static-methods" name="pub-static-methods"></a>
+Static Public Member Functions</h2></td></tr>
+<tr class="memitem:a5125cc532b5f64df2fcc223b428ca6e7" id="r_a5125cc532b5f64df2fcc223b428ca6e7"><td class="memItemLeft">static uintptr_t&#160;</td><td class="memItemRight"><a class="el" href="#a5125cc532b5f64df2fcc223b428ca6e7">genChkSum</a> ()</td></tr>
+<tr class="memdesc:a5125cc532b5f64df2fcc223b428ca6e7"><td class="mdescLeft">&#160;</td><td class="mdescRight">static method used for check sum generation  <br /></td></tr>
 </table>
+<a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
+<div class="textblock"><div class="compoundTemplParams">template&lt;typename T&gt;<br />
+class buffioMemoryPool&lt; T &gt;</div><p>Core Memory allocator for buffio memory needs. </p>
+<p><a class="el" href="classbuffioMemoryPool.html" title="Core Memory allocator for buffio memory needs.">buffioMemoryPool</a>:</p><ul>
+<li>Owns every memory allocated within it self</li>
+<li>CheckSum based verification to verify the memory given back</li>
+<li>Allocated memory in pages, to reduce fragmentation, and each page have memory fragments that is given out</li>
+</ul>
+<p>checksum is used to check, if the memory has maintained, it integrity after use, and is usefull to find memorybugs for buffers, as if one buffer overflows, it's invalidates the checksum of other memory region, corrupting other memory regions.</p>
+<p>Typical Usage:</p><ol type="1">
+<li>Create <a class="el" href="classbuffioMemoryPool.html" title="Core Memory allocator for buffio memory needs.">buffioMemoryPool</a> instance, with the memory type in the template arg</li>
+<li>use get() to get memory and <a class="el" href="#abaf7d0e5e3e4f09fb38058ef1e4bee66" title="method to push back the memory after use">push()</a> to give memory back.</li>
+<li>If the instance of <a class="el" href="classbuffioMemoryPool.html" title="Core Memory allocator for buffio memory needs.">buffioMemoryPool</a> goes out of scope of the function, that owns it, all the memory allocated is freed. </li>
+</ol>
+</div><a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Member Function Documentation</h2>
+<a id="a5125cc532b5f64df2fcc223b428ca6e7" name="a5125cc532b5f64df2fcc223b428ca6e7"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a5125cc532b5f64df2fcc223b428ca6e7">&#9670;&#160;</a></span>genChkSum()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename T&gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">uintptr_t <a class="el" href="classbuffioMemoryPool.html">buffioMemoryPool</a>&lt; T &gt;::genChkSum </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span><span class="mlabel static">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>static method used for check sum generation </p>
+<dl class="section return"><dt>Returns</dt><dd>uintptr_t - generated number; </dd></dl>
+
+</div>
+</div>
+<a id="ac47ed91c659b029be788a59058f3af21" name="ac47ed91c659b029be788a59058f3af21"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ac47ed91c659b029be788a59058f3af21">&#9670;&#160;</a></span>init()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename T&gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">int <a class="el" href="classbuffioMemoryPool.html">buffioMemoryPool</a>&lt; T &gt;::init </td>
+          <td>(</td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>fragmentCount</em></span><span class="paramdefsep"> = </span><span class="paramdefval">25</span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">void(*</td>          <td class="paramname"><span class="paramname"><em>deleter&#160;</em></span>)(T *data)<span class="paramdefsep"> = </span><span class="paramdefval">nullptr</span>&#160;)</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>method used to initlise the pool with pages </p>
+<p>init must me called before using memorypoll, as to initlise the page, with the pagesize.</p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">fragmentCount</td><td>number of memory chunk per page </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">void(*deleter)(T</td><td>*data) - custom deleter to call for all the fagments in the page.</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>0 on success , -1 on error. Any value below 0 is treated as error. </dd></dl>
+
+</div>
+</div>
+<a id="a429848d6b535f2f1e11c8a02b951ce19" name="a429848d6b535f2f1e11c8a02b951ce19"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a429848d6b535f2f1e11c8a02b951ce19">&#9670;&#160;</a></span>pop()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename T&gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">T * <a class="el" href="classbuffioMemoryPool.html">buffioMemoryPool</a>&lt; T &gt;::pop </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>method to get memory from the pool </p>
+<p><a class="el" href="#a429848d6b535f2f1e11c8a02b951ce19" title="method to get memory from the pool">pop()</a> method is used to get the memory from the pool.</p><ul>
+<li>pop workings:<ol type="1">
+<li>if there memory available, it immediately return with the memory</li>
+<li>if there is no memory availabe, a new page is allocated and memory is returned.</li>
+</ol>
+</li>
+</ul>
+<dl class="section return"><dt>Returns</dt><dd>pointer to the memoryfragment, or nullptr if there any error occured. </dd></dl>
+
+</div>
+</div>
+<a id="abaf7d0e5e3e4f09fb38058ef1e4bee66" name="abaf7d0e5e3e4f09fb38058ef1e4bee66"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#abaf7d0e5e3e4f09fb38058ef1e4bee66">&#9670;&#160;</a></span>push()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename T&gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void <a class="el" href="classbuffioMemoryPool.html">buffioMemoryPool</a>&lt; T &gt;::push </td>
+          <td>(</td>
+          <td class="paramtype">T *</td>          <td class="paramname"><span class="paramname"><em>data</em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>method to push back the memory after use </p>
+<p><a class="el" href="#abaf7d0e5e3e4f09fb38058ef1e4bee66" title="method to push back the memory after use">push()</a> method accepts only the memory that was obtained from the memory pool, any other memory from other sources(user allocated memory), causes the assertion to fail.</p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">data</td><td>memory fragment to push back. </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
+<a id="a01b7258f2ad63d0cf3ed8518edf6d94a" name="a01b7258f2ad63d0cf3ed8518edf6d94a"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a01b7258f2ad63d0cf3ed8518edf6d94a">&#9670;&#160;</a></span>release()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename T&gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void <a class="el" href="classbuffioMemoryPool.html">buffioMemoryPool</a>&lt; T &gt;::release </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>method used to release all the pages and deallocate memory allocated by the pool. </p>
+<dl class="section return"><dt>Returns</dt><dd>void </dd></dl>
+
+</div>
+</div>
 <hr/>The documentation for this class was generated from the following file:<ul>
 <li>/home/harsh/Desktop/cpp/buffio/<a class="el" href="buffiomemory_8hpp_source.html">buffiomemory.hpp</a></li>
 </ul>

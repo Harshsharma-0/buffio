@@ -7,6 +7,7 @@
 #include "buffiofd.hpp"
 #endif
 
+#include "./buffiosockbroker.hpp"
 #include <atomic>
 #include <cassert>
 #include <coroutine>
@@ -115,17 +116,15 @@ template <typename T> struct buffioPromise {
         assert(handle != nullptr);
 
         switch (handle->opCode) {
-        case buffioOpCode::release:
-          headerPool->push(handle);
-          break;
         case buffioOpCode::poll:
           if (broker->pollOp(handle->reqToken.fd, handle->fd,
                              handle->len.mask) == 0) {
             handle->fd->bitSet(BUFFIO_FD_POLLED);
             fdPool->pushUse(handle->fd);
-          } else {
-            std::cout << "poll uncesfull" << std::endl;
-          };
+          }
+          break;
+        case buffioOpCode::release:
+          headerPool->push(handle);
           break;
         case buffioOpCode::rmPoll:
           if (*(handle->fd) == BUFFIO_FD_POLLED)

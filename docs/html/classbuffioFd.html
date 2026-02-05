@@ -107,97 +107,98 @@ $(function() {
   <div class="headertitle"><div class="title">buffioFd Class Reference</div></div>
 </div><!--header-->
 <div class="contents">
+
+<p>Fd wrapper for buffio.  
+ <a href="#details">More...</a></p>
+
+<p><code>#include &lt;<a class="el" href="buffiofd_8hpp_source.html">buffiofd.hpp</a>&gt;</code></p>
 <table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 id="header-nested-classes" class="groupheader"><a id="nested-classes" name="nested-classes"></a>
+Classes</h2></td></tr>
+<tr class="memitem:localFdInfo" id="r_localFdInfo"><td class="memItemLeft">union &#160;</td><td class="memItemRight"><a class="el" href="unionbuffioFd_1_1localFdInfo.html">localFdInfo</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">union to hold the respective fd based on family type  <a href="unionbuffioFd_1_1localFdInfo.html#details">More...</a><br /></td></tr>
+</table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-pub-methods" class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a8d592284db73b3176928005358dd3dd3" id="r_a8d592284db73b3176928005358dd3dd3"><td class="memItemLeft"><a id="a8d592284db73b3176928005358dd3dd3" name="a8d592284db73b3176928005358dd3dd3"></a>
-void&#160;</td><td class="memItemRight"><b>operator|</b> (int bit)</td></tr>
-<tr class="memitem:a218cda1597ef7ad5bdeb2716aa22f3e3" id="r_a218cda1597ef7ad5bdeb2716aa22f3e3"><td class="memItemLeft"><a id="a218cda1597ef7ad5bdeb2716aa22f3e3" name="a218cda1597ef7ad5bdeb2716aa22f3e3"></a>
-bool&#160;</td><td class="memItemRight"><b>operator==</b> (int bit) const</td></tr>
-<tr class="memitem:a2ac9e425129febae501a5ff804b11557" id="r_a2ac9e425129febae501a5ff804b11557"><td class="memItemLeft"><a id="a2ac9e425129febae501a5ff804b11557" name="a2ac9e425129febae501a5ff804b11557"></a>
-void&#160;</td><td class="memItemRight"><b>bitSet</b> (int bit) noexcept</td></tr>
-<tr class="memitem:a52274cf821eb3254ed58529bcd77aa35" id="r_a52274cf821eb3254ed58529bcd77aa35"><td class="memItemLeft"><a id="a52274cf821eb3254ed58529bcd77aa35" name="a52274cf821eb3254ed58529bcd77aa35"></a>
-bool&#160;</td><td class="memItemRight"><b>isBitSet</b> (int bit) const</td></tr>
-<tr class="memitem:a9e0846e7719c01360359c776850312a1" id="r_a9e0846e7719c01360359c776850312a1"><td class="memItemLeft"><a id="a9e0846e7719c01360359c776850312a1" name="a9e0846e7719c01360359c776850312a1"></a>
-void&#160;</td><td class="memItemRight"><b>unsetBit</b> (int bit) noexcept</td></tr>
-<tr class="memitem:a469b55de5a9af1937f87bea39fc01c85" id="r_a469b55de5a9af1937f87bea39fc01c85"><td class="memItemLeft"><a id="a469b55de5a9af1937f87bea39fc01c85" name="a469b55de5a9af1937f87bea39fc01c85"></a>
-int&#160;</td><td class="memItemRight"><b>getFd</b> () const</td></tr>
-<tr class="memitem:a38fcf1d90a6779634df346cbf39ab202" id="r_a38fcf1d90a6779634df346cbf39ab202"><td class="memItemLeft"><a id="a38fcf1d90a6779634df346cbf39ab202" name="a38fcf1d90a6779634df346cbf39ab202"></a>
-<a class="el" href="structbuffioHeader.html">buffioHeader</a> *&#160;</td><td class="memItemRight"><b>getReadReq</b> () const</td></tr>
-<tr class="memitem:aa725d8aae4ca255e9a5d766fb5442dfe" id="r_aa725d8aae4ca255e9a5d766fb5442dfe"><td class="memItemLeft"><a id="aa725d8aae4ca255e9a5d766fb5442dfe" name="aa725d8aae4ca255e9a5d766fb5442dfe"></a>
-<a class="el" href="structbuffioHeader.html">buffioHeader</a> *&#160;</td><td class="memItemRight"><b>getWriteReq</b> () const</td></tr>
-<tr class="memitem:ab467f667e7457fc643712d89feb8022b" id="r_ab467f667e7457fc643712d89feb8022b"><td class="memItemLeft"><a id="ab467f667e7457fc643712d89feb8022b" name="ab467f667e7457fc643712d89feb8022b"></a>
-const <a class="el" href="structbuffioHeader.html">buffioHeader</a> *&#160;</td><td class="memItemRight"><b>getReserveHeader</b> () const</td></tr>
-<tr class="memitem:a97e8efcba9beb56598cce84a7e0f883b" id="r_a97e8efcba9beb56598cce84a7e0f883b"><td class="memItemLeft"><a id="a97e8efcba9beb56598cce84a7e0f883b" name="a97e8efcba9beb56598cce84a7e0f883b"></a>
-int&#160;</td><td class="memItemRight"><b>listen</b> (int backlog) const</td></tr>
-<tr class="memitem:aabbfffca68dfe268c1c2362a58e8e528" id="r_aabbfffca68dfe268c1c2362a58e8e528"><td class="memItemLeft"><a id="aabbfffca68dfe268c1c2362a58e8e528" name="aabbfffca68dfe268c1c2362a58e8e528"></a>
-int&#160;</td><td class="memItemRight"><b>accept</b> (struct sockaddr *addr, socklen_t *socklen) const</td></tr>
-<tr class="memitem:a6a46bbed08a9048ed81e18ceb0867b3c" id="r_a6a46bbed08a9048ed81e18ceb0867b3c"><td class="memItemLeft"><a id="a6a46bbed08a9048ed81e18ceb0867b3c" name="a6a46bbed08a9048ed81e18ceb0867b3c"></a>
-int&#160;</td><td class="memItemRight"><b>connect</b> (struct sockaddr *addr, socklen_t socklen) const</td></tr>
-<tr class="memitem:a3e81bd4646960227376f06c3d4042832" id="r_a3e81bd4646960227376f06c3d4042832"><td class="memItemLeft"><a id="a3e81bd4646960227376f06c3d4042832" name="a3e81bd4646960227376f06c3d4042832"></a>
-void&#160;</td><td class="memItemRight"><b>asyncReadDone</b> (<a class="el" href="structbuffioHeader.html">buffioHeader</a> *header) noexcept</td></tr>
-<tr class="memitem:a06604d44a7c0befa7f936bc29115caa4" id="r_a06604d44a7c0befa7f936bc29115caa4"><td class="memItemLeft"><a id="a06604d44a7c0befa7f936bc29115caa4" name="a06604d44a7c0befa7f936bc29115caa4"></a>
-void&#160;</td><td class="memItemRight"><b>asyncWriteDone</b> (<a class="el" href="structbuffioHeader.html">buffioHeader</a> *header) noexcept</td></tr>
-<tr class="memitem:af2b03d17e382eea133957ffc1b54af3e" id="r_af2b03d17e382eea133957ffc1b54af3e"><td class="memTemplParams" colspan="2"><a id="af2b03d17e382eea133957ffc1b54af3e" name="af2b03d17e382eea133957ffc1b54af3e"></a>
-template&lt;typename T&gt; </td></tr>
-<tr class="memitem:af2b03d17e382eea133957ffc1b54af3e template"><td class="memItemLeft"><a class="el" href="structbuffioHeader.html">buffioHeader</a> *&#160;</td><td class="memItemRight"><b>asyncAccept</b> (struct sockaddr *addr, socklen_t socklen, T then)</td></tr>
-<tr class="memitem:a416b524f0ba46a0b232bc81bc61c69fe" id="r_a416b524f0ba46a0b232bc81bc61c69fe"><td class="memItemLeft"><a id="a416b524f0ba46a0b232bc81bc61c69fe" name="a416b524f0ba46a0b232bc81bc61c69fe"></a>
-<a class="el" href="structbuffioHeader.html">buffioHeader</a> *&#160;</td><td class="memItemRight"><b>asyncConnect</b> (struct sockaddr *addr, socklen_t socklen, asyncConnect then)</td></tr>
-<tr class="memitem:ae00a94446188bc1c94a2509befc052c5" id="r_ae00a94446188bc1c94a2509befc052c5"><td class="memItemLeft"><a id="ae00a94446188bc1c94a2509befc052c5" name="ae00a94446188bc1c94a2509befc052c5"></a>
-<a class="el" href="structbuffioHeader.html">buffioHeader</a> *&#160;</td><td class="memItemRight"><b>waitAccept</b> (struct sockaddr *addr, socklen_t socklen)</td></tr>
-<tr class="memitem:af6d7738cd66b4df3a87d91e8d6a381d2" id="r_af6d7738cd66b4df3a87d91e8d6a381d2"><td class="memItemLeft"><a id="af6d7738cd66b4df3a87d91e8d6a381d2" name="af6d7738cd66b4df3a87d91e8d6a381d2"></a>
-<a class="el" href="structbuffioHeader.html">buffioHeader</a> *&#160;</td><td class="memItemRight"><b>waitConnect</b> (struct sockaddr *addr, socklen_t socklen)</td></tr>
-<tr class="memitem:a88a698f1f02b534998643e856e38b86a" id="r_a88a698f1f02b534998643e856e38b86a"><td class="memItemLeft"><a id="a88a698f1f02b534998643e856e38b86a" name="a88a698f1f02b534998643e856e38b86a"></a>
-ssize_t&#160;</td><td class="memItemRight"><b>read</b> (char *buffer, size_t len) const</td></tr>
-<tr class="memitem:a7fbc325f061a1bb4b189dfeb4843085c" id="r_a7fbc325f061a1bb4b189dfeb4843085c"><td class="memItemLeft"><a id="a7fbc325f061a1bb4b189dfeb4843085c" name="a7fbc325f061a1bb4b189dfeb4843085c"></a>
-ssize_t&#160;</td><td class="memItemRight"><b>write</b> (char *buffer, size_t len) const</td></tr>
-<tr class="memitem:a25a7d2ec66c9d480e91f9914b702da08" id="r_a25a7d2ec66c9d480e91f9914b702da08"><td class="memItemLeft"><a id="a25a7d2ec66c9d480e91f9914b702da08" name="a25a7d2ec66c9d480e91f9914b702da08"></a>
-<a class="el" href="structbuffioHeader.html">buffioHeader</a> *&#160;</td><td class="memItemRight"><b>waitRead</b> (char *buffer, size_t len)</td></tr>
-<tr class="memitem:ada498cf96b554bfb0e94cc5420029802" id="r_ada498cf96b554bfb0e94cc5420029802"><td class="memItemLeft"><a id="ada498cf96b554bfb0e94cc5420029802" name="ada498cf96b554bfb0e94cc5420029802"></a>
-<a class="el" href="structbuffioHeader.html">buffioHeader</a> *&#160;</td><td class="memItemRight"><b>waitWrite</b> (char *buffer, size_t len)</td></tr>
-<tr class="memitem:a01edd6f8ef42c84bec30b2464788e92a" id="r_a01edd6f8ef42c84bec30b2464788e92a"><td class="memItemLeft"><a id="a01edd6f8ef42c84bec30b2464788e92a" name="a01edd6f8ef42c84bec30b2464788e92a"></a>
-<a class="el" href="structbuffioHeader.html">buffioHeader</a> *&#160;</td><td class="memItemRight"><b>asyncRead</b> (<a class="el" href="structbuffioHeader.html">buffioHeader</a> *header, char *buffer, size_t len, asyncRead then)</td></tr>
-<tr class="memitem:a625382853aa6ff66248956eaadb87178" id="r_a625382853aa6ff66248956eaadb87178"><td class="memItemLeft"><a id="a625382853aa6ff66248956eaadb87178" name="a625382853aa6ff66248956eaadb87178"></a>
-<a class="el" href="structbuffioHeader.html">buffioHeader</a> *&#160;</td><td class="memItemRight"><b>asyncWrite</b> (<a class="el" href="structbuffioHeader.html">buffioHeader</a> *header, char *buffer, size_t len, asyncWrite then)</td></tr>
-<tr class="memitem:a25aab40153a686d0fbcd58d24fa1aebb" id="r_a25aab40153a686d0fbcd58d24fa1aebb"><td class="memItemLeft"><a id="a25aab40153a686d0fbcd58d24fa1aebb" name="a25aab40153a686d0fbcd58d24fa1aebb"></a>
-<a class="el" href="structbuffioHeader.html">buffioHeader</a> *&#160;</td><td class="memItemRight"><b>poll</b> (int mask=EPOLLIN|EPOLLOUT)</td></tr>
-<tr class="memitem:ad12b994dc798cdc6e5649bdbb5df398e" id="r_ad12b994dc798cdc6e5649bdbb5df398e"><td class="memItemLeft"><a id="ad12b994dc798cdc6e5649bdbb5df398e" name="ad12b994dc798cdc6e5649bdbb5df398e"></a>
-int&#160;</td><td class="memItemRight"><b>getPipeRead</b> () const</td></tr>
-<tr class="memitem:a699dbd58911b13becf8b5f3eaffe8064" id="r_a699dbd58911b13becf8b5f3eaffe8064"><td class="memItemLeft"><a id="a699dbd58911b13becf8b5f3eaffe8064" name="a699dbd58911b13becf8b5f3eaffe8064"></a>
-int&#160;</td><td class="memItemRight"><b>getPipeWrite</b> () const</td></tr>
-<tr class="memitem:acc2232880d29c69d45e0f59bdb689913" id="r_acc2232880d29c69d45e0f59bdb689913"><td class="memItemLeft"><a id="acc2232880d29c69d45e0f59bdb689913" name="acc2232880d29c69d45e0f59bdb689913"></a>
-void&#160;</td><td class="memItemRight"><b>release</b> ()</td></tr>
+<tr class="memitem:a3870393dba97613bb419845c9504e62a" id="r_a3870393dba97613bb419845c9504e62a"><td class="memItemLeft"><a id="a3870393dba97613bb419845c9504e62a" name="a3870393dba97613bb419845c9504e62a"></a>
+&#160;</td><td class="memItemRight"><b>buffioFd</b> ()</td></tr>
+<tr class="memdesc:a3870393dba97613bb419845c9504e62a"><td class="mdescLeft">&#160;</td><td class="mdescRight">constructs the instance with default value <br /></td></tr>
+<tr class="memitem:a92405e235e76cf3cf683b138fd8e9906" id="r_a92405e235e76cf3cf683b138fd8e9906"><td class="memItemLeft"><a id="a92405e235e76cf3cf683b138fd8e9906" name="a92405e235e76cf3cf683b138fd8e9906"></a>
+&#160;</td><td class="memItemRight"><b>~buffioFd</b> ()</td></tr>
+<tr class="memdesc:a92405e235e76cf3cf683b138fd8e9906"><td class="mdescLeft">&#160;</td><td class="mdescRight">destructor of buffio fd <br /></td></tr>
+<tr class="memitem:a8d592284db73b3176928005358dd3dd3" id="r_a8d592284db73b3176928005358dd3dd3"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a8d592284db73b3176928005358dd3dd3">operator|</a> (int bit)</td></tr>
+<tr class="memdesc:a8d592284db73b3176928005358dd3dd3"><td class="mdescLeft">&#160;</td><td class="mdescRight">operator oveload to set a specific bit in read/write mask  <br /></td></tr>
+<tr class="memitem:a218cda1597ef7ad5bdeb2716aa22f3e3" id="r_a218cda1597ef7ad5bdeb2716aa22f3e3"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a218cda1597ef7ad5bdeb2716aa22f3e3">operator==</a> (int bit) const</td></tr>
+<tr class="memdesc:a218cda1597ef7ad5bdeb2716aa22f3e3"><td class="mdescLeft">&#160;</td><td class="mdescRight">operator overload to check if the bit field is set or not.  <br /></td></tr>
+<tr class="memitem:a2ac9e425129febae501a5ff804b11557" id="r_a2ac9e425129febae501a5ff804b11557"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a2ac9e425129febae501a5ff804b11557">bitSet</a> (int bit) noexcept</td></tr>
+<tr class="memdesc:a2ac9e425129febae501a5ff804b11557"><td class="mdescLeft">&#160;</td><td class="mdescRight">method to set a specific bit in read/write mask  <br /></td></tr>
+<tr class="memitem:a52274cf821eb3254ed58529bcd77aa35" id="r_a52274cf821eb3254ed58529bcd77aa35"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a52274cf821eb3254ed58529bcd77aa35">isBitSet</a> (int bit) const</td></tr>
+<tr class="memdesc:a52274cf821eb3254ed58529bcd77aa35"><td class="mdescLeft">&#160;</td><td class="mdescRight">method to check if specific bit is set or not in read/write mask  <br /></td></tr>
+<tr class="memitem:a9e0846e7719c01360359c776850312a1" id="r_a9e0846e7719c01360359c776850312a1"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a9e0846e7719c01360359c776850312a1">unsetBit</a> (int bit) noexcept</td></tr>
+<tr class="memdesc:a9e0846e7719c01360359c776850312a1"><td class="mdescLeft">&#160;</td><td class="mdescRight">method to unset bits in read/write mask  <br /></td></tr>
+<tr class="memitem:a469b55de5a9af1937f87bea39fc01c85" id="r_a469b55de5a9af1937f87bea39fc01c85"><td class="memItemLeft">int&#160;</td><td class="memItemRight"><a class="el" href="#a469b55de5a9af1937f87bea39fc01c85">getFd</a> () const</td></tr>
+<tr class="memdesc:a469b55de5a9af1937f87bea39fc01c85"><td class="mdescLeft">&#160;</td><td class="mdescRight">method to get fd, managed by the instance  <br /></td></tr>
+<tr class="memitem:a38fcf1d90a6779634df346cbf39ab202" id="r_a38fcf1d90a6779634df346cbf39ab202"><td class="memItemLeft"><a class="el" href="structbuffioHeader.html">buffioHeader</a> *&#160;</td><td class="memItemRight"><a class="el" href="#a38fcf1d90a6779634df346cbf39ab202">getReadReq</a> () const</td></tr>
+<tr class="memdesc:a38fcf1d90a6779634df346cbf39ab202"><td class="mdescLeft">&#160;</td><td class="mdescRight">method to get the read request header  <br /></td></tr>
+<tr class="memitem:aa725d8aae4ca255e9a5d766fb5442dfe" id="r_aa725d8aae4ca255e9a5d766fb5442dfe"><td class="memItemLeft"><a class="el" href="structbuffioHeader.html">buffioHeader</a> *&#160;</td><td class="memItemRight"><a class="el" href="#aa725d8aae4ca255e9a5d766fb5442dfe">getWriteReq</a> () const</td></tr>
+<tr class="memdesc:aa725d8aae4ca255e9a5d766fb5442dfe"><td class="mdescLeft">&#160;</td><td class="mdescRight">method to get the write request header  <br /></td></tr>
+<tr class="memitem:ab467f667e7457fc643712d89feb8022b" id="r_ab467f667e7457fc643712d89feb8022b"><td class="memItemLeft">const <a class="el" href="structbuffioHeader.html">buffioHeader</a> *&#160;</td><td class="memItemRight"><a class="el" href="#ab467f667e7457fc643712d89feb8022b">getReserveHeader</a> () const</td></tr>
+<tr class="memdesc:ab467f667e7457fc643712d89feb8022b"><td class="mdescLeft">&#160;</td><td class="mdescRight">method returns the reserve header of the fd instance  <br /></td></tr>
+<tr class="memitem:a97e8efcba9beb56598cce84a7e0f883b" id="r_a97e8efcba9beb56598cce84a7e0f883b"><td class="memItemLeft">int&#160;</td><td class="memItemRight"><a class="el" href="#a97e8efcba9beb56598cce84a7e0f883b">listen</a> (int backlog) const</td></tr>
+<tr class="memdesc:a97e8efcba9beb56598cce84a7e0f883b"><td class="mdescLeft">&#160;</td><td class="mdescRight">method to start listening on a socket, owned by the instance  <br /></td></tr>
+<tr class="memitem:aabbfffca68dfe268c1c2362a58e8e528" id="r_aabbfffca68dfe268c1c2362a58e8e528"><td class="memItemLeft">int&#160;</td><td class="memItemRight"><a class="el" href="#aabbfffca68dfe268c1c2362a58e8e528">accept</a> (struct sockaddr *addr, socklen_t *socklen) const</td></tr>
+<tr class="memdesc:aabbfffca68dfe268c1c2362a58e8e528"><td class="mdescLeft">&#160;</td><td class="mdescRight">method to accept connection on socket, owned by the instance  <br /></td></tr>
+<tr class="memitem:a6a46bbed08a9048ed81e18ceb0867b3c" id="r_a6a46bbed08a9048ed81e18ceb0867b3c"><td class="memItemLeft">int&#160;</td><td class="memItemRight"><a class="el" href="#a6a46bbed08a9048ed81e18ceb0867b3c">connect</a> (struct sockaddr *addr, socklen_t socklen) const</td></tr>
+<tr class="memdesc:a6a46bbed08a9048ed81e18ceb0867b3c"><td class="mdescLeft">&#160;</td><td class="mdescRight">method to connect to a socket,  <br /></td></tr>
+<tr class="memitem:a3e81bd4646960227376f06c3d4042832" id="r_a3e81bd4646960227376f06c3d4042832"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a3e81bd4646960227376f06c3d4042832">asyncReadDone</a> (<a class="el" href="structbuffioHeader.html">buffioHeader</a> *header) noexcept</td></tr>
+<tr class="memdesc:a3e81bd4646960227376f06c3d4042832"><td class="mdescLeft">&#160;</td><td class="mdescRight">method to mark read requests done  <br /></td></tr>
+<tr class="memitem:a06604d44a7c0befa7f936bc29115caa4" id="r_a06604d44a7c0befa7f936bc29115caa4"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a06604d44a7c0befa7f936bc29115caa4">asyncWriteDone</a> (<a class="el" href="structbuffioHeader.html">buffioHeader</a> *header) noexcept</td></tr>
+<tr class="memdesc:a06604d44a7c0befa7f936bc29115caa4"><td class="mdescLeft">&#160;</td><td class="mdescRight">method to mark write request done  <br /></td></tr>
+<tr class="memitem:ab6638f8e7b0854dee480d4fe16bae59c" id="r_ab6638f8e7b0854dee480d4fe16bae59c"><td class="memTemplParams" colspan="2">template&lt;typename T&gt; </td></tr>
+<tr class="memitem:ab6638f8e7b0854dee480d4fe16bae59c template"><td class="memItemLeft"><a class="el" href="structbuffioHeader.html">buffioHeader</a> *&#160;</td><td class="memItemRight"><a class="el" href="#ab6638f8e7b0854dee480d4fe16bae59c">asyncAccept</a> (T then)</td></tr>
+<tr class="memdesc:ab6638f8e7b0854dee480d4fe16bae59c"><td class="mdescLeft">&#160;</td><td class="mdescRight">method to asyn accept the connection  <br /></td></tr>
+<tr class="memitem:a97bfe905ed0bc6d79ecc9b0a8ab1c3ed" id="r_a97bfe905ed0bc6d79ecc9b0a8ab1c3ed"><td class="memItemLeft"><a class="el" href="structbuffioHeader.html">buffioHeader</a> *&#160;</td><td class="memItemRight"><a class="el" href="#a97bfe905ed0bc6d79ecc9b0a8ab1c3ed">asyncConnect</a> (asyncConnect then)</td></tr>
+<tr class="memdesc:a97bfe905ed0bc6d79ecc9b0a8ab1c3ed"><td class="mdescLeft">&#160;</td><td class="mdescRight">method to async connect to a socket  <br /></td></tr>
+<tr class="memitem:ae00a94446188bc1c94a2509befc052c5" id="r_ae00a94446188bc1c94a2509befc052c5"><td class="memItemLeft"><a class="el" href="structbuffioHeader.html">buffioHeader</a> *&#160;</td><td class="memItemRight"><a class="el" href="#ae00a94446188bc1c94a2509befc052c5">waitAccept</a> (struct sockaddr *addr, socklen_t socklen)</td></tr>
+<tr class="memdesc:ae00a94446188bc1c94a2509befc052c5"><td class="mdescLeft">&#160;</td><td class="mdescRight">method to wait until there any connecton to accept  <br /></td></tr>
+<tr class="memitem:aca33952b7e88b6c45940413abbcdd5f3" id="r_aca33952b7e88b6c45940413abbcdd5f3"><td class="memItemLeft"><a class="el" href="structbuffioHeader.html">buffioHeader</a> *&#160;</td><td class="memItemRight"><a class="el" href="#aca33952b7e88b6c45940413abbcdd5f3">waitConnect</a> ()</td></tr>
+<tr class="memdesc:aca33952b7e88b6c45940413abbcdd5f3"><td class="mdescLeft">&#160;</td><td class="mdescRight">method to wait until a connection is established to the socket  <br /></td></tr>
+<tr class="memitem:a88a698f1f02b534998643e856e38b86a" id="r_a88a698f1f02b534998643e856e38b86a"><td class="memItemLeft">ssize_t&#160;</td><td class="memItemRight"><a class="el" href="#a88a698f1f02b534998643e856e38b86a">read</a> (char *buffer, size_t len) const</td></tr>
+<tr class="memdesc:a88a698f1f02b534998643e856e38b86a"><td class="mdescLeft">&#160;</td><td class="mdescRight">linux read call wrapper to read from the fd  <br /></td></tr>
+<tr class="memitem:a7fbc325f061a1bb4b189dfeb4843085c" id="r_a7fbc325f061a1bb4b189dfeb4843085c"><td class="memItemLeft">ssize_t&#160;</td><td class="memItemRight"><a class="el" href="#a7fbc325f061a1bb4b189dfeb4843085c">write</a> (char *buffer, size_t len) const</td></tr>
+<tr class="memdesc:a7fbc325f061a1bb4b189dfeb4843085c"><td class="mdescLeft">&#160;</td><td class="mdescRight">linux write call wrapper to write to the fd  <br /></td></tr>
+<tr class="memitem:a25a7d2ec66c9d480e91f9914b702da08" id="r_a25a7d2ec66c9d480e91f9914b702da08"><td class="memItemLeft"><a class="el" href="structbuffioHeader.html">buffioHeader</a> *&#160;</td><td class="memItemRight"><a class="el" href="#a25a7d2ec66c9d480e91f9914b702da08">waitRead</a> (char *buffer, size_t len)</td></tr>
+<tr class="memdesc:a25a7d2ec66c9d480e91f9914b702da08"><td class="mdescLeft">&#160;</td><td class="mdescRight">method to wait until there data to read  <br /></td></tr>
+<tr class="memitem:ada498cf96b554bfb0e94cc5420029802" id="r_ada498cf96b554bfb0e94cc5420029802"><td class="memItemLeft"><a class="el" href="structbuffioHeader.html">buffioHeader</a> *&#160;</td><td class="memItemRight"><a class="el" href="#ada498cf96b554bfb0e94cc5420029802">waitWrite</a> (char *buffer, size_t len)</td></tr>
+<tr class="memdesc:ada498cf96b554bfb0e94cc5420029802"><td class="mdescLeft">&#160;</td><td class="mdescRight">method to wait until there data to write  <br /></td></tr>
+<tr class="memitem:a01edd6f8ef42c84bec30b2464788e92a" id="r_a01edd6f8ef42c84bec30b2464788e92a"><td class="memItemLeft"><a class="el" href="structbuffioHeader.html">buffioHeader</a> *&#160;</td><td class="memItemRight"><a class="el" href="#a01edd6f8ef42c84bec30b2464788e92a">asyncRead</a> (<a class="el" href="structbuffioHeader.html">buffioHeader</a> *header, char *buffer, size_t len, asyncRead then)</td></tr>
+<tr class="memdesc:a01edd6f8ef42c84bec30b2464788e92a"><td class="mdescLeft">&#160;</td><td class="mdescRight">async Read from a fd  <br /></td></tr>
+<tr class="memitem:a625382853aa6ff66248956eaadb87178" id="r_a625382853aa6ff66248956eaadb87178"><td class="memItemLeft"><a class="el" href="structbuffioHeader.html">buffioHeader</a> *&#160;</td><td class="memItemRight"><a class="el" href="#a625382853aa6ff66248956eaadb87178">asyncWrite</a> (<a class="el" href="structbuffioHeader.html">buffioHeader</a> *header, char *buffer, size_t len, asyncWrite then)</td></tr>
+<tr class="memdesc:a625382853aa6ff66248956eaadb87178"><td class="mdescLeft">&#160;</td><td class="mdescRight">async Write to a fd  <br /></td></tr>
+<tr class="memitem:a25aab40153a686d0fbcd58d24fa1aebb" id="r_a25aab40153a686d0fbcd58d24fa1aebb"><td class="memItemLeft"><a class="el" href="structbuffioHeader.html">buffioHeader</a> *&#160;</td><td class="memItemRight"><a class="el" href="#a25aab40153a686d0fbcd58d24fa1aebb">poll</a> (int mask=EPOLLIN|EPOLLOUT)</td></tr>
+<tr class="memdesc:a25aab40153a686d0fbcd58d24fa1aebb"><td class="mdescLeft">&#160;</td><td class="mdescRight">method to add fd to polling  <br /></td></tr>
+<tr class="memitem:ad12b994dc798cdc6e5649bdbb5df398e" id="r_ad12b994dc798cdc6e5649bdbb5df398e"><td class="memItemLeft">int&#160;</td><td class="memItemRight"><a class="el" href="#ad12b994dc798cdc6e5649bdbb5df398e">getPipeRead</a> () const</td></tr>
+<tr class="memdesc:ad12b994dc798cdc6e5649bdbb5df398e"><td class="mdescLeft">&#160;</td><td class="mdescRight">method to return the read end of a pipe if fd type is pipe  <br /></td></tr>
+<tr class="memitem:a699dbd58911b13becf8b5f3eaffe8064" id="r_a699dbd58911b13becf8b5f3eaffe8064"><td class="memItemLeft">int&#160;</td><td class="memItemRight"><a class="el" href="#a699dbd58911b13becf8b5f3eaffe8064">getPipeWrite</a> () const</td></tr>
+<tr class="memdesc:a699dbd58911b13becf8b5f3eaffe8064"><td class="mdescLeft">&#160;</td><td class="mdescRight">method to return the write end of the pipe  <br /></td></tr>
+<tr class="memitem:acc2232880d29c69d45e0f59bdb689913" id="r_acc2232880d29c69d45e0f59bdb689913"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#acc2232880d29c69d45e0f59bdb689913">release</a> ()</td></tr>
+<tr class="memdesc:acc2232880d29c69d45e0f59bdb689913"><td class="mdescLeft">&#160;</td><td class="mdescRight">method to properly close the fd  <br /></td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-pro-attribs" class="groupheader"><a id="pro-attribs" name="pro-attribs"></a>
 Protected Attributes</h2></td></tr>
-<tr class="memitem:ac44ba1c1d07729094bb212ff7df8d3db" id="r_ac44ba1c1d07729094bb212ff7df8d3db"><td class="memItemLeft"><a id="ac44ba1c1d07729094bb212ff7df8d3db" name="ac44ba1c1d07729094bb212ff7df8d3db"></a>
-int&#160;</td><td class="memItemRight"><b>rwmask</b> = 0</td></tr>
-<tr class="memitem:a55aa86b080aa967c1f54c70eb6f8e3fd" id="r_a55aa86b080aa967c1f54c70eb6f8e3fd"><td class="memItemLeft"><a id="a55aa86b080aa967c1f54c70eb6f8e3fd" name="a55aa86b080aa967c1f54c70eb6f8e3fd"></a>
-char *&#160;</td><td class="memItemRight"><b>address</b> = nullptr</td></tr>
-<tr class="memitem:ae53515d0ed5e42f5c4fe9282d66c5925" id="r_ae53515d0ed5e42f5c4fe9282d66c5925"><td class="memItemLeft"><a id="ae53515d0ed5e42f5c4fe9282d66c5925" name="ae53515d0ed5e42f5c4fe9282d66c5925"></a>
-size_t&#160;</td><td class="memItemRight"><b>ownerCount</b> = 0</td></tr>
-<tr class="memitem:"><td class="memItemLeft anon"><a id="a8661f1e536bba46dc1bcd09a112119b4" name="a8661f1e536bba46dc1bcd09a112119b4"></a>
-union {&#160;</td><td class="memItemRight"></td></tr>
-<tr class="memitem:"><td class="memItemLeft anon">
-&#160;&#160;&#160;struct {&#160;</td><td class="memItemRight"></td></tr>
-<tr class="memitem:a55a23e316146cdffe35ecf0564a46353" id="r_a55a23e316146cdffe35ecf0564a46353"><td class="memItemLeft anon">
-&#160;&#160;&#160;&#160;&#160;&#160;int&#160;&#160;&#160;<b>socketFd</b>&#160;</td><td class="memItemRight"></td></tr>
-<tr class="memitem:a0dcda76c559e48c533c15b8e6a575712" id="r_a0dcda76c559e48c533c15b8e6a575712"><td class="memItemLeft anon">
-&#160;&#160;&#160;&#160;&#160;&#160;int&#160;&#160;&#160;<b>portnumber</b>&#160;</td><td class="memItemRight"></td></tr>
-<tr class="memitem:a308529c1cc801fef8c13f13ed3eeb690" id="r_a308529c1cc801fef8c13f13ed3eeb690"><td class="memItemLeft anonEnd">&#160;&#160;&#160;}&#160;&#160;&#160;<b>sock</b></td></tr>
-<tr class="memitem:a09a6da1dd7ef1f7cf0819a370a9a57fe" id="r_a09a6da1dd7ef1f7cf0819a370a9a57fe"><td class="memItemLeft anon">
-&#160;&#160;&#160;int&#160;&#160;&#160;<b>fileFd</b>&#160;</td><td class="memItemRight"></td></tr>
-<tr class="memitem:ad86fa3635390ff056310c8776c8e5fb8" id="r_ad86fa3635390ff056310c8776c8e5fb8"><td class="memItemLeft anon">
-&#160;&#160;&#160;int&#160;&#160;&#160;<b>pipeFd</b> [2]&#160;</td><td class="memItemRight"></td></tr>
-<tr class="memitem:a433f23f2b09b51151bf3f32de39047b9" id="r_a433f23f2b09b51151bf3f32de39047b9"><td class="memItemLeft anon">
-&#160;&#160;&#160;int&#160;&#160;&#160;<b>fd</b> [2]&#160;</td><td class="memItemRight"></td></tr>
-<tr class="memitem:a8661f1e536bba46dc1bcd09a112119b4" id="r_a8661f1e536bba46dc1bcd09a112119b4"><td class="memItemLeft anonEnd">}&#160;</td><td class="memItemRight"><b>localfd</b></td></tr>
+<tr class="memitem:ac44ba1c1d07729094bb212ff7df8d3db" id="r_ac44ba1c1d07729094bb212ff7df8d3db"><td class="memItemLeft">int&#160;</td><td class="memItemRight"><a class="el" href="#ac44ba1c1d07729094bb212ff7df8d3db">rwmask</a> = 0</td></tr>
+<tr class="memdesc:ac44ba1c1d07729094bb212ff7df8d3db"><td class="mdescLeft">&#160;</td><td class="mdescRight">rwmask define the readyness of the file descriptor. see <a class="el" href="buffiocommon_8hpp_source.html">buffiocommon.hpp</a> to see the mask defined for readyness of the fd,  <br /></td></tr>
+<tr class="memitem:a55aa86b080aa967c1f54c70eb6f8e3fd" id="r_a55aa86b080aa967c1f54c70eb6f8e3fd"><td class="memItemLeft">char *&#160;</td><td class="memItemRight"><a class="el" href="#a55aa86b080aa967c1f54c70eb6f8e3fd">address</a> = nullptr</td></tr>
+<tr class="memdesc:a55aa86b080aa967c1f54c70eb6f8e3fd"><td class="mdescLeft">&#160;</td><td class="mdescRight">pointer to address of the fifo or unix socketpath  <br /></td></tr>
+<tr class="memitem:a9c59cacad5980f095b1ec2c1b022b3a4" id="r_a9c59cacad5980f095b1ec2c1b022b3a4"><td class="memItemLeft"><a id="a9c59cacad5980f095b1ec2c1b022b3a4" name="a9c59cacad5980f095b1ec2c1b022b3a4"></a>
+union <a class="el" href="unionbuffioFd_1_1localFdInfo.html">buffioFd::localFdInfo</a>&#160;</td><td class="memItemRight"><b>localfd</b></td></tr>
 <tr class="memitem:a72901f3809fe33fc6f3527ce9daa4ea8" id="r_a72901f3809fe33fc6f3527ce9daa4ea8"><td class="memItemLeft"><a id="a72901f3809fe33fc6f3527ce9daa4ea8" name="a72901f3809fe33fc6f3527ce9daa4ea8"></a>
 <a class="el" href="structbuffioHeader.html">buffioHeader</a>&#160;</td><td class="memItemRight"><b>reserveHeader</b></td></tr>
-<tr class="memitem:ac5aa71f0a8bf284cccab8190c9f6cf0e" id="r_ac5aa71f0a8bf284cccab8190c9f6cf0e"><td class="memItemLeft"><a id="ac5aa71f0a8bf284cccab8190c9f6cf0e" name="ac5aa71f0a8bf284cccab8190c9f6cf0e"></a>
-<a class="el" href="structbuffioHeader.html">buffioHeader</a> *&#160;</td><td class="memItemRight"><b>readReq</b> = nullptr</td></tr>
-<tr class="memitem:afcff1892a7cbdd1f72a345e60e03b861" id="r_afcff1892a7cbdd1f72a345e60e03b861"><td class="memItemLeft"><a id="afcff1892a7cbdd1f72a345e60e03b861" name="afcff1892a7cbdd1f72a345e60e03b861"></a>
-<a class="el" href="structbuffioHeader.html">buffioHeader</a> *&#160;</td><td class="memItemRight"><b>writeReq</b> = nullptr</td></tr>
+<tr class="memdesc:a72901f3809fe33fc6f3527ce9daa4ea8"><td class="mdescLeft">&#160;</td><td class="mdescRight">field used for some internal works for the fd request, request other that read/write relay on reserveHeader <br /></td></tr>
+<tr class="memitem:ac5aa71f0a8bf284cccab8190c9f6cf0e" id="r_ac5aa71f0a8bf284cccab8190c9f6cf0e"><td class="memItemLeft"><a class="el" href="structbuffioHeader.html">buffioHeader</a> *&#160;</td><td class="memItemRight"><a class="el" href="#ac5aa71f0a8bf284cccab8190c9f6cf0e">readReq</a> = nullptr</td></tr>
+<tr class="memdesc:ac5aa71f0a8bf284cccab8190c9f6cf0e"><td class="mdescLeft">&#160;</td><td class="mdescRight">readReq holds the read requests made to the fd  <br /></td></tr>
+<tr class="memitem:afcff1892a7cbdd1f72a345e60e03b861" id="r_afcff1892a7cbdd1f72a345e60e03b861"><td class="memItemLeft"><a class="el" href="structbuffioHeader.html">buffioHeader</a> *&#160;</td><td class="memItemRight"><a class="el" href="#afcff1892a7cbdd1f72a345e60e03b861">writeReq</a> = nullptr</td></tr>
+<tr class="memdesc:afcff1892a7cbdd1f72a345e60e03b861"><td class="mdescLeft">&#160;</td><td class="mdescRight">writeReq holds the write requests made to the fd  <br /></td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-friends" class="groupheader"><a id="friends" name="friends"></a>
 Friends</h2></td></tr>
@@ -206,6 +207,1096 @@ class&#160;</td><td class="memItemRight"><b>buffioFdPool</b></td></tr>
 <tr class="memitem:a31a520ef3611a5bd7f0b7f1d074b52b4" id="r_a31a520ef3611a5bd7f0b7f1d074b52b4"><td class="memItemLeft"><a id="a31a520ef3611a5bd7f0b7f1d074b52b4" name="a31a520ef3611a5bd7f0b7f1d074b52b4"></a>
 class&#160;</td><td class="memItemRight"><b>buffioMakeFd</b></td></tr>
 </table>
+<a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>Fd wrapper for buffio. </p>
+<p><a class="el" href="classbuffioFd.html" title="Fd wrapper for buffio.">buffioFd</a> class provides a wrapper to manage the life cycle of the fd </p><dl class="section note"><dt>Note</dt><dd>Before using these operation fd must be polled to get the defined behaviour:<ul>
+<li>waitRead/Write</li>
+<li>asyncRead/write</li>
+<li>asyncAccept/Connect</li>
+<li>waitAccept/Connect </li>
+</ul>
+</dd></dl>
+</div><a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Member Function Documentation</h2>
+<a id="aabbfffca68dfe268c1c2362a58e8e528" name="aabbfffca68dfe268c1c2362a58e8e528"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aabbfffca68dfe268c1c2362a58e8e528">&#9670;&#160;</a></span>accept()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">int buffioFd::accept </td>
+          <td>(</td>
+          <td class="paramtype">struct sockaddr *</td>          <td class="paramname"><span class="paramname"><em>addr</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">socklen_t *</td>          <td class="paramname"><span class="paramname"><em>socklen</em></span>&#160;) const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>method to accept connection on socket, owned by the instance </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">addr</td><td>pointer to sockaddr_(un/in/in6) to store the information of the accepted connection </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">socklen</td><td>pointer of the length of sockaddr_(un/in/in6)</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>a valid fd reffering to the accepted connecton, and -1 if error occurs</dd></dl>
+<dl class="section note"><dt>Note</dt><dd>can pass NULL, if don't want to get the address information of the accepted socket </dd></dl>
+
+</div>
+</div>
+<a id="ab6638f8e7b0854dee480d4fe16bae59c" name="ab6638f8e7b0854dee480d4fe16bae59c"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ab6638f8e7b0854dee480d4fe16bae59c">&#9670;&#160;</a></span>asyncAccept()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename T&gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structbuffioHeader.html">buffioHeader</a> * buffioFd::asyncAccept </td>
+          <td>(</td>
+          <td class="paramtype">T</td>          <td class="paramname"><span class="paramname"><em>then</em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>method to asyn accept the connection </p>
+<p><a class="el" href="#ab6638f8e7b0854dee480d4fe16bae59c" title="method to asyn accept the connection">asyncAccept()</a> is used to accept connection on a socket in async manner without blocking the function.</p>
+<p>when using async accept reserveHeader cannot be used further </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">then</td><td>valid buffioPromsieHandle to a handler to the socket after acception connection </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>void</dd></dl>
+<dl class="section note"><dt>Note</dt><dd>before asyncAccept, the user must call the poll method to register the socket for polling, and async accept must be called with buffioawait <div class="fragment"><div class="line"> buffioPromsie&lt;int&gt; function(){</div>
+<div class="line"> <a class="code hl_function" href="#a3870393dba97613bb419845c9504e62a">buffioFd</a> *fd = <span class="keyword">nullptr</span>;</div>
+<div class="line"> buffiowait &amp;fd; <span class="comment">// get a fd instance from pool</span></div>
+<div class="line"> ... setup the fd</div>
+<div class="line"> buffioawait fd-&gt;<a class="code hl_function" href="#a25aab40153a686d0fbcd58d24fa1aebb">poll</a>();</div>
+<div class="line"> <span class="comment">//then</span></div>
+<div class="line"> buffiowait fd-&gt;<a class="code hl_function" href="#ab6638f8e7b0854dee480d4fe16bae59c">asyncAccept</a>(handleToTheRoutine);</div>
+<div class="line"> </div>
+<div class="line"><span class="comment">//  do other works </span></div>
+<div class="line"> buffioreturn 0;</div>
+<div class="line"> };</div>
+<div class="ttc" id="aclassbuffioFd_html_a25aab40153a686d0fbcd58d24fa1aebb"><div class="ttname"><a href="#a25aab40153a686d0fbcd58d24fa1aebb">buffioFd::poll</a></div><div class="ttdeci">buffioHeader * poll(int mask=EPOLLIN|EPOLLOUT)</div><div class="ttdoc">method to add fd to polling</div><div class="ttdef"><b>Definition</b> buffiofd.hpp:492</div></div>
+<div class="ttc" id="aclassbuffioFd_html_a3870393dba97613bb419845c9504e62a"><div class="ttname"><a href="#a3870393dba97613bb419845c9504e62a">buffioFd::buffioFd</a></div><div class="ttdeci">buffioFd()</div><div class="ttdoc">constructs the instance with default value</div><div class="ttdef"><b>Definition</b> buffiofd.hpp:70</div></div>
+<div class="ttc" id="aclassbuffioFd_html_ab6638f8e7b0854dee480d4fe16bae59c"><div class="ttname"><a href="#ab6638f8e7b0854dee480d4fe16bae59c">buffioFd::asyncAccept</a></div><div class="ttdeci">buffioHeader * asyncAccept(T then)</div><div class="ttdoc">method to asyn accept the connection</div><div class="ttdef"><b>Definition</b> buffiofd.hpp:263</div></div>
+</div><!-- fragment --> </dd></dl>
+
+</div>
+</div>
+<a id="a97bfe905ed0bc6d79ecc9b0a8ab1c3ed" name="a97bfe905ed0bc6d79ecc9b0a8ab1c3ed"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a97bfe905ed0bc6d79ecc9b0a8ab1c3ed">&#9670;&#160;</a></span>asyncConnect()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structbuffioHeader.html">buffioHeader</a> * buffioFd::asyncConnect </td>
+          <td>(</td>
+          <td class="paramtype">asyncConnect</td>          <td class="paramname"><span class="paramname"><em>then</em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>method to async connect to a socket </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">then</td><td>buffioPromiseHandle to push to execution after connecting </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section note"><dt>Note</dt><dd>before connection the fd must be polled <div class="fragment"><div class="line"> buffiofd *fd = <span class="keyword">nullptr</span></div>
+<div class="line"> buffiowait &amp;fd; <span class="comment">// returns immediately</span></div>
+<div class="line"> <span class="comment">//setup fd in routine</span></div>
+<div class="line"> <span class="comment">//create the socket with the address and port to connect</span></div>
+<div class="line"> <span class="comment">//then</span></div>
+<div class="line"> buffiowait fd-&gt;asyncConnect(routine); <span class="comment">//returns immediately</span></div>
+<div class="line"><span class="comment">// do other works</span></div>
+</div><!-- fragment --> </dd></dl>
+<dl class="section return"><dt>Returns</dt><dd><a class="el" href="structbuffioHeader.html">buffioHeader</a> pointer that is processed by the promise object </dd></dl>
+
+</div>
+</div>
+<a id="a01edd6f8ef42c84bec30b2464788e92a" name="a01edd6f8ef42c84bec30b2464788e92a"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a01edd6f8ef42c84bec30b2464788e92a">&#9670;&#160;</a></span>asyncRead()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structbuffioHeader.html">buffioHeader</a> * buffioFd::asyncRead </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="structbuffioHeader.html">buffioHeader</a> *</td>          <td class="paramname"><span class="paramname"><em>header</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">char *</td>          <td class="paramname"><span class="paramname"><em>buffer</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>len</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">asyncRead</td>          <td class="paramname"><span class="paramname"><em>then</em></span>&#160;)</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>async Read from a fd </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">header</td><td>pointer to valid <a class="el" href="structbuffioHeader.html">buffioHeader</a> that lifecycle must be valid for async read op </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">buffer</td><td>pointer to the buffer to read </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">len</td><td>size of the data in bytes to read</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd><a class="el" href="structbuffioHeader.html">buffioHeader</a> crafted for asyncRead </dd></dl>
+
+</div>
+</div>
+<a id="a3e81bd4646960227376f06c3d4042832" name="a3e81bd4646960227376f06c3d4042832"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a3e81bd4646960227376f06c3d4042832">&#9670;&#160;</a></span>asyncReadDone()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void buffioFd::asyncReadDone </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="structbuffioHeader.html">buffioHeader</a> *</td>          <td class="paramname"><span class="paramname"><em>header</em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span><span class="mlabel noexcept">noexcept</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>method to mark read requests done </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">header</td><td>pointer to valid header that is obtained from the instance </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>void </dd></dl>
+
+</div>
+</div>
+<a id="a625382853aa6ff66248956eaadb87178" name="a625382853aa6ff66248956eaadb87178"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a625382853aa6ff66248956eaadb87178">&#9670;&#160;</a></span>asyncWrite()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structbuffioHeader.html">buffioHeader</a> * buffioFd::asyncWrite </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="structbuffioHeader.html">buffioHeader</a> *</td>          <td class="paramname"><span class="paramname"><em>header</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">char *</td>          <td class="paramname"><span class="paramname"><em>buffer</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>len</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">asyncWrite</td>          <td class="paramname"><span class="paramname"><em>then</em></span>&#160;)</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>async Write to a fd </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">header</td><td>pointer to valid <a class="el" href="structbuffioHeader.html">buffioHeader</a> that lifecycle must be valid for async write op </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">buffer</td><td>pointer to the buffer to write </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">len</td><td>size of the data in bytes to write</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd><a class="el" href="structbuffioHeader.html">buffioHeader</a> crafted for asyncRead </dd></dl>
+
+</div>
+</div>
+<a id="a06604d44a7c0befa7f936bc29115caa4" name="a06604d44a7c0befa7f936bc29115caa4"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a06604d44a7c0befa7f936bc29115caa4">&#9670;&#160;</a></span>asyncWriteDone()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void buffioFd::asyncWriteDone </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="structbuffioHeader.html">buffioHeader</a> *</td>          <td class="paramname"><span class="paramname"><em>header</em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span><span class="mlabel noexcept">noexcept</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>method to mark write request done </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">header</td><td>pointer to valid header that is obtained from the instance </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>void </dd></dl>
+
+</div>
+</div>
+<a id="a2ac9e425129febae501a5ff804b11557" name="a2ac9e425129febae501a5ff804b11557"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a2ac9e425129febae501a5ff804b11557">&#9670;&#160;</a></span>bitSet()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void buffioFd::bitSet </td>
+          <td>(</td>
+          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>bit</em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span><span class="mlabel noexcept">noexcept</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>method to set a specific bit in read/write mask </p>
+<dl class="section return"><dt>Returns</dt><dd>void </dd></dl>
+
+</div>
+</div>
+<a id="a6a46bbed08a9048ed81e18ceb0867b3c" name="a6a46bbed08a9048ed81e18ceb0867b3c"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a6a46bbed08a9048ed81e18ceb0867b3c">&#9670;&#160;</a></span>connect()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">int buffioFd::connect </td>
+          <td>(</td>
+          <td class="paramtype">struct sockaddr *</td>          <td class="paramname"><span class="paramname"><em>addr</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">socklen_t</td>          <td class="paramname"><span class="paramname"><em>socklen</em></span>&#160;) const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>method to connect to a socket, </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">addr</td><td>pointer to struct sockaddr_(un/in/in6) if socket is not binded, or NULL </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">socklen</td><td>length of the struct sockaddr_(un/in/in6) if addr is provided, or can leave 0 or NULL</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section warning"><dt>Warning</dt><dd>you must create the socket with the right address and portnumber you want to connect to, or provide addr and socklen to bind the socket to that address and port if the socket is not binded</dd></dl>
+<dl class="section return"><dt>Returns</dt><dd>0 if success, and -1 on error </dd></dl>
+
+</div>
+</div>
+<a id="a469b55de5a9af1937f87bea39fc01c85" name="a469b55de5a9af1937f87bea39fc01c85"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a469b55de5a9af1937f87bea39fc01c85">&#9670;&#160;</a></span>getFd()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">int buffioFd::getFd </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>method to get fd, managed by the instance </p>
+<dl class="section return"><dt>Returns</dt><dd>fd managed by the instance</dd></dl>
+<dl class="section note"><dt>Note</dt><dd>don't use this method to get pipe fd </dd></dl>
+
+</div>
+</div>
+<a id="ad12b994dc798cdc6e5649bdbb5df398e" name="ad12b994dc798cdc6e5649bdbb5df398e"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ad12b994dc798cdc6e5649bdbb5df398e">&#9670;&#160;</a></span>getPipeRead()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">int buffioFd::getPipeRead </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>method to return the read end of a pipe if fd type is pipe </p>
+<dl class="section return"><dt>Returns</dt><dd>read fd of pipe </dd></dl>
+
+</div>
+</div>
+<a id="a699dbd58911b13becf8b5f3eaffe8064" name="a699dbd58911b13becf8b5f3eaffe8064"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a699dbd58911b13becf8b5f3eaffe8064">&#9670;&#160;</a></span>getPipeWrite()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">int buffioFd::getPipeWrite </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>method to return the write end of the pipe </p>
+<dl class="section return"><dt>Returns</dt><dd>write fd of pipe </dd></dl>
+
+</div>
+</div>
+<a id="a38fcf1d90a6779634df346cbf39ab202" name="a38fcf1d90a6779634df346cbf39ab202"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a38fcf1d90a6779634df346cbf39ab202">&#9670;&#160;</a></span>getReadReq()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structbuffioHeader.html">buffioHeader</a> * buffioFd::getReadReq </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>method to get the read request header </p>
+<dl class="section note"><dt>Note</dt><dd>fd instance support only one subsiquent read/write request at any instance of time if there another request made while the pending one is not done, the request is dropped</dd></dl>
+<dl class="section return"><dt>Returns</dt><dd>nullptr, if there no request, or valid request header </dd></dl>
+
+</div>
+</div>
+<a id="ab467f667e7457fc643712d89feb8022b" name="ab467f667e7457fc643712d89feb8022b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ab467f667e7457fc643712d89feb8022b">&#9670;&#160;</a></span>getReserveHeader()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">const <a class="el" href="structbuffioHeader.html">buffioHeader</a> * buffioFd::getReserveHeader </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>method returns the reserve header of the fd instance </p>
+<p>reserve header is internally used by <a class="el" href="classbuffioFd.html" title="Fd wrapper for buffio.">buffioFd</a>, for request other than read/write</p>
+<dl class="section return"><dt>Returns</dt><dd>pointer reserveHeader field of the the instance </dd></dl>
+
+</div>
+</div>
+<a id="aa725d8aae4ca255e9a5d766fb5442dfe" name="aa725d8aae4ca255e9a5d766fb5442dfe"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aa725d8aae4ca255e9a5d766fb5442dfe">&#9670;&#160;</a></span>getWriteReq()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structbuffioHeader.html">buffioHeader</a> * buffioFd::getWriteReq </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>method to get the write request header </p>
+<dl class="section note"><dt>Note</dt><dd>fd instance support only one subsiquent read/write request at any instance of time if there another request made while the pending one is not done, the request is dropped</dd></dl>
+<dl class="section return"><dt>Returns</dt><dd>nullptr, if there no request, or valid request header </dd></dl>
+
+</div>
+</div>
+<a id="a52274cf821eb3254ed58529bcd77aa35" name="a52274cf821eb3254ed58529bcd77aa35"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a52274cf821eb3254ed58529bcd77aa35">&#9670;&#160;</a></span>isBitSet()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool buffioFd::isBitSet </td>
+          <td>(</td>
+          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>bit</em></span></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>method to check if specific bit is set or not in read/write mask </p>
+<dl class="section return"><dt>Returns</dt><dd>true if bit is set, else false it not </dd></dl>
+
+</div>
+</div>
+<a id="a97e8efcba9beb56598cce84a7e0f883b" name="a97e8efcba9beb56598cce84a7e0f883b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a97e8efcba9beb56598cce84a7e0f883b">&#9670;&#160;</a></span>listen()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">int buffioFd::listen </td>
+          <td>(</td>
+          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>backlog</em></span></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>method to start listening on a socket, owned by the instance </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">backlog</td><td>number of backlog connection to keep</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>value returned by the listen system call of linux </dd></dl>
+
+</div>
+</div>
+<a id="a218cda1597ef7ad5bdeb2716aa22f3e3" name="a218cda1597ef7ad5bdeb2716aa22f3e3"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a218cda1597ef7ad5bdeb2716aa22f3e3">&#9670;&#160;</a></span>operator==()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool buffioFd::operator== </td>
+          <td>(</td>
+          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>bit</em></span></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>operator overload to check if the bit field is set or not. </p>
+<dl class="section return"><dt>Returns</dt><dd>True it specific bit is set, else return false </dd></dl>
+
+</div>
+</div>
+<a id="a8d592284db73b3176928005358dd3dd3" name="a8d592284db73b3176928005358dd3dd3"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a8d592284db73b3176928005358dd3dd3">&#9670;&#160;</a></span>operator|()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void buffioFd::operator| </td>
+          <td>(</td>
+          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>bit</em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>operator oveload to set a specific bit in read/write mask </p>
+<dl class="section return"><dt>Returns</dt><dd>void </dd></dl>
+
+</div>
+</div>
+<a id="a25aab40153a686d0fbcd58d24fa1aebb" name="a25aab40153a686d0fbcd58d24fa1aebb"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a25aab40153a686d0fbcd58d24fa1aebb">&#9670;&#160;</a></span>poll()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structbuffioHeader.html">buffioHeader</a> * buffioFd::poll </td>
+          <td>(</td>
+          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>mask</em></span><span class="paramdefsep"> = </span><span class="paramdefval">EPOLLIN&#160;|&#160;EPOLLOUT</span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>method to add fd to polling </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">mask</td><td>mask of events to watchout on the fd</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd><a class="el" href="structbuffioHeader.html">buffioHeader</a> Crafter for poll op </dd></dl>
+
+</div>
+</div>
+<a id="a88a698f1f02b534998643e856e38b86a" name="a88a698f1f02b534998643e856e38b86a"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a88a698f1f02b534998643e856e38b86a">&#9670;&#160;</a></span>read()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">ssize_t buffioFd::read </td>
+          <td>(</td>
+          <td class="paramtype">char *</td>          <td class="paramname"><span class="paramname"><em>buffer</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>len</em></span>&#160;) const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>linux read call wrapper to read from the fd </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">buffer</td><td>pointer to the buffer to read </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">len</td><td>size of the data in bytes to read</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>sizeof the buffer read, or -1 on error </dd></dl>
+
+</div>
+</div>
+<a id="acc2232880d29c69d45e0f59bdb689913" name="acc2232880d29c69d45e0f59bdb689913"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#acc2232880d29c69d45e0f59bdb689913">&#9670;&#160;</a></span>release()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void buffioFd::release </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>method to properly close the fd </p>
+<dl class="section return"><dt>Returns</dt><dd>void </dd></dl>
+
+</div>
+</div>
+<a id="a9e0846e7719c01360359c776850312a1" name="a9e0846e7719c01360359c776850312a1"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a9e0846e7719c01360359c776850312a1">&#9670;&#160;</a></span>unsetBit()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void buffioFd::unsetBit </td>
+          <td>(</td>
+          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>bit</em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span><span class="mlabel noexcept">noexcept</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>method to unset bits in read/write mask </p>
+<dl class="section return"><dt>Returns</dt><dd>void </dd></dl>
+
+</div>
+</div>
+<a id="ae00a94446188bc1c94a2509befc052c5" name="ae00a94446188bc1c94a2509befc052c5"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ae00a94446188bc1c94a2509befc052c5">&#9670;&#160;</a></span>waitAccept()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structbuffioHeader.html">buffioHeader</a> * buffioFd::waitAccept </td>
+          <td>(</td>
+          <td class="paramtype">struct sockaddr *</td>          <td class="paramname"><span class="paramname"><em>addr</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">socklen_t</td>          <td class="paramname"><span class="paramname"><em>socklen</em></span>&#160;)</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>method to wait until there any connecton to accept </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">addr</td><td>pointer to sockaddr_(un/in/in6) to get the address of the accepted connection @parma[in] socklen lenght of the respective sockaddr </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section warning"><dt>Warning</dt><dd>lifecycle of the sockaddr must be valid throughout the entire process of accept </dd></dl>
+<dl class="section note"><dt>Note</dt><dd>the poll method must be called before calling waitAccept</dd></dl>
+<dl class="section return"><dt>Returns</dt><dd>pointer to <a class="el" href="structbuffioHeader.html">buffioHeader</a> </dd></dl>
+
+</div>
+</div>
+<a id="aca33952b7e88b6c45940413abbcdd5f3" name="aca33952b7e88b6c45940413abbcdd5f3"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aca33952b7e88b6c45940413abbcdd5f3">&#9670;&#160;</a></span>waitConnect()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structbuffioHeader.html">buffioHeader</a> * buffioFd::waitConnect </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>method to wait until a connection is established to the socket </p>
+<dl class="section note"><dt>Note</dt><dd>the poll method must be called before calling waitConect</dd></dl>
+<dl class="section return"><dt>Returns</dt><dd>pointer to <a class="el" href="structbuffioHeader.html">buffioHeader</a> </dd></dl>
+
+</div>
+</div>
+<a id="a25a7d2ec66c9d480e91f9914b702da08" name="a25a7d2ec66c9d480e91f9914b702da08"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a25a7d2ec66c9d480e91f9914b702da08">&#9670;&#160;</a></span>waitRead()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structbuffioHeader.html">buffioHeader</a> * buffioFd::waitRead </td>
+          <td>(</td>
+          <td class="paramtype">char *</td>          <td class="paramname"><span class="paramname"><em>buffer</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>len</em></span>&#160;)</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>method to wait until there data to read </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">buffer</td><td>pointer to the buffer to read </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">len</td><td>size of the data in bytes to read</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd><a class="el" href="structbuffioHeader.html">buffioHeader</a> crafted for wait read operation </dd></dl>
+
+</div>
+</div>
+<a id="ada498cf96b554bfb0e94cc5420029802" name="ada498cf96b554bfb0e94cc5420029802"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ada498cf96b554bfb0e94cc5420029802">&#9670;&#160;</a></span>waitWrite()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structbuffioHeader.html">buffioHeader</a> * buffioFd::waitWrite </td>
+          <td>(</td>
+          <td class="paramtype">char *</td>          <td class="paramname"><span class="paramname"><em>buffer</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>len</em></span>&#160;)</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>method to wait until there data to write </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">buffer</td><td>pointer to the buffer to write </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">len</td><td>size of the data in bytes to write</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd><a class="el" href="structbuffioHeader.html">buffioHeader</a> crafted for wait write operation </dd></dl>
+
+</div>
+</div>
+<a id="a7fbc325f061a1bb4b189dfeb4843085c" name="a7fbc325f061a1bb4b189dfeb4843085c"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a7fbc325f061a1bb4b189dfeb4843085c">&#9670;&#160;</a></span>write()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">ssize_t buffioFd::write </td>
+          <td>(</td>
+          <td class="paramtype">char *</td>          <td class="paramname"><span class="paramname"><em>buffer</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>len</em></span>&#160;) const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>linux write call wrapper to write to the fd </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">pointer</td><td>to the buffer to write </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">len</td><td>length of the buffer to write </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>sizeof the buffer written, or -1 on error </dd></dl>
+
+</div>
+</div>
+<a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
+<a id="a55aa86b080aa967c1f54c70eb6f8e3fd" name="a55aa86b080aa967c1f54c70eb6f8e3fd"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a55aa86b080aa967c1f54c70eb6f8e3fd">&#9670;&#160;</a></span>address</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">char* buffioFd::address = nullptr</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel protected">protected</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>pointer to address of the fifo or unix socketpath </p>
+<dl class="section note"><dt>Note</dt><dd>pointer to the address must be allocated with new operator </dd></dl>
+
+</div>
+</div>
+<a id="ac5aa71f0a8bf284cccab8190c9f6cf0e" name="ac5aa71f0a8bf284cccab8190c9f6cf0e"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ac5aa71f0a8bf284cccab8190c9f6cf0e">&#9670;&#160;</a></span>readReq</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structbuffioHeader.html">buffioHeader</a>* buffioFd::readReq = nullptr</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel protected">protected</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>readReq holds the read requests made to the fd </p>
+<dl class="section note"><dt>Note</dt><dd><a class="el" href="structbuffioHeader.html">buffioHeader</a> must be either allocated via the header pool or new operator it's a good practice to use buffiocall to get header memory so the memory leak can be prevented </dd></dl>
+
+</div>
+</div>
+<a id="ac44ba1c1d07729094bb212ff7df8d3db" name="ac44ba1c1d07729094bb212ff7df8d3db"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ac44ba1c1d07729094bb212ff7df8d3db">&#9670;&#160;</a></span>rwmask</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">int buffioFd::rwmask = 0</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel protected">protected</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>rwmask define the readyness of the file descriptor. see <a class="el" href="buffiocommon_8hpp_source.html">buffiocommon.hpp</a> to see the mask defined for readyness of the fd, </p>
+<dl class="section note"><dt>Note</dt><dd><ul>
+<li>BUFFIO_READ_READY: if masked with this, it means the fd is ready for read operation.</li>
+<li>BUFFIO_WRITE_READY: if masked with this, it means the fd is ready for write operation. </li>
+</ul>
+</dd></dl>
+
+</div>
+</div>
+<a id="afcff1892a7cbdd1f72a345e60e03b861" name="afcff1892a7cbdd1f72a345e60e03b861"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#afcff1892a7cbdd1f72a345e60e03b861">&#9670;&#160;</a></span>writeReq</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structbuffioHeader.html">buffioHeader</a>* buffioFd::writeReq = nullptr</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel protected">protected</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>writeReq holds the write requests made to the fd </p>
+<dl class="section note"><dt>Note</dt><dd><a class="el" href="structbuffioHeader.html">buffioHeader</a> must be either allocated via the header pool or new operator it's a good practice to use buffiocall to get header memory so the memory leak can be prevented </dd></dl>
+
+</div>
+</div>
 <hr/>The documentation for this class was generated from the following file:<ul>
 <li>/home/harsh/Desktop/cpp/buffio/<a class="el" href="buffiofd_8hpp_source.html">buffiofd.hpp</a></li>
 </ul>

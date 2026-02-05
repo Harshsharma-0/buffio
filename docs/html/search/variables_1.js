@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['next_0',['next',['../classblockQueue.html#a1239ea4ef0ba4be5e868b2f38b2f87ae',1,'blockQueue']]]
+  ['current_0',['current',['../classblockQueue.html#affbfa04e22116a80ca0de8510cb157dd',1,'blockQueue']]]
 ];
