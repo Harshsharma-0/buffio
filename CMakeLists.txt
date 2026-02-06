@@ -11,11 +11,6 @@ set(CMAKE_BUILD_TYPE Debug)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 
-#    src/lfqueue.cpp
-#    src/log.cpp
-#    src/memory.cpp
-#    src/promise.cpp
-#    src/schedular.cpp
 
 # Library target
 add_library(buffio
@@ -23,6 +18,9 @@ add_library(buffio
   src/thread.cpp
   src/sockbroker.cpp
   src/scheduler.cpp
+  src/fd.cpp
+  src/fiber.cpp
+
 )
 
 target_include_directories(buffio PUBLIC

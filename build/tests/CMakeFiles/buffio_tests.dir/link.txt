@@ -1,1 +1,0 @@
-/usr/bin/c++ -g -Wl,--dependency-file=CMakeFiles/buffio_tests.dir/link.d CMakeFiles/buffio_tests.dir/test_queue.cpp.o CMakeFiles/buffio_tests.dir/test_schedular.cpp.o -o buffio_tests  ../libbuffio.a

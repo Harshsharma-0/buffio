@@ -31,7 +31,7 @@ public:
 
   ~sockBroker() {}
 
-  static buffioPromiseHandle handleAsync(buffioHeader *req);
+  static buffio::promiseHandle handleAsync(buffioHeader *req);
   /**
    * @brief consumeEntry is used to process the events received from the epoll
    * and that are not edge-triggered.
@@ -45,7 +45,7 @@ public:
    */
 
   static int consumeEntry(buffioHeader *req);
-  int start(buffio::thread &thread, int workerNum = 2, size_t queueOrder = 11);
+  int start(buffio::thread &thread, int &workerNum, size_t queueOrder = 11);
 
   inline int pushreq(buffioHeaderType *which) {
     if (sockBrokerState == buffioSockBrokerState::active) {
@@ -63,9 +63,12 @@ public:
   }
   inline buffioHeaderType *pop() {
     if (sockBrokerState == buffioSockBrokerState::active) {
-      count -= 1;
-      return epollWorks.dequeue(nullptr);
-    }
+      auto tmp = epollWorks.dequeue(nullptr);
+      if (tmp != nullptr) {
+        count -= 1;
+        return tmp;
+      }
+    };
 
     return nullptr;
   }
@@ -84,7 +87,7 @@ public:
   };
   bool busy() const { return (count != 0); }
 
-  int pollOp(int fd, void *data, int32_t mask = EPOLLIN | EPOLLOUT) {
+  int pollOp(int fd, void *data, int mask = EPOLLIN | EPOLLOUT | EPOLLET) {
     if (!running())
       return (int)buffioErrorCode::epollInstance;
 

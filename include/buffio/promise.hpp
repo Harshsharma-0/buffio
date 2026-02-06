@@ -10,6 +10,7 @@
 #include <cassert>
 #include <coroutine>
 #include <exception>
+#include <iostream>
 #include <type_traits>
 
 #define buffiowait co_await
@@ -25,7 +26,8 @@ struct buffioAwaiter {
   bool ready;
 };
 
-template <typename T> struct buffioPromise {
+namespace buffio {
+template <typename T> struct promise {
 
   struct promise_type;
   using coro_handle = std::coroutine_handle<promise_type>;
@@ -33,15 +35,14 @@ template <typename T> struct buffioPromise {
 
   struct promise_type {
 
-    template <typename Y>
-    using buffioPromiseObject = buffioPromise<Y>::promise_type;
+    template <typename Y> using promiseObject = promise<Y>::promise_type;
     template <typename U>
-    using buffioTypedHandle = std::coroutine_handle<buffioPromiseObject<U>>;
+    using buffioTypedHandle = std::coroutine_handle<promiseObject<U>>;
 
-    using buffioPromiseHandle = std::coroutine_handle<>;
+    using promiseHandle = std::coroutine_handle<>;
     template <typename D>
 
-    inline buffioPromiseObject<D> *getPromise(buffioPromiseHandle handle) {
+    inline promiseObject<D> *getPromise(promiseHandle handle) {
       void *tmp_ptr = handle.address();
       buffioTypedHandle<D> typed = buffioTypedHandle<D>::from_address(tmp_ptr);
       return &typed.promise();
@@ -86,74 +87,31 @@ template <typename T> struct buffioPromise {
     template <typename P> buffioAwaiter await_transform(P handle) {
       killChild();
       std::coroutine_handle<> handleTmp = voidSelf;
-      bool wait = false;
+      bool continueRoutine = false;
 
       if constexpr (std::is_same_v<P, std::coroutine_handle<>>) {
         handle_child = handle;
         status = buffioRoutineStatus::waiting;
         handleTmp = handle_child;
-      } else if (std::is_same_v<P, buffioPromise>) {
+      } else if constexpr (std::is_same_v<P, promise>) {
         handle_child = handle.get();
         status = buffioRoutineStatus::waiting;
         handleTmp = handle_child;
+      } else if constexpr (std::is_same_v<P, buffioRoutineStatus>) {
+        switch (handle) {
+        case buffioRoutineStatus::none:
+          continueRoutine = true;
+          break;
+        case buffioRoutineStatus::waitingFd:
+          status = handle;
+          break;
+        };
+        static_assert(false);
+      } else {
+        static_assert(false);
       };
 
-      /*
-      if constexpr (std::is_same_v<P, buffioTimer *>) {
-        if (handle->then) {
-          auto *promise = getPromise<char>(handle->then);
-          promise->setInstance(clock, broker, fdPool, headerPool);
-          clock->push(handle->duration, handle->then);
-          wait = true;
-        } else {
-          clock->push(handle->duration, voidSelf);
-        };
-        status = buffioRoutineStatus::waitingTimer;
-
-      } else if constexpr (std::is_same_v<P, buffioHeader **>) {
-       *handle = headerPool->pop();
-        wait = true;
-
-      } else if constexpr (std::is_same_v<P, buffioHeader *>) {
-
-        assert(handle != nullptr);
-
-        switch (handle->opCode) {
-        case buffioOpCode::poll:
-
-          if (broker->pollOp(handle->reqToken.fd, handle->fd,
-                             handle->len.mask) == 0) {
-            handle->fd->bitSet(BUFFIO_FD_POLLED);
-            fdPool->pushUse(handle->fd);
-          }
-
-          break;
-        case buffioOpCode::release:
-          headerPool->push(handle);
-          break;
-        case buffioOpCode::rmPoll:
-          if (*(handle->fd) == BUFFIO_FD_POLLED)
-            broker->pollDel(handle->fd->getFd());
-          break;
-        };
-        wait = true;
-
-      } else
-      } else if constexpr (std::is_same_v<P, buffioFd *>) {
-
-        static_assert(false, "don't support fd now");
-        return {};
-
-      } else if constexpr (std::is_same_v<P, buffioFd **>) {
-        *handle = fdPool->get();
-        wait = true;
-
-      } else {
-        static_assert(false, "we don't support this type");
-        return {};
-      }
-      */
-      return {.self = handleTmp, .ready = wait};
+      return {.self = handleTmp, .ready = continueRoutine};
     };
 
     void unhandled_exception() {
@@ -171,48 +129,37 @@ template <typename T> struct buffioPromise {
     void setStatus(buffioRoutineStatus stat) { status = stat; }
     buffioRoutineStatus checkStatus() const { return status; };
   };
-  buffioPromise(void_handle _handle) : handle(_handle) { assert(_handle); }
+  promise(void_handle _handle) : handle(_handle) { assert(_handle); }
   void_handle get() const { return handle; };
 
   // For simplicity, declare these 4 special functions as deleted:
-  buffioPromise(buffioPromise const &) = delete;
-  buffioPromise(buffioPromise &&) = delete;
-  buffioPromise &operator=(buffioPromise const &) = delete;
-  buffioPromise &operator=(buffioPromise &&) = delete;
+  promise(promise const &) = delete;
+  promise(promise &&) = delete;
+  promise &operator=(promise const &) = delete;
+  promise &operator=(promise &&) = delete;
 
 private:
   void_handle handle;
 };
 
-/*
- *============================================================================
- *
- *
- * global defination of types to use to get return value / promise object
- *
- *
- * ===========================================================================
- */
-
-template <typename Y>
-using buffioPromiseObject = buffioPromise<Y>::promise_type;
+template <typename Y> using promiseObject = buffio::promise<Y>::promise_type;
 template <typename U>
-using buffioTypedHandle = std::coroutine_handle<buffioPromiseObject<U>>;
-
-using buffioPromiseHandle = std::coroutine_handle<>;
+using buffioTypedHandle = std::coroutine_handle<promiseObject<U>>;
 
 template <typename D>
-inline buffioPromiseObject<D> *getPromise(buffioPromiseHandle handle) {
+inline promiseObject<D> *getPromise(promiseHandle handle) {
   void *tmp_ptr = handle.address();
   buffioTypedHandle<D> typed = buffioTypedHandle<D>::from_address(tmp_ptr);
   return &typed.promise();
 };
 
-template <typename G> constexpr G getReturn(buffioPromiseHandle handle) {
+template <typename G> constexpr G getReturn(promiseHandle handle) {
   auto tmp = getPromise<G>(handle);
   G data = tmp->returnData;
   tmp->setStatus(buffioRoutineStatus::done);
   return data;
 };
+
+}; // namespace buffio
 
 #endif

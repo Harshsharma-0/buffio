@@ -3,6 +3,7 @@
 #include <cstdint>
 
 enum class buffioRoutineStatus : uint32_t {
+  none = 19,
   fresh = 20,
   waiting = 21,
   executing = 22,
@@ -198,7 +199,8 @@ enum class buffioReadWriteType : uint8_t {
   X(makeShared, -25, "failed to create a shared ptr")                          \
   X(makeUnique, -26, "failed to create a unique ptr")                          \
   X(protocol, -27, "error invalid protocol number")                            \
-  X(protocolString, -28, "error open, no protocol string")
+  X(protocolString, -28, "error open, no protocol string")                     \
+  X(threadRun, -29, "failed to run threads")
 
 #define X(ERROR_ENUM, ERROR_CODE, MESSAGE) ERROR_ENUM = ERROR_CODE,
 enum class buffioErrorCode : int { BUFFIO_ERROR_LIST };

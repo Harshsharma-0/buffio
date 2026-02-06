@@ -3,6 +3,7 @@
 #include "common.hpp"
 #include "memory.hpp"
 #include <cassert>
+#include <iostream>
 #include <type_traits>
 /**
  * @file buffioQueue.hpp
@@ -24,10 +25,10 @@ enum class buffioQueueNoMem : int { no = 1 };
  */
 class blockQueue {
 public:
-  blockQueue *next;            ///< next member of the queue.
-  blockQueue *prev;            ///< previous member of the queue.
-  blockQueue *waiter;          ///< waiter for the task.
-  buffioPromiseHandle current; ///< coroutine handle of the task
+  blockQueue *next;              ///< next member of the queue.
+  blockQueue *prev;              ///< previous member of the queue.
+  blockQueue *waiter;            ///< waiter for the task.
+  buffio::promiseHandle current; ///< coroutine handle of the task
 
   ~blockQueue() { assert(current == nullptr); }
 };
@@ -51,7 +52,7 @@ public:
 
 namespace buffio {
 
-template <typename C = blockQueue, typename V = buffioPromiseHandle,
+template <typename C = blockQueue, typename V = buffio::promiseHandle,
           typename D = void>
 
 class Queue {
@@ -71,13 +72,13 @@ public:
   ~Queue() = default;
 
   template <typename Z = V>
-    requires std::is_same_v<Z, buffioPromiseHandle>
+    requires std::is_same_v<Z, buffio::promiseHandle>
   int push(V which, C *waiter = nullptr) {
     blockQueue *frag = nullptr;
     if ((frag = memory.pop()) == nullptr)
       return -1;
     if constexpr (std::is_same_v<C, blockQueue> &&
-                  std::is_same_v<V, buffioPromiseHandle>) {
+                  std::is_same_v<V, buffio::promiseHandle>) {
       frag->current = which;
       frag->waiter = waiter;
     };
@@ -127,7 +128,6 @@ public:
   int push(C *frag) {
     assert(frag != nullptr);
     count += 1;
-
     if (head == nullptr) {
       head = frag;
       tail = frag;

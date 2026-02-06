@@ -1,10 +1,11 @@
 #pragma once
-#include "fd.hpp"
-#include "promise.hpp"
-#include "sockbroker.hpp"
-
 #include "Queue.hpp"
 #include "clock.hpp"
+#include "fd.hpp"
+#include "fiber.hpp"
+#include "promise.hpp"
+#include "sockbroker.hpp"
+#include <iostream>
 
 /**
  * @file buffioschedular.hpp
@@ -55,13 +56,13 @@ public:
    * to the header pool.
    */
 
-  scheduler() : syncPipe(nullptr) { fdPool.mountPool(&headerPool); };
+  scheduler();
   /**
    * @brief Default destructor.
    *
    * All resources are released during run() shutdown.
    */
-  ~scheduler() = default;
+  ~scheduler();
 
   /**
    * @brief Starts the main event loop.
@@ -107,7 +108,7 @@ public:
    * @return -1 on Error.
    */
 
-  int dispatchHandle(int errorCode, buffioFd *fd, buffioHeader *header);
+  int dispatchHandle(int errorCode, buffio::Fd *fd, buffioHeader *header);
   /**
    * @brief Executes a fixed number of fd events. only called when any fd is
    * used with epoll edge-triggered
@@ -162,13 +163,16 @@ public:
    * smaller than 0 must be treated as error.
    *
    */
-  int push(buffioPromiseHandle handle);
+  int push(auto handle) {
+    queue.push(handle.get());
+    return 0;
+  };
+  void shutWorker(int workerNum, int tries, long wait);
 
 private:
-  buffioFd *syncPipe;
+  buffio::Fd syncPipe;
   buffio::sockBroker poller;
   buffio::Clock timerClock;
-  buffioFdPool fdPool;
   buffio::Queue<> queue;
   buffio::Memory<buffioHeader> headerPool;
   buffio::Queue<buffioHeader, void *, buffioQueueNoMem> requestBatch;

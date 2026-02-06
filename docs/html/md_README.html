@@ -113,10 +113,10 @@ Async I/O library with c++ coroutine.</h1>
 <ul>
 <li>Do async I/O in a organised way and clear way, no callback needed just cpp coroutines and buffio eventloop to manage it all.</li>
 <li>Buffio is collection of seperate <span class="tt">.hpp</span> files that when combines create a performancefull system that is modular and configurable.</li>
-<li>Each module of the buffio can be used seperately or with each other, &gt; <b>Buffio core</b> \ &gt; 1 <span class="tt"><a class="el" href="buffio_8hpp_source.html">buffio.hpp</a> </span> just a wrapper of all buffio modules.\ &gt; 2 <span class="tt">buffioschedular</span> schedular for buffio coroutines and the eventloop.\ &gt; 3 <span class="tt">buffiosockbroker</span> socket I/O request watcher and worker thread manager.\ &gt; 4 <span class="tt">buffiothread</span> provide class wrapper to create thread and manage them.\ &gt; 5 <span class="tt">buffioqueue</span> proveide a fixed size queue that is not thread safe.\ &gt; 6 <span class="tt"><a class="el" href="classbuffiolfqueue.html">buffiolfqueue</a></span> provedes MPMC lockfree queue, and is thread safe.\ &gt; 7 <span class="tt">buffiolog</span> provides logging function.\ &gt; 8 <span class="tt">buffiopromise</span> provides necessary defination to create buffiotask(coroutine) and use.\ &gt; 9 <span class="tt">buffiosock</span> provides abstraction to create and manage network sockets.\</li>
+<li>Each module of the buffio can be used seperately or with each other, &gt; <b>Buffio core</b> \ &gt; 1 <span class="tt">buffio.hpp </span> just a wrapper of all buffio modules.\ &gt; 2 <span class="tt">buffioschedular</span> schedular for buffio coroutines and the eventloop.\ &gt; 3 <span class="tt">buffiosockbroker</span> socket I/O request watcher and worker thread manager.\ &gt; 4 <span class="tt">buffiothread</span> provide class wrapper to create thread and manage them.\ &gt; 5 <span class="tt">buffioqueue</span> proveide a fixed size queue that is not thread safe.\ &gt; 6 <span class="tt">buffiolfqueue</span> provedes MPMC lockfree queue, and is thread safe.\ &gt; 7 <span class="tt">buffiolog</span> provides logging function.\ &gt; 8 <span class="tt">buffiopromise</span> provides necessary defination to create buffiotask(coroutine) and use.\ &gt; 9 <span class="tt">buffiosock</span> provides abstraction to create and manage network sockets.\</li>
 </ul>
 <p>&gt;[!NOTE] </p><blockquote class="doxtable">
-<p>Defination Macro <span class="tt">BUFFIO_IMPLEMENTATION</span> must be used on top of the file where you want to use buffio only applied for <span class="tt"><a class="el" href="buffio_8hpp_source.html">buffio.hpp</a></span>.</p><ul>
+<p>Defination Macro <span class="tt">BUFFIO_IMPLEMENTATION</span> must be used on top of the file where you want to use buffio only applied for <span class="tt">buffio.hpp</span>.</p><ul>
 <li>BUFFIO_DEBUF_BUILD macro is used to enable debug logs that are used while debugging</li>
 <li>BUFFIO_LOG_LOG is used to enable the loglevel=LOG that can be viewed. </li>
 </ul>
@@ -129,7 +129,7 @@ Quick example:</h2>
 <div class="line"><span class="preprocessor">#include &quot;./buffio.hpp&quot;</span></div>
 <div class="line"><span class="preprocessor">#include &lt;iostream&gt;</span></div>
 <div class="line"> </div>
-<div class="line"><a class="code hl_struct" href="structbuffioPromise.html">buffioPromise&lt;int&gt;</a> task(<span class="keywordtype">int</span> val){</div>
+<div class="line">buffioPromise&lt;int&gt; task(<span class="keywordtype">int</span> val){</div>
 <div class="line"> std::cout&lt;&lt;<span class="stringliteral">&quot;Hello World! - &quot;</span>&lt;&lt;val&lt;&lt;std::endl;</div>
 <div class="line"> buffioreturn 0;</div>
 <div class="line">}</div>
@@ -139,7 +139,6 @@ Quick example:</h2>
 <div class="line">  evloop.run();</div>
 <div class="line"> <span class="keywordflow">return</span> 0;</div>
 <div class="line">}</div>
-<div class="ttc" id="astructbuffioPromise_html"><div class="ttname"><a href="structbuffioPromise.html">buffioPromise</a></div><div class="ttdef"><b>Definition</b> buffiopromise.hpp:30</div></div>
 </div><!-- fragment --> </div></div><!-- contents -->
 </div><!-- PageDoc -->
 </div><!-- doc-content -->

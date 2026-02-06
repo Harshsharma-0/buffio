@@ -1,4 +1,8 @@
 #include "buffio/sockbroker.hpp"
+#include "buffio/fiber.hpp"
+#include <atomic>
+#include <cstdint>
+#include <iostream>
 
 namespace buffio {
 int sockBroker::worker(void *data) {
@@ -7,6 +11,8 @@ int sockBroker::worker(void *data) {
   buffioSockBrokerQueue *consumeQueue = &parent->epollConsume;
   bool exit = false;
 
+  buffio::fiber::workerCount.fetch_add(1, std::memory_order_acq_rel);
+
   while (exit != true) {
     ::sem_wait(&parent->buffioWorkerSignal);
     buffioHeader *tmpWork = workQueue->dequeue(nullptr);
@@ -14,7 +20,7 @@ int sockBroker::worker(void *data) {
       break;
     if (tmpWork->opCode == buffioOpCode::abort) {
       exit = true;
-      continue;
+      break;
     };
     int error = 0;
     switch (tmpWork->opCode) {
@@ -55,10 +61,12 @@ int sockBroker::worker(void *data) {
     };
     consumeQueue->enqueue(tmpWork);
   };
+  buffio::fiber::workerCount.fetch_add(-1, std::memory_order_acq_rel);
+
   return 0;
 };
 
-buffioPromiseHandle sockBroker::handleAsync(buffioHeader *req) {
+buffio::promiseHandle sockBroker::handleAsync(buffioHeader *req) {
 
   switch (req->opCode) {
   case buffioOpCode::asyncConnect: {
@@ -127,6 +135,8 @@ int sockBroker::consumeEntry(buffioHeader *req) {
       req->reserved -= buffiolen;
       if (req->reserved <= 0) {
         req->len.len = (req->bufferCursor - req->data.buffer);
+        *req->fd | req->unsetBit; // set bit's read/write ready it the fd was
+                                  // just picked from the queue.
         return 0;
       };
     };
@@ -148,7 +158,7 @@ int sockBroker::consumeEntry(buffioHeader *req) {
   return 1;
 };
 
-int sockBroker::start(buffio::thread &thread, int workerNum,
+int sockBroker::start(buffio::thread &thread, int &workerNum,
                       size_t queueOrder) {
 
   size_t queueSizeRel = 1 << queueOrder;
@@ -169,8 +179,14 @@ int sockBroker::start(buffio::thread &thread, int workerNum,
   if ((epollFd = ::epoll_create1(EPOLL_CLOEXEC)) < 0)
     goto outWithCleanUp;
 
+  for (int i = 0; i < workerNum; i++) {
+    if (thread.run(nullptr, buffio::sockBroker::worker, this) != 0) {
+      workerNum = i + 1;
+      return (int)buffioErrorCode::threadRun;
+    }
+  };
   sockBrokerState = buffioSockBrokerState::active;
-  //  thread.run("buffio-", buffio::sockBroker::worker, this);
+
   return (int)buffioErrorCode::none;
 
 outWithEpoll:

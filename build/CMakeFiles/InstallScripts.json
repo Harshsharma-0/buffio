@@ -1,8 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/home/harsh/Desktop/cpp/buffio/build/cmake_install.cmake",
-		"/home/harsh/Desktop/cpp/buffio/build/tests/cmake_install.cmake"
-	],
-	"Parallel" : false
-}

@@ -18,26 +18,32 @@
 #define BUFFIO_FD_READ_REQUEST (1 << 7)
 #define BUFFIO_FD_WRITE_REQUEST (1 << 8)
 
-class buffioFd;
+namespace buffio {
+class Fd;
+class sockBroker;
+template <typename T> struct promise;
+using promiseHandle = std::coroutine_handle<>;
+
+}; // namespace buffio
 struct buffioHeader;
-template <typename T> struct buffioPromise;
 
-using buffioPromiseHandle = std::coroutine_handle<>;
+using promiseHandle = std::coroutine_handle<>;
 
-typedef buffioPromise<int> (*asyncAccept_local)(int fd, struct sockaddr_un,
+typedef buffio::promise<int> (*asyncAccept_local)(int fd, struct sockaddr_un,
+                                                  socklen_t);
+typedef buffio::promise<int> (*asyncAccept_in)(int fd, struct sockaddr_in,
+                                               socklen_t);
+typedef buffio::promise<int> (*asyncAccept_in6)(int fd, struct sockaddr_in6,
                                                 socklen_t);
-typedef buffioPromise<int> (*asyncAccept_in)(int fd, struct sockaddr_in,
-                                             socklen_t);
-typedef buffioPromise<int> (*asyncAccept_in6)(int fd, struct sockaddr_in6,
-                                              socklen_t);
 
-typedef buffioPromise<int> (*asyncConnect)(int errorCode, buffioFd *fd,
-                                           struct sockaddr *);
-typedef buffioPromise<int> (*asyncWrite)(int errorCode, char *buffer,
-                                         size_t len, buffioFd *fd,
-                                         buffioHeader *);
-typedef buffioPromise<int> (*asyncRead)(int errorCode, char *buffer, size_t len,
-                                        buffioFd *fd, buffioHeader *);
+typedef buffio::promise<int> (*onAsyncConnects)(int errorCode, buffio::Fd *fd,
+                                                struct sockaddr *);
+typedef buffio::promise<int> (*onAsyncWrites)(int errorCode, char *buffer,
+                                              size_t len, buffio::Fd *fd,
+                                              buffioHeader *);
+typedef buffio::promise<int> (*onAsyncReads)(int errorCode, char *buffer,
+                                             size_t len, buffio::Fd *fd,
+                                             buffioHeader *);
 
 typedef struct buffioHeader {
 
@@ -82,7 +88,7 @@ typedef struct buffioHeader {
    * header is pushed to the worker thread or to the main event loop
    * if using no worker thread.
    */
-  buffioFd *fd;
+  buffio::Fd *fd;
   /*
    * buffer field contains buffer in which the user want to read/write
    * the buffer must maintain it's lifecycle, until or unless the operation
@@ -115,7 +121,7 @@ typedef struct buffioHeader {
    * routine contain the handle of the routine to run after
    * the operation is competed. if not an async request
    */
-  buffioPromiseHandle routine;
+  buffio::promiseHandle routine;
 
   /*
    * routine used for async requests
@@ -124,9 +130,9 @@ typedef struct buffioHeader {
    */
 
   union {
-    asyncConnect onAsyncConnect;
-    asyncRead onAsyncRead;
-    asyncWrite onAsyncWrite;
+    onAsyncConnects onAsyncConnect;
+    onAsyncReads onAsyncRead;
+    onAsyncWrites onAsyncWrite;
     asyncAccept_local asyncAcceptlocal;
     asyncAccept_in asyncAcceptin;
     asyncAccept_in6 asyncAcceptin6;
