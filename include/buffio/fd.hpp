@@ -99,7 +99,8 @@ public:
    */
   [[nodiscard]]
   static int socket(buffio::Fd &fdCore, struct sockaddr *lsocket,
-                    const char *address, int portNumber = 8080,
+                    const char *address, bool bindSocket = true,
+                    int portNumber = 8080,
                     buffioFdFamily family = buffioFdFamily::ipv4,
                     buffioSocketProtocol protocol = buffioSocketProtocol::tcp,
                     bool blocking = false);
@@ -342,16 +343,14 @@ public:
                            "signature for a specific connection"
                            "type accept request");
     };
-     if(!(rwmask & BUFFIO_FD_ACCEPT_READY)){
-      this->poll(EPOLLIN);
+    if (!(rwmask & BUFFIO_FD_ACCEPT_READY)) {
+      this->poll(EPOLLIN); // trigger events until there is client availble
     };
 
     reserveHeader.reqToken.fd = localfd.fd[0];
-    auto tmp = reserveToQueue(BUFFIO_READ_READY);
-    buffio::fiber::pendingReq.fetch_add(1,std::memory_order_acq_rel);
+    buffio::fiber::pendingReq.fetch_add(1, std::memory_order_acq_rel);
 
     return buffioRoutineStatus::none;
-
   };
   /**
    *@brief method to add fd to polling
@@ -407,8 +406,8 @@ public:
    * @return pointer to buffioHeader
    *
    */
-  buffioHeader *waitConnect();
-
+  buffioHeader *waitConnect(struct sockaddr *addr, socklen_t socklen);
+  int getConnectError() const { return reserveHeader.opError; }
   /**
    * @brief linux read call wrapper to read from the fd
    * @param[in] buffer pointer to the buffer to read
@@ -512,8 +511,8 @@ public:
   buffioHeader *getPendingRead() const { return pendingReadReq; }
   buffioHeader *getPendingWrite() const { return pendingWriteReq; }
   buffioHeader *reserveToQueue(int rmBit);
-  void resetHeader(){
-    ::memset((void*)&reserveHeader,'\0',sizeof(buffioHeader));
+  void resetHeader() {
+    ::memset((void *)&reserveHeader, '\0', sizeof(buffioHeader));
   };
   void popPendingWrite() noexcept { pendingWriteReq = nullptr; };
   void popPendingRead() noexcept { pendingReadReq = nullptr; };

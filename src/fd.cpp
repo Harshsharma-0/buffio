@@ -1,11 +1,15 @@
 #include "buffio/fd.hpp"
 #include "buffio/fiber.hpp"
+#include <asm-generic/errno.h>
+#include <cerrno>
+#include <cstring>
 
 namespace buffio {
 
 int MakeFd::socket(buffio::Fd &fdCore, struct sockaddr *lsocket,
-                   const char *address, int portNumber, buffioFdFamily family,
-                   buffioSocketProtocol protocol, bool blocking) {
+                   const char *address, bool bindSocket, int portNumber,
+                   buffioFdFamily family, buffioSocketProtocol protocol,
+                   bool blocking) {
 
   assert(lsocket != nullptr);
   assert(address != nullptr || portNumber > 0);
@@ -98,15 +102,13 @@ int MakeFd::socket(buffio::Fd &fdCore, struct sockaddr *lsocket,
   if (socketFd < 0)
     return (int)buffioErrorCode::socket;
 
-  char ip[INET_ADDRSTRLEN];
-  sockaddr_in *tmp = (sockaddr_in *)&addr;
-  inet_ntop(AF_INET, &tmp->sin_addr, ip, sizeof(ip));
+  if (bindSocket == true) {
+    if (::bind(socketFd, reinterpret_cast<sockaddr *>(&addr), addrLen) != 0) {
+      ::close(socketFd);
 
-  if (::bind(socketFd, reinterpret_cast<sockaddr *>(&addr), addrLen) != 0) {
-    ::close(socketFd);
-
-    return (int)buffioErrorCode::bind;
-  }
+      return (int)buffioErrorCode::bind;
+    }
+  };
 
   fdCore.fdFamily = family;
   fdCore.mountSocket(addressfd, socketFd, portNumber);
@@ -223,16 +225,31 @@ buffioHeader *Fd::reserveToQueue(int rmBit) {
 
   return nullptr;
 };
-buffioHeader *Fd::waitConnect() {
+buffioHeader *Fd::waitConnect(struct sockaddr *addr, socklen_t socklen) {
 
-  reserveHeader.opCode = buffioOpCode::waitConnect;
-  reserveHeader.unsetBit = BUFFIO_READ_READY;
-  reserveHeader.fd = this;
-  reserveHeader.reqToken.fd = localfd.fd[0];
+  if (this->connect(addr, socklen) != -1)
+    return nullptr;
 
-  buffio::fiber::pendingReq.fetch_add(1, std::memory_order_acq_rel);
+  switch (errno) {
+  case EINPROGRESS: {
+    reserveHeader.opCode = buffioOpCode::waitConnect;
+    reserveHeader.unsetBit = BUFFIO_READ_READY;
+    reserveHeader.fd = this;
+    reserveHeader.reqToken.fd = localfd.fd[0];
+    reserveHeader.data.socketaddr = addr;
+    reserveHeader.len.socklen = socklen;
+    reserveHeader.opError = 0;
+    buffio::fiber::pendingReq.fetch_add(1, std::memory_order_acq_rel);
+    buffio::fiber::poller->pollMod(localfd.fd[0], this, EPOLLOUT);
+    return &reserveHeader;
 
-  return &reserveHeader;
+  } break;
+  default:
+    reserveHeader.opError = -1;
+    break;
+  };
+
+  return nullptr;
 };
 
 buffioHeader *Fd::waitRead(char *buffer, size_t len) {

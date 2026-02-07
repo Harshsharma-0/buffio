@@ -1,11 +1,14 @@
 
 
 #include "buffio/sockbroker.hpp"
-#include "buffio/fiber.hpp"
 #include "buffio/fd.hpp"
+#include "buffio/fiber.hpp"
 #include <atomic>
+#include <cerrno>
 #include <cstdint>
+#include <cstring>
 #include <iostream>
+#include <sys/socket.h>
 #include <sys/types.h>
 
 namespace buffio {
@@ -121,12 +124,30 @@ buffio::promiseHandle sockBroker::handleAsync(buffioHeader *req) {
     return handle;
     break;
   };
-  case buffioOpCode::waitAccept:
-    [[fallthrough]];
-  case buffioOpCode::waitConnect:
+  case buffioOpCode::waitAccept: {
     auto tmp = req->routine;
-    int fd = ::accept(req->reqToken.fd,req->data.socketaddr, &req->len.socklen);
+    int fd =
+        ::accept(req->reqToken.fd, req->data.socketaddr, &req->len.socklen);
     req->reserved = fd;
+    req->opCode = buffioOpCode::done;
+    return tmp;
+  }; break;
+  case buffioOpCode::waitConnect:
+
+    auto tmp = req->routine;
+    int error = -1;
+    socklen_t len = sizeof(int);
+    req->opCode = buffioOpCode::done;
+    getsockopt(req->reqToken.fd, SOL_SOCKET, SO_ERROR, &error, &len);
+    req->opError = error;
+
+    if (error != 0) {
+      // reattempting connection on failure
+      ::connect(req->reqToken.fd, req->data.socketaddr, req->len.socklen);
+      if (errno != EINPROGRESS) {
+        req->opError = -1;
+      };
+    };
     req->opCode = buffioOpCode::done;
     return tmp;
     break;
@@ -155,7 +176,7 @@ int sockBroker::consumeEntry(buffioHeader *req) {
         req->len.len = (req->bufferCursor - req->data.buffer);
         *req->fd | req->unsetBit; // set bit's read/write ready it the fd was
                                   // just picked from the queue.
-        
+
         return 0;
       };
     };

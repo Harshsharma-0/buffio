@@ -105,6 +105,10 @@ template <typename T> struct promise {
         status = buffioRoutineStatus::waitingTimer;
 
       } else if constexpr (std::is_same_v<P, buffioHeader *>) {
+        if (handle == nullptr) {
+          return {.self = handleTmp, .ready = true};
+        };
+
         handle->routine = voidSelf;
         status = buffioRoutineStatus::waitingFd;
       };

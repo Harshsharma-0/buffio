@@ -41,3 +41,6 @@ target_link_libraries(hello_world_example PRIVATE buffio)
 add_executable(yield_example examples/yield_example.cpp)
 target_link_libraries(yield_example PRIVATE buffio)
 
+add_executable(connect_example examples/connect_example.cpp)
+target_link_libraries(connect_example PRIVATE buffio)
+

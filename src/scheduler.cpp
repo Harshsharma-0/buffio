@@ -58,7 +58,7 @@ int scheduler::run() {
     if (nfd != 0) {
       processEvents(evnt, nfd);
     }
-    
+
     yieldQueue(10); // yielding queue before batch consumption;
     consumeBatch(8);
     yieldQueue(10); // yielding queue after batch consumption;
@@ -97,7 +97,6 @@ void scheduler::shutWorker(int workerNum, int tries, long wait) {
     if (tries < 0)
       break;
   };
-
 };
 int scheduler::processEvents(struct epoll_event evnts[], int len) {
   for (int i = 0; i < len; i++) {
@@ -105,7 +104,7 @@ int scheduler::processEvents(struct epoll_event evnts[], int len) {
     if (evnts[i].events & EPOLLIN) {
       auto req = handle->getPendingRead();
       if (req != nullptr) {
-        buffio::fiber::pendingReq.fetch_add(-1,std::memory_order_acq_rel);
+        buffio::fiber::pendingReq.fetch_add(-1, std::memory_order_acq_rel);
         handle->popPendingRead();
         requestBatch.push(req);
       } else {
@@ -116,7 +115,7 @@ int scheduler::processEvents(struct epoll_event evnts[], int len) {
     if (evnts[i].events & EPOLLOUT) {
       auto req = handle->getPendingWrite();
       if (req != nullptr) {
-        buffio::fiber::pendingReq.fetch_add(-1,std::memory_order_acq_rel);
+        buffio::fiber::pendingReq.fetch_add(-1, std::memory_order_acq_rel);
         handle->popPendingWrite();
         requestBatch.push(req);
       } else {
@@ -137,8 +136,8 @@ int scheduler::processEvents(struct epoll_event evnts[], int len) {
     };
 
     auto routine = buffio::sockBroker::handleAsync((buffioHeader *)req);
-    if (routine){
-      buffio::fiber::pendingReq.fetch_add(-1,std::memory_order_acq_rel);
+    if (routine) {
+      buffio::fiber::pendingReq.fetch_add(-1, std::memory_order_acq_rel);
       queue.push(routine);
     }
   };
@@ -183,42 +182,42 @@ int scheduler::dispatchHandle(int errorCode, buffio::Fd *fd,
 
 int scheduler::consumeBatch(int cycle) {
   if (requestBatch.empty())
-     return -1;
+    return -1;
 
   // consumeBatch only handle read and write requests;
   ssize_t buffiolen = -1;
 
   for (int i = 0; i < cycle; i++) {
     auto req = requestBatch.get();
-    
-    if(req->rwtype == buffioReadWriteType::async){
+
+    if (req->rwtype == buffioReadWriteType::async) {
       auto routine = buffio::sockBroker::handleAsync(req);
-      if(routine){
+      if (routine) {
         queue.push(routine);
         requestBatch.pop();
-      };     
-    }else{
+      };
+    } else {
 
-    int error = 0;
-    while((error = buffio::sockBroker::consumeEntry(req)) > 0);
+      int error = 0;
+      while ((error = buffio::sockBroker::consumeEntry(req)) > 0)
+        ;
 
-     if (error <= 0) {
+      if (error <= 0) {
         if (error == 0)
           dispatchHandle(-1, req->fd, req);
         requestBatch.pop();
-     };
- 
-    // returned when there no data to read or write and we have consumed the
-    // batch && bufferlen = -1
-    if (errno == EAGAIN || errno == EWOULDBLOCK) {
-      req->fd->unsetBit(req->unsetBit);
-      requestBatch.pop();
-      dispatchHandle(0, req->fd, req);
-      } else {
-      dispatchHandle(errno, req->fd, req);
-    };
-    };
+      };
 
+      // returned when there no data to read or write and we have consumed the
+      // batch && bufferlen = -1
+      if (errno == EAGAIN || errno == EWOULDBLOCK) {
+        req->fd->unsetBit(req->unsetBit);
+        requestBatch.pop();
+        dispatchHandle(0, req->fd, req);
+      } else {
+        dispatchHandle(errno, req->fd, req);
+      };
+    };
 
     if (requestBatch.empty())
       break;
@@ -247,15 +246,15 @@ int scheduler::getWakeTime(bool *flag) {
     looptime = timerClock.getNext(startTime);
   };
 
-  if (!queue.empty() || !requestBatch.empty()){
+  if (!queue.empty() || !requestBatch.empty()) {
     return 0;
   }
   ssize_t req = buffio::fiber::pendingReq.load(std::memory_order_acquire);
-  if (req > 0){
+  if (req > 0) {
     return looptime;
   }
 
-  if (queue.empty() && timerClock.empty()){
+  if (queue.empty() && timerClock.empty()) {
     *flag = true;
     return 0;
   };
@@ -264,7 +263,7 @@ int scheduler::getWakeTime(bool *flag) {
 
 int scheduler::yieldQueue(int chunk) {
   for (int i = chunk; 0 < i; i--) {
-    if (queue.empty()){
+    if (queue.empty()) {
       return -1;
     }
 
@@ -326,8 +325,7 @@ int scheduler::yieldQueue(int chunk) {
     }
     };
     if (queue.empty())
-       break;
-      
+      break;
 
     queue.mvNext();
   };
