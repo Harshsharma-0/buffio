@@ -1,8 +1,12 @@
+
+
 #include "buffio/sockbroker.hpp"
 #include "buffio/fiber.hpp"
+#include "buffio/fd.hpp"
 #include <atomic>
 #include <cstdint>
 #include <iostream>
+#include <sys/types.h>
 
 namespace buffio {
 int sockBroker::worker(void *data) {
@@ -10,18 +14,25 @@ int sockBroker::worker(void *data) {
   buffioSockBrokerQueue *workQueue = &parent->epollWorks;
   buffioSockBrokerQueue *consumeQueue = &parent->epollConsume;
   bool exit = false;
+  ssize_t abort = 0;
 
   buffio::fiber::workerCount.fetch_add(1, std::memory_order_acq_rel);
-
   while (exit != true) {
-    ::sem_wait(&parent->buffioWorkerSignal);
+    abort = buffio::fiber::abort.load(std::memory_order_acquire);
+    if (abort < 0)
+      break;
+    if (workQueue->empty()) {
+      ::sem_wait(&parent->buffioWorkerSignal);
+      abort = buffio::fiber::abort.load(std::memory_order_acquire);
+      if (abort < 0) {
+        break;
+      }
+    };
+
     buffioHeader *tmpWork = workQueue->dequeue(nullptr);
     if (tmpWork == nullptr)
-      break;
-    if (tmpWork->opCode == buffioOpCode::abort) {
-      exit = true;
-      break;
-    };
+      continue;
+
     int error = 0;
     switch (tmpWork->opCode) {
     case buffioOpCode::asyncRead:
@@ -60,6 +71,9 @@ int sockBroker::worker(void *data) {
       break;
     };
     consumeQueue->enqueue(tmpWork);
+    abort = buffio::fiber::abort.load(std::memory_order_acquire);
+    if (abort < 0)
+      break;
   };
   buffio::fiber::workerCount.fetch_add(-1, std::memory_order_acq_rel);
 
@@ -110,7 +124,11 @@ buffio::promiseHandle sockBroker::handleAsync(buffioHeader *req) {
   case buffioOpCode::waitAccept:
     [[fallthrough]];
   case buffioOpCode::waitConnect:
-    return req->routine;
+    auto tmp = req->routine;
+    int fd = ::accept(req->reqToken.fd,req->data.socketaddr, &req->len.socklen);
+    req->reserved = fd;
+    req->opCode = buffioOpCode::done;
+    return tmp;
     break;
   };
 
@@ -137,6 +155,7 @@ int sockBroker::consumeEntry(buffioHeader *req) {
         req->len.len = (req->bufferCursor - req->data.buffer);
         *req->fd | req->unsetBit; // set bit's read/write ready it the fd was
                                   // just picked from the queue.
+        
         return 0;
       };
     };
@@ -192,8 +211,8 @@ int sockBroker::start(buffio::thread &thread, int &workerNum,
 outWithEpoll:
   ::close(epollFd);
 outWithCleanUp:
-  epollConsume.~buffiolfqueue();
-  epollWorks.~buffiolfqueue();
+  epollConsume.~lfqueue();
+  epollWorks.~lfqueue();
   return (int)buffioErrorCode::none;
 };
 }; // namespace buffio

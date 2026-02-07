@@ -1,0 +1,1 @@
+/usr/bin/c++ -g -Wl,--dependency-file=CMakeFiles/async_example.dir/link.d CMakeFiles/async_example.dir/examples/async_example.cpp.o -o async_example  libbuffio.a

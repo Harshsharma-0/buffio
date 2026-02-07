@@ -16,7 +16,7 @@ int Clock::getNext(uint64_t looptime) {
   return static_cast<int>(offset);
 };
 
-inline void Clock::push(uint64_t ms, std::coroutine_handle<> task) {
+void Clock::push(uint64_t ms, std::coroutine_handle<> task) {
 
   assert(this != nullptr);
   this->count += 1;

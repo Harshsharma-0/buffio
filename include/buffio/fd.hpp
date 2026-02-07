@@ -21,7 +21,6 @@
 #include <type_traits>
 
 #include "common.hpp"
-#include "fiber.hpp"
 #include "memory.hpp"
 #include "sockbroker.hpp"
 #include <atomic>
@@ -99,12 +98,11 @@ public:
    *
    */
   [[nodiscard]]
-  static int
-  createSocket(buffio::Fd &fdCore, struct sockaddr *lsocket,
-               const char *address, int portNumber = 8080,
-               buffioFdFamily family = buffioFdFamily::ipv4,
-               buffioSocketProtocol protocol = buffioSocketProtocol::tcp,
-               bool blocking = false);
+  static int socket(buffio::Fd &fdCore, struct sockaddr *lsocket,
+                    const char *address, int portNumber = 8080,
+                    buffioFdFamily family = buffioFdFamily::ipv4,
+                    buffioSocketProtocol protocol = buffioSocketProtocol::tcp,
+                    bool blocking = false);
   /**
    * @brief pipe communication channel maker function
    *
@@ -344,10 +342,27 @@ public:
                            "signature for a specific connection"
                            "type accept request");
     };
+     if(!(rwmask & BUFFIO_FD_ACCEPT_READY)){
+      this->poll(EPOLLIN);
+    };
+
     reserveHeader.reqToken.fd = localfd.fd[0];
+    auto tmp = reserveToQueue(BUFFIO_READ_READY);
+    buffio::fiber::pendingReq.fetch_add(1,std::memory_order_acq_rel);
 
     return buffioRoutineStatus::none;
+
   };
+  /**
+   *@brief method to add fd to polling
+   *
+   * @param[in] mask mask of events to watchout on the fd
+   *
+   * @return buffioHeader Crafter for poll op
+   */
+
+  buffioRoutineStatus poll(int mask = EPOLLIN | EPOLLOUT);
+
   buffioHeader *getRawHeader() const;
   /**
    * @brief method to async connect to a socket
@@ -383,7 +398,7 @@ public:
    * @return pointer to buffioHeader
    *
    */
-  buffioRoutineStatus waitAccept(struct sockaddr *addr, socklen_t socklen);
+  buffioHeader *waitAccept(struct sockaddr *addr, socklen_t socklen);
   /**
    * @brief method to wait until a connection is established to the socket
    *
@@ -392,7 +407,7 @@ public:
    * @return pointer to buffioHeader
    *
    */
-  buffioRoutineStatus waitConnect();
+  buffioHeader *waitConnect();
 
   /**
    * @brief linux read call wrapper to read from the fd
@@ -426,7 +441,7 @@ public:
    * @return buffioHeader crafted for wait read operation
    */
 
-  buffioRoutineStatus waitRead(char *buffer, size_t len);
+  buffioHeader *waitRead(char *buffer, size_t len);
 
   /**
    * @brief method to wait until there data to write
@@ -437,7 +452,7 @@ public:
    * @return buffioHeader crafted for wait write operation
    */
 
-  buffioRoutineStatus waitWrite(char *buffer, size_t len);
+  buffioHeader *waitWrite(char *buffer, size_t len);
   /*
    *
    * asyncRead/asyncWrite behaves same as the waitRead/waitWrite, the difference
@@ -469,15 +484,6 @@ public:
    */
 
   buffioRoutineStatus asyncWrite(char *buffer, size_t len, onAsyncWrites then);
-  /**
-   *@brief method to add fd to polling
-   *
-   * @param[in] mask mask of events to watchout on the fd
-   *
-   * @return buffioHeader Crafter for poll op
-   */
-
-  buffioRoutineStatus poll(int mask = EPOLLIN | EPOLLOUT);
 
   /**
    * @brief method to return the read end of a pipe if fd type is pipe
@@ -505,6 +511,10 @@ public:
 
   buffioHeader *getPendingRead() const { return pendingReadReq; }
   buffioHeader *getPendingWrite() const { return pendingWriteReq; }
+  buffioHeader *reserveToQueue(int rmBit);
+  void resetHeader(){
+    ::memset((void*)&reserveHeader,'\0',sizeof(buffioHeader));
+  };
   void popPendingWrite() noexcept { pendingWriteReq = nullptr; };
   void popPendingRead() noexcept { pendingReadReq = nullptr; };
 

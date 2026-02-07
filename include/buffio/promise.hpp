@@ -2,15 +2,9 @@
 #define __BUFFIO_PROMISE_HPP__
 
 #include "common.hpp"
-#include "enum.hpp"
-#include "fd.hpp"
-
-#include "./sockbroker.hpp"
-#include <atomic>
+#include "fiber.hpp"
 #include <cassert>
-#include <coroutine>
 #include <exception>
-#include <iostream>
 #include <type_traits>
 
 #define buffiowait co_await
@@ -106,9 +100,13 @@ template <typename T> struct promise {
           status = handle;
           break;
         };
-        static_assert(false);
-      } else {
-        static_assert(false);
+      } else if constexpr (std::is_same_v<P, buffio::clockSpec::wait>) {
+        buffio::fiber::timerClock->push(handle.ms, voidSelf);
+        status = buffioRoutineStatus::waitingTimer;
+
+      } else if constexpr (std::is_same_v<P, buffioHeader *>) {
+        handle->routine = voidSelf;
+        status = buffioRoutineStatus::waitingFd;
       };
 
       return {.self = handleTmp, .ready = continueRoutine};

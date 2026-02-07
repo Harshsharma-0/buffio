@@ -13,6 +13,11 @@ struct buffioTimerInfo {
 
 namespace buffio {
 
+namespace clockSpec {
+struct wait {
+  uint32_t ms;
+};
+}; // namespace clock
 struct buffioTimerCmp {
   bool operator()(const buffioTimerInfo &a, const buffioTimerInfo &b) const {
     return a.expires > b.expires;
@@ -31,8 +36,8 @@ public:
 
   uint64_t now() noexcept;
 
-  inline std::coroutine_handle<> get() const { return nextWork; }
-  inline void push(uint64_t ms, std::coroutine_handle<> task);
+  std::coroutine_handle<> get() const { return nextWork; }
+  void push(uint64_t ms, std::coroutine_handle<> task);
 
 private:
   size_t count;

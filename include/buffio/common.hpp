@@ -14,9 +14,9 @@
 #define BUFFIO_FD_ORIGIN_POOL (1 << 4)
 #define BUFFIO_FD_REQUEST_AVAILABLE (1 << 5)
 #define BUFFIO_FD_CONNECT_REQUEST (1 << 6)
-#define BUFFIO_FD_ACCEPT_REQUEST (1 << 7)
-#define BUFFIO_FD_READ_REQUEST (1 << 7)
-#define BUFFIO_FD_WRITE_REQUEST (1 << 8)
+#define BUFFIO_FD_ACCEPT_READY (1 << 7)
+#define BUFFIO_FD_READ_REQUEST (1 << 8)
+#define BUFFIO_FD_WRITE_REQUEST (1 << 9)
 
 namespace buffio {
 class Fd;

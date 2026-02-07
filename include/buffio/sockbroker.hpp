@@ -2,16 +2,16 @@
 
 #include "common.hpp"
 #include "enum.hpp"
-#include "fd.hpp"
+#include "fiber.hpp"
+
 #include "lfqueue.hpp"
-#include "promise.hpp"
 #include "thread.hpp"
 #include <semaphore.h>
 #include <sys/epoll.h>
 #include <unistd.h>
 
 #define BUFFIO_REQUEST_MAX_SIZE sizeof(buffioRequestMaxSize)
-using buffioSockBrokerQueue = buffiolfqueue<buffioHeader *>;
+using buffioSockBrokerQueue = buffio::lfqueue<buffioHeader *>;
 
 namespace buffio {
 class sockBroker {
@@ -98,7 +98,13 @@ public:
     int retcode = epoll_ctl(epollFd, EPOLL_CTL_ADD, fd, &evnt);
     return (int)buffioErrorCode::none;
   };
-
+  int pollMod(int fd,void *data,int mask){
+    struct epoll_event evnt = {0};
+    evnt.events = mask;
+    evnt.data.ptr = data;
+    int retcode = epoll_ctl(epollFd,EPOLL_CTL_MOD,fd,&evnt);
+    return 0;
+   }
   int pollDel(int fd) {
     if (!running())
       return (int)buffioErrorCode::epollInstance;

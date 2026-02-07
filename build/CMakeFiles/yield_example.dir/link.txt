@@ -1,0 +1,1 @@
+/usr/bin/c++ -g -Wl,--dependency-file=CMakeFiles/yield_example.dir/link.d CMakeFiles/yield_example.dir/examples/yield_example.cpp.o -o yield_example  libbuffio.a

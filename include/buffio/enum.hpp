@@ -157,6 +157,7 @@ enum class buffioReadWriteType : uint8_t {
   sendto = 5,
 
   rwEnd = 6,
+  async = 7,
 };
 
 /*

@@ -18,5 +18,11 @@ extern buffio::Queue<> *queue;
 extern buffio::Clock *timerClock;
 extern buffio::sockBroker *poller;
 extern std::atomic<size_t> workerCount;
+extern std::atomic<ssize_t> abort; // below 0 to abort,
+extern std::atomic<ssize_t> FdCount;
+extern std::atomic<ssize_t> pendingReq; 
 }; // namespace fiber
 }; // namespace buffio
+
+#include "promise.hpp"
+

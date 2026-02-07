@@ -1,11 +1,12 @@
 #pragma once
-#include "Queue.hpp"
-#include "clock.hpp"
 #include "fd.hpp"
 #include "fiber.hpp"
 #include "promise.hpp"
-#include "sockbroker.hpp"
+
 #include <iostream>
+#include <unistd.h>
+
+#define __buffioCall(type) buffiowait type
 
 /**
  * @file buffioschedular.hpp
@@ -169,6 +170,7 @@ public:
   };
   void shutWorker(int workerNum, int tries, long wait);
 
+
 private:
   buffio::Fd syncPipe;
   buffio::sockBroker poller;
@@ -176,6 +178,7 @@ private:
   buffio::Queue<> queue;
   buffio::Memory<buffioHeader> headerPool;
   buffio::Queue<buffioHeader, void *, buffioQueueNoMem> requestBatch;
+
   buffio::thread threadPool;
 };
 }; // namespace buffio

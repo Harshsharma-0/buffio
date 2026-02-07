@@ -144,6 +144,11 @@ public:
     return 0;
   };
 
+  int pushHead(C *frag) {
+    push(frag);
+    head = frag;
+    return 0;
+  };
   /**
    * @brief method used to erase the entry that
    *
