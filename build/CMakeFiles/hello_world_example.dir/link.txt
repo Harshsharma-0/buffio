@@ -1,1 +1,0 @@
-/usr/bin/c++ -g -Wl,--dependency-file=CMakeFiles/hello_world_example.dir/link.d CMakeFiles/hello_world_example.dir/examples/hello_world.cpp.o -o hello_world_example  libbuffio.a
