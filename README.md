@@ -28,11 +28,10 @@ Buffio only provides you with a eventloop and fd operations function, all the lo
      cd buffio && mkdir build && cmake .. 
    ```
  - To use in your project add `add_subdirectory(buffio)` and `target_link_libraries(myapp PRIVATE buffio)`  in your CMakeLists.txt
-
-```CMakeLists.txt
-  add_subdirectory(buffio)
-  target_link_libraries(myapp PRIVATE buffio)
-```
+   ```CMakeLists.txt
+     add_subdirectory(buffio)
+     target_link_libraries(myapp PRIVATE buffio)
+   ```
 - To just test example, after cloning, run
   ```bash
     cd buffio && mkdir build && cmake .. && make && ./hello_world_example
