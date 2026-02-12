@@ -1,4 +1,5 @@
 #include "buffio/scheduler.hpp"
+#include <iostream>
 
 namespace buffio {
 
@@ -47,10 +48,9 @@ int scheduler::run() {
   while (exit != true) {
 
     timeout = getWakeTime(&exit);
-
+    timerClock.pushExpired(queue);
     if (exit == true)
       break;
-
     int nfd = poller.poll(evnt, 1024, timeout);
 
     if (nfd < 0)
@@ -58,12 +58,10 @@ int scheduler::run() {
     if (nfd != 0) {
       processEvents(evnt, nfd);
     }
-
     yieldQueue(10); // yielding queue before batch consumption;
     consumeBatch(8);
     yieldQueue(10); // yielding queue after batch consumption;
-
-    getWakeTime(&exit);
+    timerClock.pushExpired(queue);
   };
 
   cleanQueue();
@@ -103,6 +101,7 @@ int scheduler::processEvents(struct epoll_event evnts[], int len) {
     auto handle = (buffio::Fd *)evnts[i].data.ptr;
     if (evnts[i].events & EPOLLIN) {
       auto req = handle->getPendingRead();
+
       if (req != nullptr) {
         buffio::fiber::pendingReq.fetch_add(-1, std::memory_order_acq_rel);
         handle->popPendingRead();
@@ -132,6 +131,7 @@ int scheduler::processEvents(struct epoll_event evnts[], int len) {
     case buffioOpCode::read:
     case buffioOpCode::write:
       requestBatch.push((buffioHeader *)req);
+      buffio::fiber::pendingReq.fetch_add(-1, std::memory_order_acq_rel);
       break;
     };
 
@@ -151,8 +151,7 @@ int scheduler::dispatchHandle(int errorCode, buffio::Fd *fd,
   case buffioOpCode::read:
     [[fallthrough]];
   case buffioOpCode::readFile:
-    queue.push(header->routine);
-    break;
+    [[fallthrough]];
   case buffioOpCode::write:
     [[fallthrough]];
   case buffioOpCode::writeFile:
@@ -189,40 +188,23 @@ int scheduler::consumeBatch(int cycle) {
 
   for (int i = 0; i < cycle; i++) {
     auto req = requestBatch.get();
-
     if (req->rwtype == buffioReadWriteType::async) {
       auto routine = buffio::sockBroker::handleAsync(req);
-      if (routine) {
+      if (routine)
         queue.push(routine);
-        requestBatch.pop();
-      };
+
+      requestBatch.pop();
     } else {
 
-      int error = 0;
-      while ((error = buffio::sockBroker::consumeEntry(req)) > 0)
-        ;
-
-      if (error <= 0) {
-        if (error == 0)
-          dispatchHandle(-1, req->fd, req);
-        requestBatch.pop();
-      };
-
-      // returned when there no data to read or write and we have consumed the
-      // batch && bufferlen = -1
-      if (errno == EAGAIN || errno == EWOULDBLOCK) {
-        req->fd->unsetBit(req->unsetBit);
-        requestBatch.pop();
-        dispatchHandle(0, req->fd, req);
-      } else {
-        dispatchHandle(errno, req->fd, req);
-      };
+      int error = buffio::sockBroker::consumeEntry(req);
+      dispatchHandle(error, req->fd, req);
+      requestBatch.pop();
+      if (requestBatch.empty())
+        break;
+      requestBatch.mvNext();
+      return 0;
     };
-
-    if (requestBatch.empty())
-      break;
-    requestBatch.mvNext();
-  };
+  }
   return 0;
 };
 
@@ -236,15 +218,8 @@ void scheduler::cleanQueue() {
 };
 
 int scheduler::getWakeTime(bool *flag) {
-  uint64_t startTime = timerClock.now();
-  int looptime = timerClock.getNext(startTime);
-  while (looptime == 0) {
-    auto clkWork = timerClock.get();
-    auto *promise = getPromise<char>(clkWork);
-    promise->setStatus(buffioRoutineStatus::executing);
-    queue.push(clkWork);
-    looptime = timerClock.getNext(startTime);
-  };
+
+  int looptime = timerClock.getNext();
 
   if (!queue.empty() || !requestBatch.empty()) {
     return 0;

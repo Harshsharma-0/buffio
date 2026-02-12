@@ -144,6 +144,8 @@ public:
    *
    */
   static int setNonBlocking(int fd);
+
+  static int mkFdSock(buffio::Fd &fdCore, int fd, struct sockaddr &addr);
 };
 
 /**

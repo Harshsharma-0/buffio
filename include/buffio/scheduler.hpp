@@ -170,7 +170,6 @@ public:
   };
   void shutWorker(int workerNum, int tries, long wait);
 
-
 private:
   buffio::Fd syncPipe;
   buffio::sockBroker poller;

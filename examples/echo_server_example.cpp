@@ -2,6 +2,7 @@
 
 #include <iostream>
 
+#define SERVER_PORT 8080
 buffio::promise<int> client() {
   buffio::Fd connectFd;
   struct sockaddr_in addr;
@@ -13,12 +14,13 @@ buffio::promise<int> client() {
    * here false control whether to bind the socket or not
    */
 
-  if (buffio::MakeFd::socket(connectFd, (sockaddr *)&addr, "127.0.0.1",
-                             false) != 0) {
+  if (buffio::MakeFd::socket(connectFd, (sockaddr *)&addr, "127.0.0.1", false,
+                             SERVER_PORT) != 0) {
     std::cout << "error" << std::endl;
     buffioreturn 0;
   };
 
+  std::cout << "connecting fd " << connectFd.getFd() << std::endl;
   // taking 5 attempts to connect to the server
   for (int i = 0; i < 5; i++) {
     __buffioCall(connectFd.waitConnect((sockaddr *)&addr, sizeof(sockaddr_in)));
@@ -29,18 +31,41 @@ buffio::promise<int> client() {
     }
     std::cout << "connection unsuccessfull attempting in 1s..." << std::endl;
     buffio::clockSpec::wait delay;
-    delay.ms = 1000; // sleep 1s for server to become up and running;
+    delay.ms = 1000; // sleep 1s just for delay;
     __buffioCall(delay);
   };
 
-  std::cout << "client exiting" << std::endl;
+  char buffer[1024];
+
+  int i = 0;
+  for (;;) {
+    buffio::clockSpec::wait clk;
+    clk.ms = 1000;
+    __buffioCall(connectFd.waitRead(buffer, 1024));
+    std::cout << "client read : " << buffer << " " << i << std::endl;
+    __buffioCall(clk);
+    i += 1;
+  }
+
   buffioreturn 0;
 };
 buffio::promise<int> asyncAcceptEx(int fd, sockaddr_in addr, socklen_t len) {
 
   std::cout << "connection accepted : fd - " << fd
             << " ip adress : " << inet_ntoa(addr.sin_addr) << std::endl;
-  ::close(fd);
+
+  buffio::Fd clientFd;
+  buffio::MakeFd::mkFdSock(clientFd, fd, (sockaddr &)addr);
+
+  const char *buffer = "echo";
+
+  for (;;) {
+    buffio::clockSpec::wait clk;
+    clk.ms = 1000;
+    __buffioCall(clk);
+    __buffioCall(clientFd.waitWrite((char *)buffer, strlen(buffer) + 1));
+  }
+
   buffioreturn 0;
 };
 buffio::promise<int> server() {
@@ -52,8 +77,10 @@ buffio::promise<int> server() {
    * by default MakeFd::socket create a ipv4 socket and on port 8080
    * return negative num on error
    */
-  if (buffio::MakeFd::socket(serverFd, (sockaddr *)&addr, "127.0.0.1") != 0) {
+  if (buffio::MakeFd::socket(serverFd, (sockaddr *)&addr, "127.0.0.1", true,
+                             SERVER_PORT) != 0) {
     std::cout << "error" << std::endl;
+    assert(false);
     buffioreturn 0;
   };
 
@@ -61,7 +88,7 @@ buffio::promise<int> server() {
    */
 
   serverFd.listen(2);
-  std::cout << "server listening..." << std::endl;
+  std::cout << "server listening... " << serverFd.getFd() << std::endl;
 
   __buffioCall(serverFd.asyncAccept(asyncAcceptEx));
 

@@ -147,6 +147,10 @@ buffio::promiseHandle sockBroker::handleAsync(buffioHeader *req) {
       if (errno != EINPROGRESS) {
         req->opError = -1;
       };
+    } else {
+      buffio::fiber::pendingReq.fetch_add(1, std::memory_order_acq_rel);
+      buffio::fiber::poller->pollDel(req->reqToken.fd);
+      buffio::fiber::poller->pollOp(req->reqToken.fd, req->fd);
     };
     req->opCode = buffioOpCode::done;
     return tmp;
@@ -159,43 +163,37 @@ buffio::promiseHandle sockBroker::handleAsync(buffioHeader *req) {
 int sockBroker::consumeEntry(buffioHeader *req) {
 
   // consumeBatch only handle read and write requests;
-  ssize_t buffiolen = -1;
+  ssize_t buffiolen = 0;
+  req->opError = 0;
 
-  switch (req->rwtype) {
-  case buffioReadWriteType::read:
-    buffiolen = ::read(req->reqToken.fd, req->bufferCursor, req->reserved);
-    [[fallthrough]];
-  case buffioReadWriteType::write:
-    buffiolen = ::write(req->reqToken.fd, req->bufferCursor, req->reserved);
-    [[fallthrough]];
-  case buffioReadWriteType::rwEnd:
-    if (buffiolen > 0) {
-      req->bufferCursor += buffiolen; // moving the buffer to the next bytes;
-      req->reserved -= buffiolen;
-      if (req->reserved <= 0) {
-        req->len.len = (req->bufferCursor - req->data.buffer);
-        *req->fd | req->unsetBit; // set bit's read/write ready it the fd was
-                                  // just picked from the queue.
+  errno = 0;
+  while (buffiolen >= 0) {
 
-        return 0;
-      };
+    switch (req->rwtype) {
+    case buffioReadWriteType::read:
+      buffiolen = read(req->reqToken.fd, req->bufferCursor, req->reserved);
+      break;
+    case buffioReadWriteType::write:
+      buffiolen = write(req->reqToken.fd, req->bufferCursor, req->reserved);
+      break;
+    default:
+      break;
     };
-    break;
-  case buffioReadWriteType::recvfrom:
-    [[fallthrough]];
-  case buffioReadWriteType::recv:
-    break;
-  case buffioReadWriteType::sendto:
-    [[fallthrough]];
-  case buffioReadWriteType::send:
-    break;
-  default:
-    break;
+    if (buffiolen > 0) {
+      req->reserved -= buffiolen;
+      if (req->reserved <= 0)
+        return 0;
+      req->bufferCursor = req->data.buffer + buffiolen;
+    };
   };
+  req->len.len -= (req->bufferCursor - req->data.buffer);
 
-  if (buffiolen < 0)
-    return -1;
-  return 1;
+  if (errno == EAGAIN || errno == EWOULDBLOCK) {
+    req->fd->unsetBit(req->unsetBit);
+    return 0;
+  };
+  req->opError = errno;
+  return -1;
 };
 
 int sockBroker::start(buffio::thread &thread, int &workerNum,

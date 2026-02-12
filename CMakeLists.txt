@@ -44,3 +44,6 @@ target_link_libraries(yield_example PRIVATE buffio)
 add_executable(connect_example examples/connect_example.cpp)
 target_link_libraries(connect_example PRIVATE buffio)
 
+add_executable(echo_server_example examples/echo_server_example.cpp)
+target_link_libraries(echo_server_example PRIVATE buffio)
+

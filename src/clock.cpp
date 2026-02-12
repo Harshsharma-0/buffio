@@ -1,32 +1,41 @@
 #include "buffio/clock.hpp"
+#include "buffio/promise.hpp"
+#include <chrono>
 
 namespace buffio {
 
-int Clock::getNext(uint64_t looptime) {
-  if (count == 0)
+int Clock::getNext() {
+  if (timerTree.empty())
     return -1;
 
-  auto timerOf = timerTree.top();
-  uint64_t offset = timerOf.expires < looptime ? 0 : timerOf.expires - looptime;
-  if (offset == 0) {
-    timerTree.pop();
-    count -= 1;
-  };
-  nextWork = timerOf.task;
-  return static_cast<int>(offset);
+  auto now = chrClock::now();
+  auto next = timerTree.top().expires;
+
+  if (next <= now)
+    return 0;
+  auto diff =
+      std::chrono::duration_cast<std::chrono::milliseconds>(next - now).count();
+  return static_cast<int>(diff);
 };
 
-void Clock::push(uint64_t ms, std::coroutine_handle<> task) {
+void Clock::push(uint32_t delay, std::coroutine_handle<> task) {
 
   assert(this != nullptr);
-  this->count += 1;
-  timerTree.push({ms + now(), task});
+  timerTree.push({std::chrono::milliseconds(delay) + chrClock::now(), task});
 };
 
-uint64_t Clock::now() noexcept {
-  struct timespec tv;
-  if (clock_gettime(CLOCK_MONOTONIC, &tv) != 0)
-    return -1;
-  return (uint64_t)tv.tv_sec * 1000 + tv.tv_nsec / 1000000;
+void Clock::pushExpired(buffio::Queue<> &queue) {
+  if (timerTree.empty())
+    return;
+
+  auto now = chrClock::now();
+
+  while (!timerTree.empty() && timerTree.top().expires <= now) {
+    auto handle = timerTree.top().task;
+    auto *promise = getPromise<char>(handle);
+    promise->setStatus(buffioRoutineStatus::executing);
+    queue.push(handle);
+    timerTree.pop();
+  }
 };
 }; // namespace buffio

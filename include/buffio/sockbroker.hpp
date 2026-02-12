@@ -98,13 +98,13 @@ public:
     int retcode = epoll_ctl(epollFd, EPOLL_CTL_ADD, fd, &evnt);
     return (int)buffioErrorCode::none;
   };
-  int pollMod(int fd,void *data,int mask){
+  int pollMod(int fd, void *data, int mask) {
     struct epoll_event evnt = {0};
     evnt.events = mask;
     evnt.data.ptr = data;
-    int retcode = epoll_ctl(epollFd,EPOLL_CTL_MOD,fd,&evnt);
+    int retcode = epoll_ctl(epollFd, EPOLL_CTL_MOD, fd, &evnt);
     return 0;
-   }
+  }
   int pollDel(int fd) {
     if (!running())
       return (int)buffioErrorCode::epollInstance;

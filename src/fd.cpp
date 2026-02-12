@@ -171,12 +171,39 @@ int MakeFd::setNonBlocking(int fd) {
   int flags = 0;
   if ((flags = fcntl(fd, F_GETFL, 0)) == -1)
     return (int)buffioErrorCode::fcntl;
+  if (flags & O_NONBLOCK)
+    return (int)buffioErrorCode::none;
   flags |= O_NONBLOCK;
   if (fcntl(fd, F_SETFL, flags) == -1)
     return (int)buffioErrorCode::fcntl;
 
   return (int)buffioErrorCode::none;
 }
+int MakeFd::mkFdSock(buffio::Fd &fdCore, int fd, struct sockaddr &addr) {
+
+  assert(fd >= 0);
+
+  int portNumber = 0;
+  switch (addr.sa_family) {
+  case AF_UNIX:
+    fdCore.fdFamily = buffioFdFamily::local;
+  case AF_INET:
+    fdCore.fdFamily = buffioFdFamily::ipv4;
+    portNumber = ntohs(((sockaddr_in *)&addr)->sin_port);
+  case AF_INET6:
+    fdCore.fdFamily = buffioFdFamily::ipv6;
+    portNumber = ntohs(((sockaddr_in6 *)&addr)->sin6_port);
+    break;
+  default:
+    assert(false);
+    break;
+  };
+  //  fdCore | BUFFIO_WRITE_READY;
+  MakeFd::setNonBlocking(fd);
+  fdCore.mountSocket(nullptr, fd, portNumber);
+
+  return 0;
+};
 }; // namespace buffio
 
 namespace buffio {
@@ -242,7 +269,6 @@ buffioHeader *Fd::waitConnect(struct sockaddr *addr, socklen_t socklen) {
     buffio::fiber::pendingReq.fetch_add(1, std::memory_order_acq_rel);
     buffio::fiber::poller->pollMod(localfd.fd[0], this, EPOLLOUT);
     return &reserveHeader;
-
   } break;
   default:
     reserveHeader.opError = -1;
@@ -258,15 +284,18 @@ buffioHeader *Fd::waitRead(char *buffer, size_t len) {
                              : buffioOpCode::read;
   reserveHeader.fd = this;
   reserveHeader.unsetBit = BUFFIO_READ_READY;
+  reserveHeader.rwtype = buffioReadWriteType::read;
   reserveHeader.data.buffer = buffer;
+  reserveHeader.bufferCursor = buffer;
+  reserveHeader.reserved = len;
   reserveHeader.len.len = len;
   reserveHeader.reqToken.fd = localfd.fd[0];
-  auto tmp = reserveToQueue(BUFFIO_READ_READY);
-  if (tmp != nullptr)
-    return tmp;
+  if (rwmask & BUFFIO_READ_READY) {
+    buffio::fiber::requestBatch->push(&reserveHeader);
+    return &reserveHeader;
+  };
 
   buffio::fiber::pendingReq.fetch_add(1, std::memory_order_acq_rel);
-
   return &reserveHeader;
 };
 
@@ -278,14 +307,17 @@ buffioHeader *Fd::waitWrite(char *buffer, size_t len) {
   reserveHeader.fd = this;
   reserveHeader.data.buffer = buffer;
   reserveHeader.unsetBit = BUFFIO_WRITE_READY;
+  reserveHeader.rwtype = buffioReadWriteType::write;
+  reserveHeader.bufferCursor = buffer;
+  reserveHeader.reserved = len;
   reserveHeader.len.len = len;
   reserveHeader.reqToken.fd = localfd.fd[0];
-  auto tmp = reserveToQueue(BUFFIO_WRITE_READY);
-  if (tmp != nullptr)
-    return tmp;
+  if (rwmask & BUFFIO_WRITE_READY) {
+    buffio::fiber::requestBatch->push(&reserveHeader);
+    return &reserveHeader;
+  };
 
   buffio::fiber::pendingReq.fetch_add(1, std::memory_order_acq_rel);
-
   return &reserveHeader;
 };
 

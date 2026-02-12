@@ -1,13 +1,17 @@
 #pragma once
 
+#include "Queue.hpp"
 #include <cassert>
+#include <chrono>
 #include <coroutine>
 #include <cstdint>
 #include <queue>
+#include <ratio>
 #include <time.h>
 
+using chrClock = std::chrono::steady_clock;
 struct buffioTimerInfo {
-  uint64_t expires;
+  chrClock::time_point expires;
   std::coroutine_handle<> task;
 };
 
@@ -17,7 +21,7 @@ namespace clockSpec {
 struct wait {
   uint32_t ms;
 };
-}; // namespace clock
+}; // namespace clockSpec
 struct buffioTimerCmp {
   bool operator()(const buffioTimerInfo &a, const buffioTimerInfo &b) const {
     return a.expires > b.expires;
@@ -28,19 +32,16 @@ using buffioClockTree =
                         buffioTimerCmp>;
 class Clock {
 public:
-  Clock() : count(0) {};
+  Clock() = default;
   ~Clock() = default;
 
-  int getNext(uint64_t looptime);
-  bool empty() const { return (count == 0); }
+  int getNext();
+  bool empty() const { return timerTree.empty(); }
 
-  uint64_t now() noexcept;
-
-  std::coroutine_handle<> get() const { return nextWork; }
-  void push(uint64_t ms, std::coroutine_handle<> task);
+  void push(uint32_t delay, std::coroutine_handle<> task);
+  void pushExpired(buffio::Queue<> &queue);
 
 private:
-  size_t count;
   buffioClockTree timerTree;
   std::coroutine_handle<> nextWork;
 };
