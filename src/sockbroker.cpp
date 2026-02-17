@@ -35,7 +35,7 @@ int sockBroker::worker(void *data) {
     buffioHeader *tmpWork = workQueue->dequeue(nullptr);
     if (tmpWork == nullptr)
       continue;
-
+    //    std::cout << "[worker activated] " << std::endl;
     int error = 0;
     switch (tmpWork->opCode) {
     case buffioOpCode::asyncRead:
@@ -54,7 +54,6 @@ int sockBroker::worker(void *data) {
       error =
           ::read(tmpWork->reqToken.fd, tmpWork->data.buffer, tmpWork->len.len);
       tmpWork->opError = error;
-
     } break;
     case buffioOpCode::asyncWriteFile:
       [[fallthrough]];
@@ -62,7 +61,6 @@ int sockBroker::worker(void *data) {
       error =
           ::write(tmpWork->reqToken.fd, tmpWork->data.buffer, tmpWork->len.len);
       tmpWork->opError = error;
-
     } break;
     default:
       auto handle = buffio::sockBroker::handleAsync(tmpWork);
@@ -74,6 +72,8 @@ int sockBroker::worker(void *data) {
       break;
     };
     consumeQueue->enqueue(tmpWork);
+    parent->wakeLoop();
+    buffio::fiber::pendingReq.fetch_add(-1, std::memory_order_acq_rel);
     abort = buffio::fiber::abort.load(std::memory_order_acquire);
     if (abort < 0)
       break;
@@ -163,11 +163,10 @@ buffio::promiseHandle sockBroker::handleAsync(buffioHeader *req) {
 int sockBroker::consumeEntry(buffioHeader *req) {
 
   // consumeBatch only handle read and write requests;
-  ssize_t buffiolen = 0;
+  ssize_t buffiolen = 1;
   req->opError = 0;
-
   errno = 0;
-  while (buffiolen >= 0) {
+  while (buffiolen > 0) {
 
     switch (req->rwtype) {
     case buffioReadWriteType::read:
@@ -179,6 +178,7 @@ int sockBroker::consumeEntry(buffioHeader *req) {
     default:
       break;
     };
+
     if (buffiolen > 0) {
       req->reserved -= buffiolen;
       if (req->reserved <= 0)
@@ -186,8 +186,8 @@ int sockBroker::consumeEntry(buffioHeader *req) {
       req->bufferCursor = req->data.buffer + buffiolen;
     };
   };
-  req->len.len -= (req->bufferCursor - req->data.buffer);
 
+  req->len.len = (req->bufferCursor - req->data.buffer);
   if (errno == EAGAIN || errno == EWOULDBLOCK) {
     req->fd->unsetBit(req->unsetBit);
     return 0;

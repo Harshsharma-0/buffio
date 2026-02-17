@@ -3,21 +3,23 @@
 #include <cstdint>
 
 enum class buffioRoutineStatus : uint32_t {
-  none = 19,
-  fresh = 20,
-  waiting = 21,
-  executing = 22,
-  yield = 23,
-  error = 24,
-  paused = 25,
-  pushTask = 26,
-  done = 27,
-  unhandledException = 28,
-  waitingFd = 29,
-  zombie = 30,
-  wakeParent = 31,
-  waitingOp = 32,
-  waitingTimer = 33,
+  none = 0,
+  executing,
+  yield,
+  waitingFd,
+  waitingFile,
+  paused,
+  waiting,
+  waitingTimer,
+  pushTask,
+  unhandledException,
+  error,
+  wakeParent,
+  zombie,
+  done,
+
+  fresh,
+  waitingOp,
 
 };
 

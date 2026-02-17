@@ -20,6 +20,7 @@
 #include <exception>
 #include <type_traits>
 
+#include "buffio/fiber.hpp"
 #include "common.hpp"
 #include "memory.hpp"
 #include "sockbroker.hpp"
@@ -135,6 +136,15 @@ public:
   static int mkfifo(buffio::Fd &fdCore,
                     const char *path = "/usr/home/buffioDefault",
                     mode_t mode = 0666, bool onlyFifo = false);
+  /**
+   * @brief opens the file at the specified path
+   *
+   *
+   *
+   */
+  [[nodiscard]]
+  static int openFile(buffio::Fd &fdCore, const char *path, int flags,
+                      mode_t mode = 0666);
   /**
    * @brief set a fd to non-blocking mode from blocking mode
    *
@@ -354,6 +364,9 @@ public:
 
     return buffioRoutineStatus::none;
   };
+  inline void asyncAccpetDone() {
+    buffio::fiber::pendingReq.fetch_add(-1, std::memory_order_acq_rel);
+  }
   /**
    *@brief method to add fd to polling
    *
@@ -547,7 +560,7 @@ private:
    */
 
   void mountFifo(char *address) { this->address = address; };
-
+  void mountFile(int fd);
   buffioFdFamily fdFamily = buffioFdFamily::none;
   buffioOrigin origin = buffioOrigin::routine;
 

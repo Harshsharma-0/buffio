@@ -36,13 +36,13 @@ public:
   ~Clock() = default;
 
   int getNext();
-  bool empty() const { return timerTree.empty(); }
+  bool empty() const { return clockTree.empty(); }
 
   void push(uint32_t delay, std::coroutine_handle<> task);
   void pushExpired(buffio::Queue<> &queue);
 
 private:
-  buffioClockTree timerTree;
+  buffioClockTree clockTree;
   std::coroutine_handle<> nextWork;
 };
 }; // namespace buffio

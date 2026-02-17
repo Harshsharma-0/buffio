@@ -1,5 +1,6 @@
 #include "buffio/scheduler.hpp"
 #include <iostream>
+#include <unistd.h>
 
 namespace buffio {
 
@@ -31,10 +32,11 @@ int scheduler::run() {
     return error;
   if ((error = buffio::MakeFd::pipe(syncPipe)) != 0)
     return error;
-  if ((error = poller.pollOp(syncPipe.getPipeRead(), &syncPipe)) != 0) {
+  if ((error = poller.pollMod(syncPipe.getPipeRead(), NULL, EPOLLIN)) != 0) {
     syncPipe.release();
     return error;
   };
+  poller.mountWakeFd(syncPipe.getPipeWrite());
   struct epoll_event evnt[1024];
 
   /*
@@ -58,9 +60,11 @@ int scheduler::run() {
     if (nfd != 0) {
       processEvents(evnt, nfd);
     }
-    yieldQueue(10); // yielding queue before batch consumption;
+    if (yieldQueue(10) < 0)
+      break;
     consumeBatch(8);
-    yieldQueue(10); // yielding queue after batch consumption;
+    if (yieldQueue(10) < 0)
+      break;
     timerClock.pushExpired(queue);
   };
 
@@ -99,6 +103,13 @@ void scheduler::shutWorker(int workerNum, int tries, long wait) {
 int scheduler::processEvents(struct epoll_event evnts[], int len) {
   for (int i = 0; i < len; i++) {
     auto handle = (buffio::Fd *)evnts[i].data.ptr;
+    if (handle == nullptr) {
+      char s[2];
+      read(syncPipe.getPipeRead(), s, 1);
+      auto header = poller.pop();
+      dispatchHandle(header->opError, header->fd, header);
+      continue;
+    };
     if (evnts[i].events & EPOLLIN) {
       auto req = handle->getPendingRead();
 
@@ -115,6 +126,7 @@ int scheduler::processEvents(struct epoll_event evnts[], int len) {
       auto req = handle->getPendingWrite();
       if (req != nullptr) {
         buffio::fiber::pendingReq.fetch_add(-1, std::memory_order_acq_rel);
+
         handle->popPendingWrite();
         requestBatch.push(req);
       } else {
@@ -157,6 +169,7 @@ int scheduler::dispatchHandle(int errorCode, buffio::Fd *fd,
   case buffioOpCode::writeFile:
     queue.push(header->routine);
     break;
+  case buffioOpCode::asyncReadFile:
   case buffioOpCode::asyncRead: {
     auto handle = header->onAsyncDone
                       .onAsyncWrite(errorCode, header->data.buffer,
@@ -164,6 +177,8 @@ int scheduler::dispatchHandle(int errorCode, buffio::Fd *fd,
                       .get();
     queue.push(handle);
   } break;
+
+  case buffioOpCode::asyncWriteFile:
   case buffioOpCode::asyncWrite: {
     auto handle = header->onAsyncDone
                       .onAsyncRead(errorCode, header->data.buffer,
@@ -189,6 +204,7 @@ int scheduler::consumeBatch(int cycle) {
   for (int i = 0; i < cycle; i++) {
     auto req = requestBatch.get();
     if (req->rwtype == buffioReadWriteType::async) {
+
       auto routine = buffio::sockBroker::handleAsync(req);
       if (routine)
         queue.push(routine);
@@ -220,10 +236,9 @@ void scheduler::cleanQueue() {
 int scheduler::getWakeTime(bool *flag) {
 
   int looptime = timerClock.getNext();
-
   if (!queue.empty() || !requestBatch.empty()) {
     return 0;
-  }
+  };
   ssize_t req = buffio::fiber::pendingReq.load(std::memory_order_acquire);
   if (req > 0) {
     return looptime;
@@ -238,14 +253,16 @@ int scheduler::getWakeTime(bool *flag) {
 
 int scheduler::yieldQueue(int chunk) {
   for (int i = chunk; 0 < i; i--) {
-    if (queue.empty()) {
-      return -1;
-    }
+    if (queue.empty())
+      return 1;
 
     auto handle = queue.get();
     auto promise = getPromise<char>(handle->current);
-    if (promise->checkStatus() == buffioRoutineStatus::executing)
-      handle->current.resume();
+    if (promise->checkStatus() != buffioRoutineStatus::executing) {
+      std::cout << "[invalid entry found]" << std::endl;
+      return -1;
+    };
+    handle->current.resume();
 
     switch (promise->checkStatus()) {
     case buffioRoutineStatus::executing:
@@ -255,18 +272,27 @@ int scheduler::yieldQueue(int chunk) {
     } break;
     case buffioRoutineStatus::waitingFd: {
       promise->setStatus(buffioRoutineStatus::executing);
-
+      handle->current = nullptr;
       queue.pop();
     } break;
+    case buffioRoutineStatus::waitingFile: {
+      promise->setStatus(buffioRoutineStatus::executing);
+      handle->current = nullptr;
+      queue.pop();
+      poller.ping();
+      break;
+    };
     case buffioRoutineStatus::paused: {
     } break;
     case buffioRoutineStatus::waiting: {
       queue.push(promise->getChild(), handle);
-      queue.erase();
+      handle->current = nullptr;
+      queue.pop();
     } break;
     case buffioRoutineStatus::waitingTimer: {
       handle->current = nullptr;
       promise->setStatus(buffioRoutineStatus::executing);
+      handle->current = nullptr;
       queue.pop();
     } break;
     case buffioRoutineStatus::pushTask: {
@@ -294,10 +320,9 @@ int scheduler::yieldQueue(int chunk) {
     case buffioRoutineStatus::done: {
       handle->current.destroy();
       handle->current = nullptr;
-
       queue.pop();
       break;
-    }
+    };
     };
     if (queue.empty())
       break;

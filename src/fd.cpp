@@ -1,4 +1,5 @@
 #include "buffio/fd.hpp"
+#include "buffio/enum.hpp"
 #include "buffio/fiber.hpp"
 #include <asm-generic/errno.h>
 #include <cerrno>
@@ -204,6 +205,18 @@ int MakeFd::mkFdSock(buffio::Fd &fdCore, int fd, struct sockaddr &addr) {
 
   return 0;
 };
+
+int MakeFd::openFile(buffio::Fd &fdCore, const char *path, int flags,
+                     mode_t mode) {
+
+  int fd = -1;
+  if ((fd = open(path, flags | O_CLOEXEC, mode)) < 0)
+    return (int)buffioErrorCode::open;
+
+  fdCore.mountFile(fd);
+
+  return 0;
+};
 }; // namespace buffio
 
 namespace buffio {
@@ -290,6 +303,13 @@ buffioHeader *Fd::waitRead(char *buffer, size_t len) {
   reserveHeader.reserved = len;
   reserveHeader.len.len = len;
   reserveHeader.reqToken.fd = localfd.fd[0];
+
+  if (fdFamily == buffioFdFamily::file) {
+    buffio::fiber::poller->push(&reserveHeader);
+    buffio::fiber::pendingReq.fetch_add(1, std::memory_order_acq_rel);
+    return &reserveHeader;
+  };
+
   if (rwmask & BUFFIO_READ_READY) {
     buffio::fiber::requestBatch->push(&reserveHeader);
     return &reserveHeader;
@@ -312,6 +332,12 @@ buffioHeader *Fd::waitWrite(char *buffer, size_t len) {
   reserveHeader.reserved = len;
   reserveHeader.len.len = len;
   reserveHeader.reqToken.fd = localfd.fd[0];
+  if (fdFamily == buffioFdFamily::file) {
+    buffio::fiber::poller->push(&reserveHeader);
+    buffio::fiber::pendingReq.fetch_add(1, std::memory_order_acq_rel);
+    return &reserveHeader;
+  };
+
   if (rwmask & BUFFIO_WRITE_READY) {
     buffio::fiber::requestBatch->push(&reserveHeader);
     return &reserveHeader;
@@ -328,16 +354,20 @@ buffioRoutineStatus Fd::asyncRead(char *buffer, size_t len, onAsyncReads then) {
                        ? buffioOpCode::asyncReadFile
                        : buffioOpCode::asyncRead;
 
-  header->rwtype = buffioReadWriteType::read;
   header->fd = this;
   header->unsetBit = BUFFIO_READ_READY;
-  header->reqToken.fd = localfd.fd[0];
+  header->rwtype = buffioReadWriteType::read;
   header->data.buffer = buffer;
+  header->bufferCursor = buffer;
+  header->reserved = len;
   header->len.len = len;
+  header->reqToken.fd = localfd.fd[0];
   header->onAsyncDone.onAsyncRead = then;
 
   if (fdFamily == buffioFdFamily::file) {
     buffio::fiber::poller->push(header);
+    buffio::fiber::pendingReq.fetch_add(1, std::memory_order_acq_rel);
+    buffio::fiber::poller->ping();
     return buffioRoutineStatus::none;
   };
 
@@ -348,6 +378,7 @@ buffioRoutineStatus Fd::asyncRead(char *buffer, size_t len, onAsyncReads then) {
 
     return buffioRoutineStatus::none;
   }
+  buffio::fiber::pendingReq.fetch_add(1, std::memory_order_acq_rel);
   pendingReadReq = header;
 
   return buffioRoutineStatus::none;
@@ -371,6 +402,8 @@ buffioRoutineStatus Fd::asyncWrite(char *buffer, size_t len,
 
   if (fdFamily == buffioFdFamily::file) {
     buffio::fiber::poller->push(header);
+    buffio::fiber::pendingReq.fetch_add(1, std::memory_order_acq_rel);
+    buffio::fiber::poller->ping();
     return buffioRoutineStatus::none;
   };
   if (rwmask & BUFFIO_WRITE_READY) {
@@ -446,6 +479,10 @@ void Fd::mountPipe(int read, int write) noexcept {
   this->rwmask |= BUFFIO_FD_POLLED;
 };
 
+void Fd::mountFile(int fd) {
+  fdFamily = buffioFdFamily::file;
+  localfd.fileFd = fd;
+};
 buffioHeader *Fd::getRawHeader() const {
   return buffio::fiber::headerPool->pop();
 };

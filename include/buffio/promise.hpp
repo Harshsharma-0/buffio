@@ -111,6 +111,9 @@ template <typename T> struct promise {
 
         handle->routine = voidSelf;
         status = buffioRoutineStatus::waitingFd;
+        if (handle->opCode == buffioOpCode::readFile ||
+            handle->opCode == buffioOpCode::writeFile)
+          status = buffioRoutineStatus::waitingFile;
       };
 
       return {.self = handleTmp, .ready = continueRoutine};

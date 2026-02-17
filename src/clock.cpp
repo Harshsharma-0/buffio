@@ -5,11 +5,11 @@
 namespace buffio {
 
 int Clock::getNext() {
-  if (timerTree.empty())
+  if (clockTree.empty())
     return -1;
 
   auto now = chrClock::now();
-  auto next = timerTree.top().expires;
+  auto next = clockTree.top().expires;
 
   if (next <= now)
     return 0;
@@ -21,21 +21,28 @@ int Clock::getNext() {
 void Clock::push(uint32_t delay, std::coroutine_handle<> task) {
 
   assert(this != nullptr);
-  timerTree.push({std::chrono::milliseconds(delay) + chrClock::now(), task});
+  clockTree.push({std::chrono::milliseconds(delay) + chrClock::now(), task});
 };
 
 void Clock::pushExpired(buffio::Queue<> &queue) {
-  if (timerTree.empty())
+  if (clockTree.empty())
     return;
 
   auto now = chrClock::now();
+  auto next = clockTree.top().expires;
+  auto diff =
+      std::chrono::duration_cast<std::chrono::milliseconds>(next - now).count();
 
-  while (!timerTree.empty() && timerTree.top().expires <= now) {
-    auto handle = timerTree.top().task;
+  while (diff <= 0) {
+    auto handle = clockTree.top().task;
     auto *promise = getPromise<char>(handle);
-    promise->setStatus(buffioRoutineStatus::executing);
     queue.push(handle);
-    timerTree.pop();
+    clockTree.pop();
+    if (clockTree.empty())
+      break;
+    next = clockTree.top().expires;
+    diff = std::chrono::duration_cast<std::chrono::milliseconds>(next - now)
+               .count();
   }
 };
 }; // namespace buffio

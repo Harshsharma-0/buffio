@@ -63,7 +63,7 @@ public:
   }
   inline buffioHeaderType *pop() {
     if (sockBrokerState == buffioSockBrokerState::active) {
-      auto tmp = epollWorks.dequeue(nullptr);
+      auto tmp = epollConsume.dequeue(nullptr);
       if (tmp != nullptr) {
         count -= 1;
         return tmp;
@@ -76,7 +76,7 @@ public:
   inline buffioHeaderType *popreq() {
     if (sockBrokerState == buffioSockBrokerState::active) {
       count -= 1;
-      return epollWorks.dequeue(nullptr);
+      return epollConsume.dequeue(nullptr);
     }
 
     return nullptr;
@@ -103,7 +103,7 @@ public:
     evnt.events = mask;
     evnt.data.ptr = data;
     int retcode = epoll_ctl(epollFd, EPOLL_CTL_MOD, fd, &evnt);
-    return 0;
+    return retcode;
   }
   int pollDel(int fd) {
     if (!running())
@@ -127,11 +127,14 @@ public:
     ::sem_post(&buffioWorkerSignal);
     return 0;
   }
+  int wakeLoop() const { return write(loopFd, "A", 1); };
+  inline void mountWakeFd(int fd) { loopFd = fd; }
 
 private:
   buffioSockBrokerQueue epollWorks;
   buffioSockBrokerQueue epollConsume;
   buffioSockBrokerState sockBrokerState;
+  int loopFd;
   int epollFd;
   size_t count;
   sem_t buffioWorkerSignal;

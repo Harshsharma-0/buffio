@@ -30,7 +30,10 @@ public:
   blockQueue *waiter;            ///< waiter for the task.
   buffio::promiseHandle current; ///< coroutine handle of the task
 
-  ~blockQueue() { assert(current == nullptr); }
+  ~blockQueue() {
+    if (current != nullptr)
+      std::cout << "[Task leaked or not cleaned up]" << std::endl;
+  };
 };
 
 /**
