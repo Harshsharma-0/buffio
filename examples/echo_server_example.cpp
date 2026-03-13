@@ -103,10 +103,12 @@ int main() {
 
   buffio::scheduler scheduler;
 
+  scheduler.init();
   scheduler.push(client());
   scheduler.push(server());
 
   scheduler.run();
+  scheduler.clean();
 
   return 0;
 };

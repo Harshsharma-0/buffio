@@ -35,7 +35,7 @@ int sockBroker::worker(void *data) {
     buffioHeader *tmpWork = workQueue->dequeue(nullptr);
     if (tmpWork == nullptr)
       continue;
-    //    std::cout << "[worker activated] " << std::endl;
+
     int error = 0;
     switch (tmpWork->opCode) {
     case buffioOpCode::asyncRead:
@@ -48,6 +48,7 @@ int sockBroker::worker(void *data) {
       tmpWork->opError = error;
       consumeQueue->enqueue(tmpWork);
     } break;
+
     case buffioOpCode::asyncReadFile:
       [[fallthrough]];
     case buffioOpCode::readFile: {
@@ -62,6 +63,9 @@ int sockBroker::worker(void *data) {
           ::write(tmpWork->reqToken.fd, tmpWork->data.buffer, tmpWork->len.len);
       tmpWork->opError = error;
     } break;
+    case buffioOpCode::clampThread:
+      tmpWork->routine.resume();
+      break;
     default:
       auto handle = buffio::sockBroker::handleAsync(tmpWork);
       if (!handle) {
@@ -125,16 +129,14 @@ buffio::promiseHandle sockBroker::handleAsync(buffioHeader *req) {
     break;
   };
   case buffioOpCode::waitAccept: {
-    auto tmp = req->routine;
     int fd =
         ::accept(req->reqToken.fd, req->data.socketaddr, &req->len.socklen);
     req->reserved = fd;
     req->opCode = buffioOpCode::done;
-    return tmp;
+    return req->routine;
   }; break;
   case buffioOpCode::waitConnect:
 
-    auto tmp = req->routine;
     int error = -1;
     socklen_t len = sizeof(int);
     req->opCode = buffioOpCode::done;
@@ -153,7 +155,7 @@ buffio::promiseHandle sockBroker::handleAsync(buffioHeader *req) {
       buffio::fiber::poller->pollOp(req->reqToken.fd, req->fd);
     };
     req->opCode = buffioOpCode::done;
-    return tmp;
+    return req->routine;
     break;
   };
 

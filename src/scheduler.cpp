@@ -1,16 +1,24 @@
 #include "buffio/scheduler.hpp"
+#include "buffio/enum.hpp"
 #include <iostream>
 #include <unistd.h>
 
+#define BUFFIO_FIBER_SETUP(AFTER_SETUP)                                        \
+  buffio::fiber::poller = &this->poller;                                       \
+  buffio::fiber::queue = &this->queue;                                         \
+  buffio::fiber::timerClock = &this->timerClock;                               \
+  buffio::fiber::headerPool = &this->headerPool;                               \
+  buffio::fiber::requestBatch = &this->requestBatch;                           \
+  AFTER_SETUP
+
 namespace buffio {
 
-scheduler::scheduler() {
-  // setting up the fiber
-  buffio::fiber::poller = &this->poller;
-  buffio::fiber::queue = &this->queue;
-  buffio::fiber::timerClock = &this->timerClock;
-  buffio::fiber::headerPool = &this->headerPool;
-  buffio::fiber::requestBatch = &this->requestBatch;
+scheduler::scheduler() : workerlNum(0) { BUFFIO_FIBER_SETUP() };
+
+scheduler::scheduler(int workerNum, int queueOrder) : workerlNum(0) {
+  BUFFIO_FIBER_SETUP(
+      if ((workerlNum = init(workerNum, queueOrder)) < 0) return);
+  workerlNum = workerNum;
 };
 scheduler::~scheduler() {
   buffio::fiber::poller = nullptr;
@@ -19,16 +27,16 @@ scheduler::~scheduler() {
   buffio::fiber::headerPool = nullptr;
   buffio::fiber::requestBatch = nullptr;
 };
-
-int scheduler::run() {
-  if (queue.empty() && timerClock.empty())
-    return -1;
-
-  int workerNum = 2;
+void scheduler::clean(int tries, int timeout) {
+  cleanQueue();
+  shutWorker(workerlNum, tries, timeout);
+  threadPool.free();
+}
+int scheduler::init(int workerNum, int queueOrder) {
   int error = 0;
   if ((error = headerPool.init()) != 0)
     return error;
-  if ((error = poller.start(threadPool, workerNum)) != 0)
+  if ((error = poller.start(threadPool, workerNum, queueOrder)) != 0)
     return error;
   if ((error = buffio::MakeFd::pipe(syncPipe)) != 0)
     return error;
@@ -37,6 +45,13 @@ int scheduler::run() {
     return error;
   };
   poller.mountWakeFd(syncPipe.getPipeWrite());
+  return 0;
+}
+int scheduler::run() {
+
+  if (queue.empty())
+    return (int)buffioErrorCode::unknown;
+
   struct epoll_event evnt[1024];
 
   /*
@@ -67,11 +82,6 @@ int scheduler::run() {
       break;
     timerClock.pushExpired(queue);
   };
-
-  cleanQueue();
-  shutWorker(workerNum, 5, 100);
-  threadPool.free();
-
   return 0;
 };
 
@@ -145,15 +155,22 @@ int scheduler::processEvents(struct epoll_event evnts[], int len) {
       requestBatch.push((buffioHeader *)req);
       buffio::fiber::pendingReq.fetch_add(-1, std::memory_order_acq_rel);
       break;
+    case buffioOpCode::wakeOnReadReady:
+      if (handle->isBitSet(BUFFIO_READ_READY))
+        queue.push(req->routine);
+    case buffioOpCode::wakeOnWriteReady:
+      if (handle->isBitSet(BUFFIO_WRITE_READY))
+        queue.push(req->routine);
+      break;
     };
-
-    auto routine = buffio::sockBroker::handleAsync((buffioHeader *)req);
-    if (routine) {
-      buffio::fiber::pendingReq.fetch_add(-1, std::memory_order_acq_rel);
-      queue.push(routine);
+    if (req->rwtype == buffioReadWriteType::async) {
+      auto routine = buffio::sockBroker::handleAsync((buffioHeader *)req);
+      if (routine) {
+        buffio::fiber::pendingReq.fetch_add(-1, std::memory_order_acq_rel);
+        queue.push(routine);
+      }
     }
   };
-  // calls like accept and connect are handled here;
   return 0;
 };
 
@@ -172,22 +189,28 @@ int scheduler::dispatchHandle(int errorCode, buffio::Fd *fd,
   case buffioOpCode::asyncReadFile:
   case buffioOpCode::asyncRead: {
     auto handle = header->onAsyncDone
-                      .onAsyncWrite(errorCode, header->data.buffer,
-                                    header->len.len, fd, header)
+                      .onAsyncRead(errorCode, header->data.buffer,
+                                    header->len.len, fd)
                       .get();
+    headerPool.push(header);
     queue.push(handle);
   } break;
 
   case buffioOpCode::asyncWriteFile:
   case buffioOpCode::asyncWrite: {
     auto handle = header->onAsyncDone
-                      .onAsyncRead(errorCode, header->data.buffer,
-                                   header->len.len, fd, header)
+                      .onAsyncWrite(errorCode, header->data.buffer,
+                                   header->len.len, fd)
                       .get();
+    headerPool.push(header);
     queue.push(handle);
   } break;
+  case buffioOpCode::clampThread:
+    headerPool.push(header);
+    return 0;
+    break;
   default:
-    assert(false);
+        assert(false);
     break;
   };
   header->opCode = buffioOpCode::done;
@@ -268,7 +291,6 @@ int scheduler::yieldQueue(int chunk) {
     case buffioRoutineStatus::executing:
       break;
     case buffioRoutineStatus::yield: {
-      promise->setStatus(buffioRoutineStatus::executing);
     } break;
     case buffioRoutineStatus::waitingFd: {
       promise->setStatus(buffioRoutineStatus::executing);
@@ -282,6 +304,14 @@ int scheduler::yieldQueue(int chunk) {
       poller.ping();
       break;
     };
+    case buffioRoutineStatus::clampThread:{
+      queue.pop();
+      auto header = promise->getAux<buffioHeader*>(); 
+      poller.push(header);
+      buffio::fiber::pendingReq.fetch_add(1,std::memory_order_acq_rel);
+      handle->current = nullptr;
+      poller.ping();
+    }break;
     case buffioRoutineStatus::paused: {
     } break;
     case buffioRoutineStatus::waiting: {

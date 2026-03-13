@@ -74,12 +74,13 @@ buffio::promise<int> server() {
 };
 int main() {
 
-  buffio::scheduler scheduler;
+  buffio::scheduler scheduler(2);
 
   scheduler.push(client());
   scheduler.push(server());
 
   scheduler.run();
+  scheduler.clean();
 
   return 0;
 };

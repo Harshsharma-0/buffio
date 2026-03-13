@@ -45,18 +45,12 @@ public:
    */
 
   static int consumeEntry(buffioHeader *req);
-  int start(buffio::thread &thread, int &workerNum, size_t queueOrder = 11);
+  int start(buffio::thread &thread, int &workerNum, size_t queueOrder = 5);
 
-  inline int pushreq(buffioHeaderType *which) {
-    if (sockBrokerState == buffioSockBrokerState::active) {
-      count += 1;
-      return epollWorks.enqueue(which);
-    }
-    return -1;
-  }
   inline int push(buffioHeaderType *which) {
     if (sockBrokerState == buffioSockBrokerState::active) {
       count += 1;
+ 
       return epollWorks.enqueue(which);
     }
     return -1;
@@ -73,14 +67,6 @@ public:
     return nullptr;
   }
 
-  inline buffioHeaderType *popreq() {
-    if (sockBrokerState == buffioSockBrokerState::active) {
-      count -= 1;
-      return epollConsume.dequeue(nullptr);
-    }
-
-    return nullptr;
-  }
 
   bool running() const {
     return (sockBrokerState == buffioSockBrokerState::active);

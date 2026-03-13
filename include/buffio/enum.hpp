@@ -8,6 +8,7 @@ enum class buffioRoutineStatus : uint32_t {
   yield,
   waitingFd,
   waitingFile,
+  clampThread,
   paused,
   waiting,
   waitingTimer,
@@ -17,7 +18,6 @@ enum class buffioRoutineStatus : uint32_t {
   wakeParent,
   zombie,
   done,
-
   fresh,
   waitingOp,
 
@@ -112,16 +112,23 @@ enum class buffioOpCode : uint8_t {
   asyncAcceptin = 15,
   asyncAcceptin6 = 16,
 
-  asyncRead = 17,
-  asyncWrite = 18,
+  waitAccept = 17,
+  waitConnect = 28,
 
-  waitAccept = 19,
-  waitConnect = 20,
+  asyncRead = 19,
+  asyncWrite = 20,
 
   done = 21,
   dequeueThread = 22,
+
   asyncReadFile = 23,
   asyncWriteFile = 24,
+
+  wakeOnReadReady = 25,
+  wakeOnWriteReady = 26,
+
+  clampThread = 27
+
 };
 enum class buffioReadWriteType : uint8_t {
 

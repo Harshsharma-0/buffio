@@ -58,13 +58,14 @@ public:
    */
 
   scheduler();
+  scheduler(int workerNum, int queueOrder = 5);
   /**
    * @brief Default destructor.
    *
    * All resources are released during run() shutdown.
    */
   ~scheduler();
-
+  int init(int workerNum = 2, int queueOrder = 5);
   /**
    * @brief Starts the main event loop.
    *
@@ -168,7 +169,9 @@ public:
     queue.push(handle.get());
     return 0;
   };
+  void clean(int tries = 5, int timeout = 100);
   void shutWorker(int workerNum, int tries, long wait);
+  bool error() const { return (workerlNum < 0); }
 
 private:
   buffio::Fd syncPipe;
@@ -177,7 +180,7 @@ private:
   buffio::Queue<> queue;
   buffio::Memory<buffioHeader> headerPool;
   buffio::Queue<buffioHeader, void *, buffioQueueNoMem> requestBatch;
-
   buffio::thread threadPool;
+  int workerlNum;
 };
 }; // namespace buffio

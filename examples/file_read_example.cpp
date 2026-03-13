@@ -28,9 +28,11 @@ buffio::promise<int> helloWrite() {
 int main() {
 
   buffio::scheduler scheduler;
+  scheduler.init();
   scheduler.push(helloWrite());
   scheduler.push(helloRead());
   scheduler.run();
+  scheduler.clean();
 
   return 0;
 };

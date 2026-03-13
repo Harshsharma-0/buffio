@@ -6,7 +6,7 @@
 buffio::Fd fileFd;
 int j = 0;
 buffio::promise<int> onWrite(int opError, char *buffer, size_t len,
-                             buffio::Fd *fd, buffioHeader *header) {
+                             buffio::Fd *fd) {
   std::cout << "file write done : " << j << std::endl;
   j += 1;
 
@@ -107,10 +107,12 @@ int main() {
                                  O_RDWR | O_FSYNC | O_CREAT);
 
   buffio::scheduler scheduler;
+  scheduler.init();
   scheduler.push(server());
   scheduler.push(client());
-
   scheduler.run();
+
+  scheduler.clean();
 
   return 0;
 };

@@ -13,10 +13,12 @@ buffio::promise<int> yielder(int id) {
 int main() {
 
   buffio::scheduler scheduler;
+  scheduler.init();
+
   for (int i = 0; i < 100; i++)
     scheduler.push(yielder(i));
 
   scheduler.run();
-
+  scheduler.clean();
   return 0;
 };

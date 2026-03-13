@@ -39,11 +39,9 @@ typedef buffio::promise<int> (*asyncAccept_in6)(int fd, struct sockaddr_in6,
 typedef buffio::promise<int> (*onAsyncConnects)(int errorCode, buffio::Fd *fd,
                                                 struct sockaddr *);
 typedef buffio::promise<int> (*onAsyncWrites)(int errorCode, char *buffer,
-                                              size_t len, buffio::Fd *fd,
-                                              buffioHeader *);
+                                              size_t len, buffio::Fd *fd);
 typedef buffio::promise<int> (*onAsyncReads)(int errorCode, char *buffer,
-                                             size_t len, buffio::Fd *fd,
-                                             buffioHeader *);
+                                             size_t len, buffio::Fd *fd);
 
 typedef struct buffioHeader {
 

@@ -1,6 +1,7 @@
 #ifndef __BUFFIO_PROMISE_HPP__
 #define __BUFFIO_PROMISE_HPP__
 
+#include "buffio/enum.hpp"
 #include "common.hpp"
 #include "fiber.hpp"
 #include <cassert>
@@ -47,6 +48,8 @@ template <typename T> struct promise {
     buffioRoutineStatus status = buffioRoutineStatus::fresh;
     void_handle handle_child = nullptr;
     void_handle voidSelf = nullptr;
+    uintptr_t auxData = 0;
+
     void killChild() {
       if (handle_child) {
         auto *tmp = handle_child.address();
@@ -72,11 +75,7 @@ template <typename T> struct promise {
     };
 
     std::suspend_always final_suspend() noexcept { return {}; };
-    std::suspend_always yield_value(int value) {
-      killChild();
-      status = buffioRoutineStatus::yield;
-      return {};
-    };
+    std::suspend_always yield_value(int value) { return {}; };
 
     template <typename P> buffioAwaiter await_transform(P handle) {
       killChild();
@@ -114,11 +113,26 @@ template <typename T> struct promise {
         if (handle->opCode == buffioOpCode::readFile ||
             handle->opCode == buffioOpCode::writeFile)
           status = buffioRoutineStatus::waitingFile;
+      } else if constexpr (std::is_same_v<P, fiber::clampInfo>) {
+        if (handle.header == nullptr)
+          return {.self = voidSelf, .ready = true};
+        if (handle.isSelf != true){
+          buffio::fiber::poller->push(handle.header);
+          buffio::fiber::pendingReq.fetch_add(1,std::memory_order_acq_rel);
+          buffio::fiber::poller->ping();
+          return {.self = handleTmp,.ready = true};
+        };
+        handle.header->routine = voidSelf;
+        auxData = (uintptr_t)handle.header;
+        status = buffioRoutineStatus::clampThread;
+      } else {
+        static_assert(false, "we don't support this type of call now");
       };
 
       return {.self = handleTmp, .ready = continueRoutine};
     };
-
+  
+    template<typename auxType> auxType getAux()const { return (auxType)auxData;}
     void unhandled_exception() {
       status = buffioRoutineStatus::unhandledException;
       killChild();

@@ -526,6 +526,14 @@ public:
   buffioHeader *getPendingRead() const { return pendingReadReq; }
   buffioHeader *getPendingWrite() const { return pendingWriteReq; }
   buffioHeader *reserveToQueue(int rmBit);
+  buffioHeader *waitReadReady() {
+    reserveHeader.opCode = buffioOpCode::wakeOnReadReady;
+    return &reserveHeader;
+  }
+  buffioHeader *waitWriteReady() {
+    reserveHeader.opCode = buffioOpCode::wakeOnWriteReady;
+    return &reserveHeader;
+  }
   void resetHeader() {
     ::memset((void *)&reserveHeader, '\0', sizeof(buffioHeader));
   };

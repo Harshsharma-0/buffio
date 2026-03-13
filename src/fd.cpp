@@ -1,4 +1,5 @@
 #include "buffio/fd.hpp"
+#include "buffio/common.hpp"
 #include "buffio/enum.hpp"
 #include "buffio/fiber.hpp"
 #include <asm-generic/errno.h>

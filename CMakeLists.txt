@@ -32,28 +32,13 @@ target_include_directories(buffio PUBLIC
 enable_testing()
 add_subdirectory(tests)
 
-# Example executable
-add_executable(async_example examples/async_example.cpp)
-target_link_libraries(async_example PRIVATE buffio)
 
-add_executable(hello_world_example examples/hello_world.cpp)
-target_link_libraries(hello_world_example PRIVATE buffio)
+file(GLOB SOURCE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/examples/*.cpp")
 
-add_executable(yield_example examples/yield_example.cpp)
-target_link_libraries(yield_example PRIVATE buffio)
+# Iterate through the list of found source files
+foreach(file ${SOURCE_FILES})
+    get_filename_component(executable_name ${file} NAME_WE)
+    add_executable(${executable_name} ${file})
+    target_link_libraries(${executable_name} PRIVATE buffio)
 
-add_executable(connect_example examples/connect_example.cpp)
-target_link_libraries(connect_example PRIVATE buffio)
-
-add_executable(echo_server_example examples/echo_server_example.cpp)
-target_link_libraries(echo_server_example PRIVATE buffio)
-
-add_executable(async_echo_example examples/async_echo_example.cpp)
-target_link_libraries(async_echo_example PRIVATE buffio)
-
-add_executable(file_read_example examples/file_read_example.cpp)
-target_link_libraries(file_read_example PRIVATE buffio)
-
-add_executable(echo_write_example examples/echo_write_example.cpp)
-target_link_libraries(echo_write_example PRIVATE buffio)
-
+endforeach()

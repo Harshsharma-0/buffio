@@ -6,7 +6,7 @@
 #define SERVER_PORT 8080
 
 buffio::promise<int> asyncReadRoutine(int errorCode, char *buffer, size_t len,
-                                      buffio::Fd *fd, buffioHeader *header) {
+                                      buffio::Fd *fd) {
   std::cout << "[async read] " << buffer << " len : " << len << std::endl;
   int i = 0;
   for (; i != 1;) {
@@ -116,12 +116,13 @@ buffio::promise<int> server() {
 };
 int main() {
 
-  buffio::scheduler scheduler;
+  buffio::scheduler scheduler(2);
 
   scheduler.push(client());
   scheduler.push(server());
 
   scheduler.run();
+  scheduler.clean();
 
   return 0;
 };
