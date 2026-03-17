@@ -32,10 +32,7 @@ public:
 
   static action::xeturn clampThread(buffioHeader *header);
 
-  static action::xeturn propBack(buffioHeader *header){
-    header->isFresh = false;
-    return header->routine;
-  }
+  static action::xeturn propBack(buffioHeader *header);
 };
 
 }; // namespace buffio

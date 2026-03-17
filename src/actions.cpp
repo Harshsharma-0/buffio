@@ -4,9 +4,13 @@
 #include <iostream>
 namespace buffio {
 
+action::xeturn action::propBack(buffioHeader *header) {
+  header->isFresh = false;
+  return header->routine;
+};
 action::xeturn action::clampThread(buffioHeader *header) {
-   header->routine.resume();   
-   return header->routine;
+  header->routine.resume();
+  return header->routine;
 };
 
 action::xeturn action::read(buffioHeader *header) {
@@ -25,7 +29,7 @@ action::xeturn action::read(buffioHeader *header) {
     if (buffiolen > 0) {
       reserved -= buffiolen;
       if (reserved <= 0)
-         break;
+        break;
       cursor = buffer + buffiolen;
     };
   };
@@ -56,7 +60,7 @@ action::xeturn action::write(buffioHeader *header) {
     if (buffiolen > 0) {
       reserved -= buffiolen;
       if (reserved <= 0)
-           break;
+        break;
       cursor = buffer + buffiolen;
     };
   };
@@ -109,7 +113,6 @@ action::xeturn action::waitConnect(buffioHeader *header) {
 
   int error = -1;
   socklen_t len = sizeof(int);
-
 
   if (getsockopt(header->iFd, SOL_SOCKET, SO_ERROR, &error, &len) != 0) {
     header->opError = -1;
