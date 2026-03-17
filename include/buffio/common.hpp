@@ -18,6 +18,7 @@
 #define BUFFIO_FD_READ_REQUEST (1 << 8)
 #define BUFFIO_FD_WRITE_REQUEST (1 << 9)
 
+#define BUFFIO_HEADER_NEWED -11111111
 namespace buffio {
 class Fd;
 class sockBroker;
@@ -42,44 +43,12 @@ typedef buffio::promise<int> (*onAsyncWrites)(int errorCode, char *buffer,
                                               size_t len, buffio::Fd *fd);
 typedef buffio::promise<int> (*onAsyncReads)(int errorCode, char *buffer,
                                              size_t len, buffio::Fd *fd);
+typedef buffio::promiseHandle (*buffioAction)(buffioHeader *);
 
 typedef struct buffioHeader {
 
-  /*
-   * opCode: it define what kind of operation we want to done on the fd,
-   * refer to the "buffioenum.hpp" buffioOpCode enum class for the list of
-   * supported opcode.
-   *
-   */
-  buffioOpCode opCode;
-  /*
-   * rwtype: it defines the function to used to read from the fd,
-   * see, buffioenum.hpp for more info.
-   *
-   */
-  buffioReadWriteType rwtype;
-  /*
-   * relayId: is a unique id for the handler which will handle the header
-   * after the request is being done. relay can be customised via the buffio
-   * relay class.
-   */
-  uint16_t relayId;
-  /*
-   * reqToken is used to synchronize the read and write to the fd,
-   * if the request is relayed to the worker thread.
-   * read and write operation is gurenteed to be sequential,
-   * means the read and write order is maintained under the hood the
-   * request that comes first is served first.
-   *
-   * reqToken is also used as fd field when, the opCode is "poll",
-   * the the request token must be the fd for pollling,
-   *
-   */
-  union {
-    uint32_t token;
-    int mask;
-    int fd;
-  } reqToken; // To sync the read and write operation;
+  bool isFresh;
+  int iFd;
   /*
    * fd, is the pointer to the fd class created by the user/requested from
    * the eventloop and all the request are done via this class and
@@ -111,15 +80,14 @@ typedef struct buffioHeader {
    *
    */
 
-  ssize_t reserved;
-  char *bufferCursor;
-  int unsetBit;
   int opError;
+  int aux;
   /*
    * routine contain the handle of the routine to run after
    * the operation is competed. if not an async request
    */
   buffio::promiseHandle routine;
+  buffio::promiseHandle then;
 
   /*
    * routine used for async requests
@@ -134,11 +102,18 @@ typedef struct buffioHeader {
     asyncAccept_local asyncAcceptlocal;
     asyncAccept_in asyncAcceptin;
     asyncAccept_in6 asyncAcceptin6;
-  } onAsyncDone;
+   } onAsyncDone;
+
+  buffioAction action;
 
   struct buffioHeader *next;
   struct buffioHeader *prev;
 } buffioHeader;
+
+typedef struct buffioHeaderSync {
+  buffioHeader *headerA;
+  buffioHeader *headerB;
+} buffioHeaderSync;
 
 /* supported protocol string format in future update:
  * tcp - "tcp://127.0.0.1:8080".

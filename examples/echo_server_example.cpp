@@ -1,8 +1,9 @@
 #include "buffio/scheduler.hpp"
 
+#include <cstring>
 #include <iostream>
 
-#define SERVER_PORT 8080
+#define SERVER_PORT 8081
 buffio::promise<int> client() {
   buffio::Fd connectFd;
   struct sockaddr_in addr;
@@ -44,6 +45,7 @@ buffio::promise<int> client() {
     __buffioCall(connectFd.waitRead(buffer, 1024));
     std::cout << "client read : " << buffer << " " << i << std::endl;
     __buffioCall(clk);
+    ::memset(buffer, 0, 20);
     i += 1;
   }
 

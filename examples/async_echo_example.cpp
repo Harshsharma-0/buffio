@@ -3,7 +3,7 @@
 #include <iostream>
 #include <string>
 
-#define SERVER_PORT 8080
+#define SERVER_PORT 8081
 
 buffio::promise<int> asyncReadRoutine(int errorCode, char *buffer, size_t len,
                                       buffio::Fd *fd) {

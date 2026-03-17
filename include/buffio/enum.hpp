@@ -2,25 +2,36 @@
 #define BUFFIO_ENUM
 #include <cstdint>
 
+enum class buffioFdFamily : int {
+  none = 0,
+  local = 1,
+  ipv4 = 2,
+  ipv6 = 3,
+  raw = 4,
+  pipe = 5,
+  fifo = 6,
+  file = 7,
+};
+
+enum class buffioSocketProtocol : int { none = 0, tcp = 1, udp = 2 };
+
 enum class buffioRoutineStatus : uint32_t {
   none = 0,
   executing,
   yield,
   waitingFd,
   waitingFile,
-  clampThread,
   paused,
+  clampThread,
   waiting,
   waitingTimer,
-  pushTask,
   unhandledException,
   error,
   wakeParent,
-  zombie,
   done,
+  backFromThread,
   fresh,
-  waitingOp,
-
+  waitingOp
 };
 
 enum class buffioOrigin : uint32_t {
@@ -46,6 +57,11 @@ enum class buffioThreadStatus : uint32_t {
   configOk = 86,
 };
 
+enum class buffioAcceptType : int {
+  local = 1,
+  ipv4,
+  ipv6,
+};
 enum class buffioOpCode : uint8_t {
   /*
    * none: define no operation

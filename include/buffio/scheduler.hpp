@@ -66,6 +66,7 @@ public:
    */
   ~scheduler();
   int init(int workerNum = 2, int queueOrder = 5);
+  void handleThreaded(int cycle = 8);
   /**
    * @brief Starts the main event loop.
    *
@@ -97,20 +98,6 @@ public:
    * @return -1 on error
    */
   int processEvents(struct epoll_event evnts[], int len);
-  /**@brief It's a helper function, to enqueue task in execution queue to run
-   *
-   * helper funcation to dispatch the routine after a successfull/errored
-   * read/write on the file descriptor.
-   *
-   * @param [in] errorCode errorCode to pass the respective handle.
-   * @param [in] fd        pointer to the instance of buffiofd.
-   * @param [in] header    pointer to the header of the request.
-   *
-   * @return  0 on Success.
-   * @return -1 on Error.
-   */
-
-  int dispatchHandle(int errorCode, buffio::Fd *fd, buffioHeader *header);
   /**
    * @brief Executes a fixed number of fd events. only called when any fd is
    * used with epoll edge-triggered
@@ -178,7 +165,6 @@ private:
   buffio::sockBroker poller;
   buffio::Clock timerClock;
   buffio::Queue<> queue;
-  buffio::Memory<buffioHeader> headerPool;
   buffio::Queue<buffioHeader, void *, buffioQueueNoMem> requestBatch;
   buffio::thread threadPool;
   int workerlNum;

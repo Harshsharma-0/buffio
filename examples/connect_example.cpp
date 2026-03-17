@@ -15,7 +15,7 @@ buffio::promise<int> client() {
 
   if (buffio::MakeFd::socket(connectFd, (sockaddr *)&addr, "127.0.0.1",
                              false) != 0) {
-    std::cout << "error" << std::endl;
+    std::cout << "error connect socket" << std::endl;
     buffioreturn 0;
   };
 

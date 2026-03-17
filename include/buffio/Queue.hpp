@@ -213,6 +213,7 @@ public:
   };
 
   bool empty() const { return (count == 0); };
+  size_t gcount() const { return count; }
 
 private:
   C *head;

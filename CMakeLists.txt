@@ -23,6 +23,7 @@ add_library(buffio
   src/fd.cpp
   src/scheduler.cpp
   src/fiber.cpp
+  src/actions.cpp
 )
 
 target_include_directories(buffio PUBLIC

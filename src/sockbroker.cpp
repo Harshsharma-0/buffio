@@ -36,166 +36,16 @@ int sockBroker::worker(void *data) {
     if (tmpWork == nullptr)
       continue;
 
-    int error = 0;
-    switch (tmpWork->opCode) {
-    case buffioOpCode::asyncRead:
-    case buffioOpCode::asyncWrite:
-    case buffioOpCode::read:
-    case buffioOpCode::write: {
-      while (error != -1 || error != 0) {
-        error = buffio::sockBroker::consumeEntry(tmpWork);
-      };
-      tmpWork->opError = error;
-      consumeQueue->enqueue(tmpWork);
-    } break;
+    tmpWork->routine = tmpWork->action(tmpWork);
 
-    case buffioOpCode::asyncReadFile:
-      [[fallthrough]];
-    case buffioOpCode::readFile: {
-      error =
-          ::read(tmpWork->reqToken.fd, tmpWork->data.buffer, tmpWork->len.len);
-      tmpWork->opError = error;
-    } break;
-    case buffioOpCode::asyncWriteFile:
-      [[fallthrough]];
-    case buffioOpCode::writeFile: {
-      error =
-          ::write(tmpWork->reqToken.fd, tmpWork->data.buffer, tmpWork->len.len);
-      tmpWork->opError = error;
-    } break;
-    case buffioOpCode::clampThread:
-      tmpWork->routine.resume();
-      break;
-    default:
-      auto handle = buffio::sockBroker::handleAsync(tmpWork);
-      if (!handle) {
-        tmpWork->opError = -1;
-      } else {
-        tmpWork->routine = handle;
-      };
-      break;
-    };
     consumeQueue->enqueue(tmpWork);
     parent->wakeLoop();
+
     buffio::fiber::pendingReq.fetch_add(-1, std::memory_order_acq_rel);
-    abort = buffio::fiber::abort.load(std::memory_order_acquire);
-    if (abort < 0)
-      break;
   };
   buffio::fiber::workerCount.fetch_add(-1, std::memory_order_acq_rel);
 
   return 0;
-};
-
-buffio::promiseHandle sockBroker::handleAsync(buffioHeader *req) {
-
-  switch (req->opCode) {
-  case buffioOpCode::asyncConnect: {
-    int code = -1;
-    socklen_t len = sizeof(int);
-    if (::getsockopt(req->reqToken.fd, SOL_SOCKET, SO_ERROR, &code, &len) !=
-        0) {
-      auto handle =
-          req->onAsyncDone.onAsyncConnect(-1, nullptr, req->data.socketaddr)
-              .get();
-      return handle;
-      break;
-    };
-    auto handle =
-        req->onAsyncDone.onAsyncConnect(code, req->fd, req->data.socketaddr)
-            .get();
-    return handle;
-  } break;
-  case buffioOpCode::asyncAcceptlocal: {
-    sockaddr_un addr = {0};
-    socklen_t len = sizeof(addr);
-    int fd = ::accept(req->reqToken.fd, (sockaddr *)&addr, &len);
-    auto handle = req->onAsyncDone.asyncAcceptlocal(fd, addr, len).get();
-    return handle;
-  } break;
-  case buffioOpCode::asyncAcceptin: {
-    sockaddr_in addrin = {0};
-    socklen_t lenin = sizeof(addrin);
-    int fd = ::accept(req->reqToken.fd, (sockaddr *)&addrin, &lenin);
-    auto handle = req->onAsyncDone.asyncAcceptin(fd, addrin, lenin).get();
-    return handle;
-  }; break;
-  case buffioOpCode::asyncAcceptin6: {
-    sockaddr_in6 addr6 = {0};
-    socklen_t len6 = sizeof(addr6);
-    int fd = ::accept(req->reqToken.fd, (sockaddr *)&addr6, &len6);
-    auto handle = req->onAsyncDone.asyncAcceptin6(fd, addr6, len6).get();
-    return handle;
-    break;
-  };
-  case buffioOpCode::waitAccept: {
-    int fd =
-        ::accept(req->reqToken.fd, req->data.socketaddr, &req->len.socklen);
-    req->reserved = fd;
-    req->opCode = buffioOpCode::done;
-    return req->routine;
-  }; break;
-  case buffioOpCode::waitConnect:
-
-    int error = -1;
-    socklen_t len = sizeof(int);
-    req->opCode = buffioOpCode::done;
-    getsockopt(req->reqToken.fd, SOL_SOCKET, SO_ERROR, &error, &len);
-    req->opError = error;
-
-    if (error != 0) {
-      // reattempting connection on failure
-      ::connect(req->reqToken.fd, req->data.socketaddr, req->len.socklen);
-      if (errno != EINPROGRESS) {
-        req->opError = -1;
-      };
-    } else {
-      buffio::fiber::pendingReq.fetch_add(1, std::memory_order_acq_rel);
-      buffio::fiber::poller->pollDel(req->reqToken.fd);
-      buffio::fiber::poller->pollOp(req->reqToken.fd, req->fd);
-    };
-    req->opCode = buffioOpCode::done;
-    return req->routine;
-    break;
-  };
-
-  return nullptr;
-};
-
-int sockBroker::consumeEntry(buffioHeader *req) {
-
-  // consumeBatch only handle read and write requests;
-  ssize_t buffiolen = 1;
-  req->opError = 0;
-  errno = 0;
-  while (buffiolen > 0) {
-
-    switch (req->rwtype) {
-    case buffioReadWriteType::read:
-      buffiolen = read(req->reqToken.fd, req->bufferCursor, req->reserved);
-      break;
-    case buffioReadWriteType::write:
-      buffiolen = write(req->reqToken.fd, req->bufferCursor, req->reserved);
-      break;
-    default:
-      break;
-    };
-
-    if (buffiolen > 0) {
-      req->reserved -= buffiolen;
-      if (req->reserved <= 0)
-        return 0;
-      req->bufferCursor = req->data.buffer + buffiolen;
-    };
-  };
-
-  req->len.len = (req->bufferCursor - req->data.buffer);
-  if (errno == EAGAIN || errno == EWOULDBLOCK) {
-    req->fd->unsetBit(req->unsetBit);
-    return 0;
-  };
-  req->opError = errno;
-  return -1;
 };
 
 int sockBroker::start(buffio::thread &thread, int &workerNum,

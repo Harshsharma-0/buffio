@@ -12,6 +12,7 @@ int main() {
   buffio::scheduler scheduler;
   scheduler.init();
   scheduler.push(helloWorld());
+  scheduler.run();
   scheduler.clean();
 
   return 0;

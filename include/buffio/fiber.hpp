@@ -5,6 +5,8 @@
 #pragma once
 
 #include "Queue.hpp"
+#include "buffio/actions.hpp"
+#include "buffio/enum.hpp"
 #include "clock.hpp"
 #include "common.hpp"
 #include "memory.hpp"
@@ -17,7 +19,6 @@ namespace fiber {
 
 extern int value;
 extern buffio::Queue<buffioHeader, void *, buffioQueueNoMem> *requestBatch;
-extern buffio::Memory<buffioHeader> *headerPool;
 extern buffio::Queue<> *queue;
 extern buffio::Clock *timerClock;
 extern buffio::sockBroker *poller;
@@ -28,35 +29,43 @@ extern std::atomic<ssize_t> pendingReq;
 
 typedef struct {
   buffioHeader *header;
-  bool isSelf;
 } clampInfo;
 
+typedef struct clampNs {
+  buffioHeader *header;
+  buffio::promiseHandle then;
+} clampNs;
 class clamper {
 public:
+  clamper(auto then) {
+    if (info.header == nullptr)
+      return;
+    info.header->action = buffio::action::clampThread;
+    auto rh = then.get();
+    info.header->routine = then.get();
+    confSelf();
+  };
   clamper() {
     if (info.header == nullptr)
       return;
-    error = 0;
-    info.header->opCode = buffioOpCode::clampThread;
+    info.header->action = buffio::action::clampThread;
+    info.header->routine = nullptr;
   };
+  clampInfo sclamp() const { return info; };
+  clampInfo sclamp(auto then){
+    info.header->routine = then.get();
+    return info;
+  }
 
-  clamper(auto handle){
-    if (info.header == nullptr)
-        return;
-      
-    error = 0;
-    info.header->opCode = buffioOpCode::clampThread;
-    info.header->routine = handle.get();
-  };
-
-  clampInfo clamp()const { return info;};
+  clampNs clamp(auto then) const { return {info.header, then.get()}; }
+  clampNs clamp()  { return {info.header, nullptr}; }
 
 private:
-  int error = -1;
-  clampInfo info = {buffio::fiber::headerPool->pop(),false};
+  void confSelf();
+  clampInfo info = {new buffioHeader};
 };
 
 }; // namespace fiber
 }; // namespace buffio
 
-#include "promise.hpp"
+#include "buffio/promise.hpp"

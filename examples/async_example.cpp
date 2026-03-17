@@ -22,7 +22,7 @@ buffio::promise<int> server() {
     std::cout << "error" << std::endl;
     buffioreturn 0;
   };
-
+  std::cout << "server started" << std::endl;
   /* listen with 2 backlogs
    */
 

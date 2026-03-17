@@ -1,6 +1,14 @@
 #ifndef BUFFIO_SOCK
 #define BUFFIO_SOCK
 
+/**
+ * @file buffiofd.hpp
+ * @author Harsh Sharma
+ * @brief  Core fd maker of buffio
+ * buffioMakeFd is a wrapper to create fd of any time.
+ *
+ */
+
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -20,33 +28,14 @@
 #include <exception>
 #include <type_traits>
 
+#include "buffio/enum.hpp"
 #include "buffio/fiber.hpp"
+
 #include "common.hpp"
 #include "memory.hpp"
 #include "sockbroker.hpp"
 #include <atomic>
 #include <memory>
-
-enum class buffioFdFamily : int {
-  none = 0,
-  local = 1,
-  ipv4 = 2,
-  ipv6 = 3,
-  raw = 4,
-  pipe = 5,
-  fifo = 6,
-  file = 7,
-};
-
-enum class buffioSocketProtocol : int { none = 0, tcp = 1, udp = 2 };
-
-/**
- * @file buffiofd.hpp
- * @author Harsh Sharma
- * @brief  Core fd maker of buffio
- * buffioMakeFd is a wrapper to create fd of any time.
- *
- */
 
 /**
  * @class buffioMakeFd
@@ -180,7 +169,11 @@ public:
    */
 
   Fd() {
-    reserveHeader.opCode = buffioOpCode::none;
+    readHeader.fd = writeHeader.fd = this;
+    readHeader.isFresh = writeHeader.isFresh = true;
+    reserveHeader.fd = this;
+    reserveHeader.isFresh = false;
+    rwmask = 0;
     localfd = {0};
   };
 
@@ -189,6 +182,9 @@ public:
    */
   ~Fd();
 
+  buffioHeader *waitReadReady();
+  buffioHeader *waitWriteReady();
+  inline buffioHeaderSync syncHeaders() { return {&readHeader, &writeHeader}; }
   /**
    * @brief operator oveload to set a specific bit in read/write mask
    *
@@ -237,6 +233,7 @@ public:
    */
   int getFd() const { return localfd.fd[0]; };
 
+  buffioFdFamily getFamily() const { return fdFamily; }
   /**
    * @brief method returns the reserve header of the fd instance
    *
@@ -273,6 +270,8 @@ public:
   int accept(struct sockaddr *addr, socklen_t *socklen) const {
     return ::accept(localfd.fd[0], addr, socklen);
   };
+
+  int acceptedFd() const { return readHeader.iFd; }
 
   /**
    * @brief method to connect to a socket,
@@ -339,15 +338,17 @@ public:
    *
    */
   template <typename T> buffioRoutineStatus asyncAccept(T then) {
+
     if constexpr (std::is_same_v<T, asyncAccept_local>) {
-      reserveHeader.opCode = buffioOpCode::asyncAcceptlocal;
+      reserveHeader.action = buffio::action::asyncAccept;
       reserveHeader.onAsyncDone.asyncAcceptlocal = then;
     } else if constexpr (std::is_same_v<T, asyncAccept_in>) {
-      reserveHeader.opCode = buffioOpCode::asyncAcceptin;
+      reserveHeader.action = buffio::action::asyncAcceptIpv4;
       reserveHeader.onAsyncDone.asyncAcceptin = then;
     } else if constexpr (std::is_same_v<T, asyncAccept_in6>) {
-      reserveHeader.opCode = buffioOpCode::asyncAcceptin6;
+      reserveHeader.action = buffio::action::asyncAcceptIpv6;
       reserveHeader.onAsyncDone.asyncAcceptin6 = then;
+      
     } else {
       static_assert(false, "currently we don't support this type of async "
                            "accept function prototype,"
@@ -355,12 +356,17 @@ public:
                            "signature for a specific connection"
                            "type accept request");
     };
+    reserveHeader.iFd = localfd.fd[0];
+
     if (!(rwmask & BUFFIO_FD_ACCEPT_READY)) {
       this->poll(EPOLLIN); // trigger events until there is client availble
     };
 
-    reserveHeader.reqToken.fd = localfd.fd[0];
+    reserveHeader.isFresh = true;
     buffio::fiber::pendingReq.fetch_add(1, std::memory_order_acq_rel);
+
+    if(rwmask & BUFFIO_READ_READY)
+       buffio::fiber::requestBatch->push(&reserveHeader);
 
     return buffioRoutineStatus::none;
   };
@@ -377,7 +383,6 @@ public:
 
   buffioRoutineStatus poll(int mask = EPOLLIN | EPOLLOUT);
 
-  buffioHeader *getRawHeader() const;
   /**
    * @brief method to async connect to a socket
    *
@@ -422,7 +427,7 @@ public:
    *
    */
   buffioHeader *waitConnect(struct sockaddr *addr, socklen_t socklen);
-  int getConnectError() const { return reserveHeader.opError; }
+  int getConnectError() const { return writeHeader.opError; }
   /**
    * @brief linux read call wrapper to read from the fd
    * @param[in] buffer pointer to the buffer to read
@@ -525,18 +530,7 @@ public:
 
   buffioHeader *getPendingRead() const { return pendingReadReq; }
   buffioHeader *getPendingWrite() const { return pendingWriteReq; }
-  buffioHeader *reserveToQueue(int rmBit);
-  buffioHeader *waitReadReady() {
-    reserveHeader.opCode = buffioOpCode::wakeOnReadReady;
-    return &reserveHeader;
-  }
-  buffioHeader *waitWriteReady() {
-    reserveHeader.opCode = buffioOpCode::wakeOnWriteReady;
-    return &reserveHeader;
-  }
-  void resetHeader() {
-    ::memset((void *)&reserveHeader, '\0', sizeof(buffioHeader));
-  };
+
   void popPendingWrite() noexcept { pendingWriteReq = nullptr; };
   void popPendingRead() noexcept { pendingReadReq = nullptr; };
 
@@ -569,6 +563,7 @@ private:
 
   void mountFifo(char *address) { this->address = address; };
   void mountFile(int fd);
+
   buffioFdFamily fdFamily = buffioFdFamily::none;
   buffioOrigin origin = buffioOrigin::routine;
 
@@ -615,6 +610,9 @@ protected:
    * reserveHeader is only used for asyncAccept/Connect
    * or waitAccept/waitConnect
    */
+
+  buffioHeader readHeader;
+  buffioHeader writeHeader;
   buffioHeader reserveHeader;
   buffioHeader *pendingReadReq = nullptr;
   buffioHeader *pendingWriteReq = nullptr;

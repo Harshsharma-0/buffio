@@ -2,6 +2,7 @@
 #define __BUFFIO_PROMISE_HPP__
 
 #include "buffio/enum.hpp"
+#include "buffio/fd.hpp"
 #include "common.hpp"
 #include "fiber.hpp"
 #include <cassert>
@@ -44,21 +45,14 @@ template <typename T> struct promise {
     };
 
   private:
-    // declaration order-locked
+
     buffioRoutineStatus status = buffioRoutineStatus::fresh;
+
     void_handle handle_child = nullptr;
     void_handle voidSelf = nullptr;
+    
+    bool threaded = false;
     uintptr_t auxData = 0;
-
-    void killChild() {
-      if (handle_child) {
-        auto *tmp = handle_child.address();
-        buffioTypedHandle<char> handle =
-            buffioTypedHandle<char>::from_address(tmp);
-        handle.promise().setStatus(buffioRoutineStatus::done);
-        handle_child = nullptr;
-      }
-    };
 
   public:
     T returnData;
@@ -67,6 +61,9 @@ template <typename T> struct promise {
       voidSelf = {coro_handle::from_promise(*this)};
       return voidSelf;
     };
+    void setChild(auto child) noexcept{ 
+      handle_child = child;
+    }
     void_handle getChild() const { return handle_child; }
     // initially called when the routine is framed
     std::suspend_always initial_suspend() noexcept {
@@ -78,7 +75,6 @@ template <typename T> struct promise {
     std::suspend_always yield_value(int value) { return {}; };
 
     template <typename P> buffioAwaiter await_transform(P handle) {
-      killChild();
       std::coroutine_handle<> handleTmp = voidSelf;
       bool continueRoutine = false;
 
@@ -86,62 +82,71 @@ template <typename T> struct promise {
         handle_child = handle;
         status = buffioRoutineStatus::waiting;
         handleTmp = handle_child;
+
       } else if constexpr (std::is_same_v<P, promise>) {
+
         handle_child = handle.get();
         status = buffioRoutineStatus::waiting;
         handleTmp = handle_child;
+
       } else if constexpr (std::is_same_v<P, buffioRoutineStatus>) {
-        switch (handle) {
-        case buffioRoutineStatus::none:
+        if (handle == buffioRoutineStatus::none)
           continueRoutine = true;
-          break;
-        case buffioRoutineStatus::waitingFd:
-          status = handle;
-          break;
-        };
+        status = handle;
+
       } else if constexpr (std::is_same_v<P, buffio::clockSpec::wait>) {
         buffio::fiber::timerClock->push(handle.ms, voidSelf);
         status = buffioRoutineStatus::waitingTimer;
 
       } else if constexpr (std::is_same_v<P, buffioHeader *>) {
-        if (handle == nullptr) {
+        if (handle == nullptr)
           return {.self = handleTmp, .ready = true};
-        };
 
         handle->routine = voidSelf;
-        status = buffioRoutineStatus::waitingFd;
-        if (handle->opCode == buffioOpCode::readFile ||
-            handle->opCode == buffioOpCode::writeFile)
-          status = buffioRoutineStatus::waitingFile;
+        status = handle->fd->getFamily() == buffioFdFamily::file
+                     ? buffioRoutineStatus::waitingFile
+                     : buffioRoutineStatus::waitingFd;
       } else if constexpr (std::is_same_v<P, fiber::clampInfo>) {
         if (handle.header == nullptr)
           return {.self = voidSelf, .ready = true};
-        if (handle.isSelf != true){
-          buffio::fiber::poller->push(handle.header);
-          buffio::fiber::pendingReq.fetch_add(1,std::memory_order_acq_rel);
-          buffio::fiber::poller->ping();
-          return {.self = handleTmp,.ready = true};
-        };
-        handle.header->routine = voidSelf;
+
         auxData = (uintptr_t)handle.header;
+        handle.header->then = handle.header->routine; 
+        handle.header->routine = voidSelf;
+        threaded = true;
         status = buffioRoutineStatus::clampThread;
+        return {.self = voidSelf, .ready = false};
+  
+      } else if constexpr (std::is_same_v<P, fiber::clampNs>) {
+
+
+        handle.header->then = handle.then; 
+        buffio::fiber::poller->push(handle.header);
+        buffio::fiber::pendingReq.fetch_add(1, std::memory_order_acq_rel);
+        buffio::fiber::poller->ping();
+         
+        return {.self = handleTmp, .ready = true};
       } else {
         static_assert(false, "we don't support this type of call now");
       };
 
       return {.self = handleTmp, .ready = continueRoutine};
     };
-  
-    template<typename auxType> auxType getAux()const { return (auxType)auxData;}
+    bool isThreaded() const { return threaded;}
+    void setAux(uintptr_t data,bool thr){
+      auxData = data; 
+      threaded = thr;
+    }
+    template <typename auxType> auxType getAux() const {
+      return (auxType)auxData;
+    }
     void unhandled_exception() {
       status = buffioRoutineStatus::unhandledException;
-      killChild();
     };
 
     void return_value(T state) {
       returnData = state;
-      status = buffioRoutineStatus::wakeParent;
-      killChild();
+      status = threaded ? buffioRoutineStatus::backFromThread : buffioRoutineStatus::wakeParent;
       return;
     };
 

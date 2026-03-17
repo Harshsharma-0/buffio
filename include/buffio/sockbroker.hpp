@@ -31,26 +31,12 @@ public:
 
   ~sockBroker() {}
 
-  static buffio::promiseHandle handleAsync(buffioHeader *req);
-  /**
-   * @brief consumeEntry is used to process the events received from the epoll
-   * and that are not edge-triggered.
-   *
-   * @param [in] req  pointer to the request Header that need to be processed.
-   *
-   * @return 0 on an entry is done,
-   * @returns 1 if the entry is not fully consumed;
-   * @returns -1 if there error occured and errno is set.
-   *
-   */
-
-  static int consumeEntry(buffioHeader *req);
   int start(buffio::thread &thread, int &workerNum, size_t queueOrder = 5);
 
   inline int push(buffioHeaderType *which) {
     if (sockBrokerState == buffioSockBrokerState::active) {
       count += 1;
- 
+
       return epollWorks.enqueue(which);
     }
     return -1;
@@ -66,7 +52,6 @@ public:
 
     return nullptr;
   }
-
 
   bool running() const {
     return (sockBrokerState == buffioSockBrokerState::active);
