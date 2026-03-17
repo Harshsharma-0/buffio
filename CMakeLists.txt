@@ -4,8 +4,8 @@ project(buffio VERSION 0.1 LANGUAGES CXX)
 # Use modern C++ standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-#set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 
 
@@ -39,7 +39,7 @@ file(GLOB SOURCE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/examples/*.cpp")
 # Iterate through the list of found source files
 foreach(file ${SOURCE_FILES})
     get_filename_component(executable_name ${file} NAME_WE)
-    add_executable(${executable_name} ${file})
-    target_link_libraries(${executable_name} PRIVATE buffio)
+    add_executable("buffio_${executable_name}" ${file})
+    target_link_libraries("buffio_${executable_name}" PRIVATE buffio)
 
 endforeach()
