@@ -19,13 +19,20 @@ namespace fiber {
 
 extern int value;
 extern buffio::Queue<buffioHeader, void *, buffioQueueNoMem> *requestBatch;
+extern buffio::Queue<buffioHeader, void *, buffioQueueNoMem> *threadRequestBatch;
 extern buffio::Queue<> *queue;
 extern buffio::Clock *timerClock;
 extern buffio::sockBroker *poller;
+
 extern std::atomic<size_t> workerCount;
 extern std::atomic<ssize_t> abort; // below 0 to abort,
 extern std::atomic<ssize_t> FdCount;
 extern std::atomic<ssize_t> pendingReq;
+extern std::atomic<ssize_t> sleepingThread;
+
+extern std::atomic<ssize_t> queuedCompleted;
+
+extern std::atomic<bool> loopWakedUp;
 
 typedef struct {
   buffioHeader *header;
@@ -41,7 +48,6 @@ public:
     if (info.header == nullptr)
       return;
     info.header->action = buffio::action::clampThread;
-    auto rh = then.get();
     info.header->routine = then.get();
     confSelf();
   };
@@ -52,13 +58,19 @@ public:
     info.header->routine = nullptr;
   };
   clampInfo sclamp() const { return info; };
-  clampInfo sclamp(auto then){
+  clampInfo sclamp(auto then) {
     info.header->routine = then.get();
     return info;
   }
 
-  clampNs clamp(auto then) const { return {info.header, then.get()}; }
-  clampNs clamp()  { return {info.header, nullptr}; }
+  void clamp(auto then) {
+    info.header->then = then.get();
+    buffio::fiber::threadRequestBatch->push(info.header);
+  }
+  void clamp() { 
+    info.header->then = nullptr;
+    buffio::fiber::threadRequestBatch->push(info.header);
+  }
 
 private:
   void confSelf();

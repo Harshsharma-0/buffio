@@ -6,6 +6,7 @@ namespace buffio {
 
 action::xeturn action::propBack(buffioHeader *header) {
   header->isFresh = false;
+  header->fd->unsetBit(header->aux);
   return header->routine;
 };
 action::xeturn action::clampThread(buffioHeader *header) {
@@ -14,9 +15,8 @@ action::xeturn action::clampThread(buffioHeader *header) {
 };
 
 action::xeturn action::read(buffioHeader *header) {
-  // consumeBatch only handle read and write headeruests;
-  errno = 0;
 
+  errno = 0;
   ssize_t buffiolen = 1;
   header->opError = 0;
   int fd = header->iFd;
@@ -45,7 +45,6 @@ action::xeturn action::read(buffioHeader *header) {
 };
 
 action::xeturn action::write(buffioHeader *header) {
-  // consumeBatch only handle read and write headeruests;
   errno = 0;
 
   ssize_t buffiolen = 1;
@@ -54,7 +53,6 @@ action::xeturn action::write(buffioHeader *header) {
   ssize_t reserved = header->len.len;
   char *cursor = header->data.buffer;
   char *buffer = header->data.buffer;
-
   while (buffiolen > 0) {
     buffiolen = ::write(fd, cursor, reserved);
     if (buffiolen > 0) {

@@ -52,8 +52,10 @@ Buffio only provides you with a eventloop and fd operations function, all the lo
     }
     int main(){
       buffio::schedular evloop;
+      evloop.init(2) // 2 is the thread num
       evloop.schedule(task(0));
       evloop.run();
+      evloop.clean();
      return 0;
     }
    ```

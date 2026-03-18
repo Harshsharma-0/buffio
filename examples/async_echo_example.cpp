@@ -3,11 +3,14 @@
 #include <iostream>
 #include <string>
 
-#define SERVER_PORT 8081
+#define SERVER_PORT 8086
 
 buffio::promise<int> asyncReadRoutine(int errorCode, char *buffer, size_t len,
                                       buffio::Fd *fd) {
-  std::cout << "[async read] " << buffer << " len : " << len << std::endl;
+
+  if (len != 0)
+    std::cout << "[async read] " << buffer << " len : " << len << std::endl;
+
   int i = 0;
   for (; i != 1;) {
     buffio::clockSpec::wait clk;
@@ -57,8 +60,6 @@ buffio::promise<int> client() {
 
   __buffioCall(connectFd->asyncRead(buffer, 1024, asyncReadRoutine));
 
-  std::cout << "[client main routine ] exit" << std::endl;
-
   buffioreturn 0;
 };
 buffio::promise<int> asyncAcceptEx(int fd, sockaddr_in addr, socklen_t len) {
@@ -70,7 +71,7 @@ buffio::promise<int> asyncAcceptEx(int fd, sockaddr_in addr, socklen_t len) {
   buffio::MakeFd::mkFdSock(clientFd, fd, (sockaddr &)addr);
 
   char buffer[100];
-  memcpy(buffer, "echo - 0", 9);
+  memcpy(buffer, "echo - 0 echo - 1", 18);
   int i = 0;
   for (;;) {
     buffio::clockSpec::wait clk;

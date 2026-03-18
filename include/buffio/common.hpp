@@ -22,6 +22,7 @@
 namespace buffio {
 class Fd;
 class sockBroker;
+class scheduler;
 template <typename T> struct promise;
 using promiseHandle = std::coroutine_handle<>;
 

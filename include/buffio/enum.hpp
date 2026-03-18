@@ -11,6 +11,7 @@ enum class buffioFdFamily : int {
   pipe = 5,
   fifo = 6,
   file = 7,
+  eventFd = 8
 };
 
 enum class buffioSocketProtocol : int { none = 0, tcp = 1, udp = 2 };

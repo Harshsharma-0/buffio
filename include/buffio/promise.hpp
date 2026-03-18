@@ -45,12 +45,11 @@ template <typename T> struct promise {
     };
 
   private:
-
     buffioRoutineStatus status = buffioRoutineStatus::fresh;
 
     void_handle handle_child = nullptr;
     void_handle voidSelf = nullptr;
-    
+
     bool threaded = false;
     uintptr_t auxData = 0;
 
@@ -61,9 +60,7 @@ template <typename T> struct promise {
       voidSelf = {coro_handle::from_promise(*this)};
       return voidSelf;
     };
-    void setChild(auto child) noexcept{ 
-      handle_child = child;
-    }
+    void setChild(auto child) noexcept { handle_child = child; }
     void_handle getChild() const { return handle_child; }
     // initially called when the routine is framed
     std::suspend_always initial_suspend() noexcept {
@@ -111,30 +108,21 @@ template <typename T> struct promise {
           return {.self = voidSelf, .ready = true};
 
         auxData = (uintptr_t)handle.header;
-        handle.header->then = handle.header->routine; 
+        handle.header->then = handle.header->routine;
         handle.header->routine = voidSelf;
         threaded = true;
         status = buffioRoutineStatus::clampThread;
         return {.self = voidSelf, .ready = false};
-  
-      } else if constexpr (std::is_same_v<P, fiber::clampNs>) {
 
-
-        handle.header->then = handle.then; 
-        buffio::fiber::poller->push(handle.header);
-        buffio::fiber::pendingReq.fetch_add(1, std::memory_order_acq_rel);
-        buffio::fiber::poller->ping();
-         
-        return {.self = handleTmp, .ready = true};
       } else {
         static_assert(false, "we don't support this type of call now");
       };
 
       return {.self = handleTmp, .ready = continueRoutine};
     };
-    bool isThreaded() const { return threaded;}
-    void setAux(uintptr_t data,bool thr){
-      auxData = data; 
+    bool isThreaded() const { return threaded; }
+    void setAux(uintptr_t data, bool thr) {
+      auxData = data;
       threaded = thr;
     }
     template <typename auxType> auxType getAux() const {
@@ -146,7 +134,8 @@ template <typename T> struct promise {
 
     void return_value(T state) {
       returnData = state;
-      status = threaded ? buffioRoutineStatus::backFromThread : buffioRoutineStatus::wakeParent;
+      status = threaded ? buffioRoutineStatus::backFromThread
+                        : buffioRoutineStatus::wakeParent;
       return;
     };
 

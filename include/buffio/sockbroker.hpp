@@ -8,6 +8,7 @@
 #include "thread.hpp"
 #include <semaphore.h>
 #include <sys/epoll.h>
+#include <sys/eventfd.h>
 #include <unistd.h>
 
 #define BUFFIO_REQUEST_MAX_SIZE sizeof(buffioRequestMaxSize)
@@ -25,7 +26,7 @@ public:
   sockBroker &operator=(sockBroker const &) = delete;
   sockBroker(sockBroker const &&) = delete;
   sockBroker &operator=(sockBroker const &&) = delete;
-  sockBroker() : epollFd(-1), count(0) {
+  sockBroker() : epollFd(-1), count(0), wakefd(0) {
     sockBrokerState = buffioSockBrokerState::none;
   };
 
@@ -33,13 +34,13 @@ public:
 
   int start(buffio::thread &thread, int &workerNum, size_t queueOrder = 5);
 
-  inline int push(buffioHeaderType *which) {
+  inline bool push(buffioHeaderType *which) {
     if (sockBrokerState == buffioSockBrokerState::active) {
       count += 1;
 
       return epollWorks.enqueue(which);
     }
-    return -1;
+    return false;
   }
   inline buffioHeaderType *pop() {
     if (sockBrokerState == buffioSockBrokerState::active) {
@@ -98,15 +99,15 @@ public:
     ::sem_post(&buffioWorkerSignal);
     return 0;
   }
-  int wakeLoop() const { return write(loopFd, "A", 1); };
-  inline void mountWakeFd(int fd) { loopFd = fd; }
+  int sendEv() const { return ::eventfd_write(wakefd, 100); };
+  inline void mountFd(int fd) { wakefd = fd; }
 
 private:
   buffioSockBrokerQueue epollWorks;
   buffioSockBrokerQueue epollConsume;
   buffioSockBrokerState sockBrokerState;
-  int loopFd;
   int epollFd;
+  int wakefd;
   size_t count;
   sem_t buffioWorkerSignal;
 };

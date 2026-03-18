@@ -156,17 +156,22 @@ public:
     queue.push(handle.get());
     return 0;
   };
+
+  void processThreadRequest();
+  void dequeueThreadQueue(int nentry);
   void clean(int tries = 5, int timeout = 100);
   void shutWorker(int workerNum, int tries, long wait);
   bool error() const { return (workerlNum < 0); }
 
 private:
-  buffio::Fd syncPipe;
+  buffio::Fd evFd;
   buffio::sockBroker poller;
   buffio::Clock timerClock;
   buffio::Queue<> queue;
   buffio::Queue<buffioHeader, void *, buffioQueueNoMem> requestBatch;
+  buffio::Queue<buffioHeader, void *, buffioQueueNoMem> threadRequestBatch;
   buffio::thread threadPool;
   int workerlNum;
+  bool immediateWake = false;
 };
 }; // namespace buffio

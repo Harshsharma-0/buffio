@@ -1,5 +1,3 @@
-
-
 #include "buffio/sockbroker.hpp"
 #include "buffio/fd.hpp"
 #include "buffio/fiber.hpp"
@@ -22,14 +20,15 @@ int sockBroker::worker(void *data) {
   buffio::fiber::workerCount.fetch_add(1, std::memory_order_acq_rel);
   while (exit != true) {
     abort = buffio::fiber::abort.load(std::memory_order_acquire);
-    if (abort < 0)
-      break;
+    if (abort < 0)  break;
+
     if (workQueue->empty()) {
+      buffio::fiber::sleepingThread.fetch_add(1,std::memory_order_acq_rel);
       ::sem_wait(&parent->buffioWorkerSignal);
+      buffio::fiber::sleepingThread.fetch_add(-1,std::memory_order_acq_rel);
+      
       abort = buffio::fiber::abort.load(std::memory_order_acquire);
-      if (abort < 0) {
-        break;
-      }
+      if (abort < 0) break;
     };
 
     buffioHeader *tmpWork = workQueue->dequeue(nullptr);
@@ -37,9 +36,18 @@ int sockBroker::worker(void *data) {
       continue;
 
     tmpWork->routine = tmpWork->action(tmpWork);
+    while(!consumeQueue->enqueue(tmpWork)){ 
+     struct timespec ts;
+     ts.tv_sec = 10 / 1000;
+     ts.tv_nsec = (10 % 1000) * 100000L;
+     ::nanosleep(&ts, &ts);
+    }
 
-    consumeQueue->enqueue(tmpWork);
-    parent->wakeLoop();
+    buffio::fiber::queuedCompleted.fetch_add(1,std::memory_order_acq_rel);
+
+    if(buffio::fiber::loopWakedUp.load(std::memory_order_acquire) == false) 
+      parent->sendEv();
+     
 
     buffio::fiber::pendingReq.fetch_add(-1, std::memory_order_acq_rel);
   };
@@ -49,7 +57,7 @@ int sockBroker::worker(void *data) {
 };
 
 int sockBroker::start(buffio::thread &thread, int &workerNum,
-                      size_t queueOrder) {
+                    size_t queueOrder) {
 
   size_t queueSizeRel = 1 << queueOrder;
   if (workerNum > queueSizeRel)
@@ -57,7 +65,7 @@ int sockBroker::start(buffio::thread &thread, int &workerNum,
   if (queueOrder < BUFFIO_RING_MIN || queueOrder > buffioatomix_max_order)
     return (int)buffioErrorCode::queueSize;
 
-  if (::sem_init(&buffioWorkerSignal, 0, 0) != 0)
+  if (::sem_init(&buffioWorkerSignal,0, 0) != 0)
     return -1;
 
   if (epollConsume.lfstart(queueOrder) < 0)

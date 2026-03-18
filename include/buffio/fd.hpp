@@ -14,6 +14,7 @@
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <sys/epoll.h>
+#include <sys/eventfd.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -30,10 +31,8 @@
 
 #include "buffio/enum.hpp"
 #include "buffio/fiber.hpp"
-
 #include "common.hpp"
 #include "memory.hpp"
-#include "sockbroker.hpp"
 #include <atomic>
 #include <memory>
 
@@ -145,6 +144,9 @@ public:
   static int setNonBlocking(int fd);
 
   static int mkFdSock(buffio::Fd &fdCore, int fd, struct sockaddr &addr);
+  [[nodiscard]]
+  static int eventFd(buffio::Fd &fdCore, int initVal,
+                     int flags = EFD_CLOEXEC | EFD_NONBLOCK);
 };
 
 /**
@@ -348,7 +350,7 @@ public:
     } else if constexpr (std::is_same_v<T, asyncAccept_in6>) {
       reserveHeader.action = buffio::action::asyncAcceptIpv6;
       reserveHeader.onAsyncDone.asyncAcceptin6 = then;
-      
+
     } else {
       static_assert(false, "currently we don't support this type of async "
                            "accept function prototype,"
@@ -356,7 +358,6 @@ public:
                            "signature for a specific connection"
                            "type accept request");
     };
-    reserveHeader.iFd = localfd.fd[0];
 
     if (!(rwmask & BUFFIO_FD_ACCEPT_READY)) {
       this->poll(EPOLLIN); // trigger events until there is client availble
@@ -365,8 +366,8 @@ public:
     reserveHeader.isFresh = true;
     buffio::fiber::pendingReq.fetch_add(1, std::memory_order_acq_rel);
 
-    if(rwmask & BUFFIO_READ_READY)
-       buffio::fiber::requestBatch->push(&reserveHeader);
+    if (rwmask & BUFFIO_READ_READY)
+      buffio::fiber::requestBatch->pushHead(&reserveHeader);
 
     return buffioRoutineStatus::none;
   };
@@ -528,13 +529,8 @@ public:
    * write.
    */
 
-  buffioHeader *getPendingRead() const { return pendingReadReq; }
-  buffioHeader *getPendingWrite() const { return pendingWriteReq; }
-
-  void popPendingWrite() noexcept { pendingWriteReq = nullptr; };
-  void popPendingRead() noexcept { pendingReadReq = nullptr; };
-
   friend class buffio::MakeFd;
+  friend class buffio::scheduler;
 
 private:
   /**
@@ -563,6 +559,10 @@ private:
 
   void mountFifo(char *address) { this->address = address; };
   void mountFile(int fd);
+
+  void mountEventFd(int fd);
+  void takeEventReadAction();
+  void takeEventWriteAction();
 
   buffioFdFamily fdFamily = buffioFdFamily::none;
   buffioOrigin origin = buffioOrigin::routine;
