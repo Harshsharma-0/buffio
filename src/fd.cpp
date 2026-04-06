@@ -324,14 +324,17 @@ inline void make_read_write_header(buffioHeader &header, char *buffer,
 };
 buffioHeader *Fd::waitRead(char *buffer, size_t len) {
 
+  
   if (readHeader.isFresh)
     return nullptr;
+
+  
 
   make_read_write_header(readHeader, buffer, len);
 
   if (fdFamily == buffioFdFamily::file) {
     readHeader.action = buffio::action::readFile;
-    buffio::fiber::threadRequestBatch->push(&readHeader);
+    buffio::fiber::threadRequestBatch->push(&readHeader); 
     return &readHeader;
   };
 
@@ -503,20 +506,18 @@ void Fd::mountEventFd(int fd) {
   buffio::fiber::FdCount.fetch_add(1, std::memory_order_acq_rel);
 };
 void Fd::takeEventReadAction() {
-  if (pendingReadReq == nullptr) {
-    rwmask &= BUFFIO_READ_READY;
-    return;
-  };
+  rwmask |= BUFFIO_READ_READY;
+
+  if (pendingReadReq == nullptr) return;
+  
   buffio::fiber::pendingReq.fetch_add(-1, std::memory_order_acq_rel);
   buffio::fiber::requestBatch->push(pendingReadReq);
   pendingReadReq = nullptr;
 };
 
 void Fd::takeEventWriteAction() {
-  if (pendingWriteReq == nullptr) {
-    rwmask &= BUFFIO_WRITE_READY;
-    return;
-  };
+  rwmask |= BUFFIO_WRITE_READY;
+  if (pendingWriteReq == nullptr) return; 
 
   buffio::fiber::pendingReq.fetch_add(-1, std::memory_order_acq_rel);
   buffio::fiber::requestBatch->push(pendingWriteReq);

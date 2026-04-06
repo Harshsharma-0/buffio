@@ -5,7 +5,6 @@
 #include <cerrno>
 #include <cstdint>
 #include <cstring>
-#include <iostream>
 #include <sys/socket.h>
 #include <sys/types.h>
 
@@ -36,6 +35,7 @@ int sockBroker::worker(void *data) {
       continue;
 
     tmpWork->routine = tmpWork->action(tmpWork);
+
     while(!consumeQueue->enqueue(tmpWork)){ 
      struct timespec ts;
      ts.tv_sec = 10 / 1000;

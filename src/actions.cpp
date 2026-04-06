@@ -1,7 +1,7 @@
 #include "buffio/actions.hpp"
 #include "buffio/promise.hpp"
 #include <cerrno>
-#include <iostream>
+
 namespace buffio {
 
 action::xeturn action::propBack(buffioHeader *header) {
@@ -65,7 +65,7 @@ action::xeturn action::write(buffioHeader *header) {
 
   header->len.len = cursor - buffer;
   header->isFresh = false;
-
+  
   if (errno == EAGAIN || errno == EWOULDBLOCK) {
     header->fd->unsetBit(BUFFIO_WRITE_READY);
     return header->routine;

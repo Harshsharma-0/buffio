@@ -5,10 +5,9 @@ namespace buffio {
 namespace fiber {
 
 
-int value = -110;
+buffio::Queue<buffio::flow, void *, buffioQueueNoMem> *flowQueue = nullptr;
 buffio::Queue<buffioHeader, void *, buffioQueueNoMem> *requestBatch = nullptr;
-buffio::Queue<buffioHeader, void *, buffioQueueNoMem> *threadRequestBatch =
-    nullptr;
+buffio::Queue<buffioHeader, void *, buffioQueueNoMem> *threadRequestBatch = nullptr;
 buffio::Queue<> *queue = nullptr;
 buffio::Clock *timerClock = nullptr;
 buffio::sockBroker *poller = nullptr;

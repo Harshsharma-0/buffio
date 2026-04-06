@@ -1,3 +1,2 @@
 #include "buffio/Queue.hpp"
-
-namespace buffio {}; // namespace buffio
+#include "buffio/fiber.hpp"

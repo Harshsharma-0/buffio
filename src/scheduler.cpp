@@ -3,7 +3,6 @@
 #include "buffio/fiber.hpp"
 #include "buffio/promise.hpp"
 #include <atomic>
-#include <iostream>
 #include <unistd.h>
 
 #define BUFFIO_FIBER_SETUP(AFTER_SETUP)                                        \
@@ -12,6 +11,7 @@
   buffio::fiber::timerClock = &this->timerClock;                               \
   buffio::fiber::requestBatch = &this->requestBatch;                           \
   buffio::fiber::threadRequestBatch = &this->threadRequestBatch;               \
+  buffio::fiber::flowQueue = &this->flowQueue;                                 \
   AFTER_SETUP
 
 namespace buffio {
@@ -29,6 +29,7 @@ scheduler::~scheduler() {
   buffio::fiber::timerClock = nullptr;
   buffio::fiber::requestBatch = nullptr;
   buffio::fiber::threadRequestBatch = nullptr;
+  buffio::fiber::flowQueue = nullptr;
 };
 void scheduler::clean(int tries, int timeout) {
   cleanQueue();
@@ -45,6 +46,7 @@ int scheduler::init(int workerNum, int queueOrder) {
     evFd.release();
     return error;
   };
+  workerlNum = workerNum;
   poller.mountFd(evFd.getFd());
    
   return 0;
@@ -52,7 +54,7 @@ int scheduler::init(int workerNum, int queueOrder) {
 int scheduler::run() {
  
   int cycle = 2;
-  if (queue.empty())
+  if (queue.empty() && flowQueue.empty())
     return (int)buffioErrorCode::unknown;
 
   struct epoll_event evnt[1024];
@@ -78,6 +80,7 @@ int scheduler::run() {
    for(int i = 0; i < cycle; i++){
     dequeueThreadQueue(50);
     if(!queue.empty()) yieldQueue(10);
+    if(!flowQueue.empty()) startFlow();
     if(!threadRequestBatch.empty()) processThreadRequest();
     if(!requestBatch.empty()) consumeBatch(8);
    };
@@ -120,7 +123,7 @@ int scheduler::processEvents(struct epoll_event evnts[], int len) {
         handle->takeEventReadAction();
 
     if (evnts[i].events & EPOLLOUT)
-        handle->takeEventReadAction();
+        handle->takeEventWriteAction();
 
     auto req = handle->getReserveHeader();
     if (req->isFresh) {
@@ -156,13 +159,15 @@ void scheduler::cleanQueue() {
   };
 };
 
+#define _CHK(name) name.empty()
+
 int scheduler::getWakeTime(bool *flag) {
 
   int looptime = timerClock.getNext();
   ssize_t nqueue = buffio::fiber::queuedCompleted.load(std::memory_order_acquire);
   bool n = true;
 
-  if (!queue.empty() || !requestBatch.empty() || !threadRequestBatch.empty() || nqueue > 0) {
+  if (_CHK(!flowQueue) || _CHK(!queue) || _CHK(!requestBatch) || _CHK(!threadRequestBatch) || nqueue > 0) {
     return 0;
   };
 
@@ -174,7 +179,7 @@ int scheduler::getWakeTime(bool *flag) {
     return looptime;
   }
 
-  if (queue.empty() && timerClock.empty()) {
+  if (queue.empty() && timerClock.empty() && flowQueue.empty()) {
     *flag = true;
     return 0;
   };
@@ -183,6 +188,7 @@ int scheduler::getWakeTime(bool *flag) {
 
   return looptime;
 };
+#undef _CHK
 
 int scheduler::yieldQueue(int chunk) {
 
@@ -273,19 +279,38 @@ int scheduler::yieldQueue(int chunk) {
   return 0;
 };
 
+void scheduler::startFlow(int cycle){
+  for (int i = cycle; 0 < i; i--){
+
+    buffio::flow *data = flowQueue.get();
+    auto nxt = data->current->chainNext; 
+    data->current->flowing(data->current->data);
+    data->current = nxt;
+
+    if(nxt == nullptr){ 
+      flowQueue.pop(); 
+      delete data;
+    };
+
+    if(flowQueue.empty()) break;
+    flowQueue.mvNext();
+  };
+};
 void scheduler::processThreadRequest(){
 
    size_t i =  0;
-   for(; i < threadRequestBatch.gcount(); i++){
+
+   for(; i < threadRequestBatch.gcount();){
       buffioHeader *header = threadRequestBatch.get();
       if(!poller.push(header)) break;
+      i += 1;
       threadRequestBatch.pop();
-
       if(threadRequestBatch.empty()) break;
       threadRequestBatch.mvNext();
     };
 
     buffio::fiber::pendingReq.fetch_add(i,std::memory_order_acq_rel);
+
     auto sleeping = buffio::fiber::sleepingThread.load(std::memory_order_acquire);
     ssize_t value = 0;
     size_t wakevalue = workerlNum;
@@ -293,15 +318,20 @@ void scheduler::processThreadRequest(){
     if((value = (workerlNum - sleeping)) >  0)
         wakevalue = sleeping;
 
-    for(ssize_t i = 0; i < wakevalue ; i++)
+    for(ssize_t i = 0; i < wakevalue ; i++){
       poller.ping();
+    }
  };
+
 void scheduler::dequeueThreadQueue(int nentry){
  ssize_t nqueue = buffio::fiber::queuedCompleted.load(std::memory_order_acquire);
  ssize_t value = nqueue;
 
+
  eventfd_t eval;
  eventfd_read(evFd.getFd(),&eval);
+
+
  if(value == 0) return;
 
   if((nentry - nqueue) < 0)

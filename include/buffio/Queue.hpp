@@ -1,7 +1,7 @@
 #pragma once
 
-#include "common.hpp"
-#include "memory.hpp"
+#include "buffio/common.hpp"
+#include "buffio/memory.hpp"
 #include <cassert>
 #include <iostream>
 #include <type_traits>
@@ -18,6 +18,7 @@
  management.
 */
 
+
 enum class buffioQueueNoMem : int { no = 1 };
 
 /**
@@ -29,7 +30,6 @@ public:
   blockQueue *prev;              ///< previous member of the queue.
   blockQueue *waiter;            ///< waiter for the task.
   buffio::promiseHandle current; ///< coroutine handle of the task
-
   ~blockQueue() {
     if (current != nullptr)
       std::cout << "[Task leaked or not cleaned up]" << std::endl;

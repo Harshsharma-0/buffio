@@ -4,22 +4,23 @@
 
 #pragma once
 
-#include "Queue.hpp"
+#include "buffio/Queue.hpp"
 #include "buffio/actions.hpp"
 #include "buffio/enum.hpp"
-#include "clock.hpp"
-#include "common.hpp"
-#include "memory.hpp"
-#include "sockbroker.hpp"
+#include "buffio/clock.hpp"
+#include "buffio/common.hpp"
+#include "buffio/memory.hpp"
+#include "buffio/sockbroker.hpp"
+#include "buffio/flow.hpp"
 #include <atomic>
 
 namespace buffio {
 
 namespace fiber {
 
-extern int value;
 extern buffio::Queue<buffioHeader, void *, buffioQueueNoMem> *requestBatch;
 extern buffio::Queue<buffioHeader, void *, buffioQueueNoMem> *threadRequestBatch;
+extern buffio::Queue<buffio::flow, void *, buffioQueueNoMem> *flowQueue;
 extern buffio::Queue<> *queue;
 extern buffio::Clock *timerClock;
 extern buffio::sockBroker *poller;
@@ -42,6 +43,7 @@ typedef struct clampNs {
   buffioHeader *header;
   buffio::promiseHandle then;
 } clampNs;
+
 class clamper {
 public:
   clamper(auto then) {

@@ -19,17 +19,51 @@
 #define BUFFIO_FD_WRITE_REQUEST (1 << 9)
 
 #define BUFFIO_HEADER_NEWED -11111111
+#include <iostream>
+
 namespace buffio {
+/*
+ * forward declaration of classes
+ */
 class Fd;
 class sockBroker;
 class scheduler;
+
+/*
+ * Prototypes for promise object
+ */
 template <typename T> struct promise;
 using promiseHandle = std::coroutine_handle<>;
 
-}; // namespace buffio
-struct buffioHeader;
+/*
+ * flow structure internal data structure
+ */
 
-using promiseHandle = std::coroutine_handle<>;
+typedef void (*runFlow)(void *);
+
+
+struct flow{
+ flow *next = nullptr;
+ flow *prev = nullptr;
+
+ flow *chainNext = nullptr;
+ flow *current = nullptr;
+
+ ~flow(){
+   if(chainNext != nullptr)
+        delete chainNext;
+ };
+
+ runFlow flowing;
+ void *data;
+};
+
+}; // namespace buffio
+
+/*
+ * forward declatatoin of buffioHeader
+ */
+struct buffioHeader;
 
 typedef buffio::promise<int> (*asyncAccept_local)(int fd, struct sockaddr_un,
                                                   socklen_t);

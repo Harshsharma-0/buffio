@@ -46,14 +46,15 @@ template <typename T> class Memory {
 
   // can give benefit as the data and next is decoupled form each other and can
   // also cause fragmentation as the struct is small
-  struct buffioMemoryFragment {
-    uintptr_t chksum; // can also be used as next ptr;
+  typedef struct buffioMemoryFragment {
     T data;
+    uintptr_t chksum; // can also be used as next ptr;
     ~buffioMemoryFragment() = default;
-  };
+  }buffioMemoryFragment;
+
   struct buffioMemoryPages {
     struct buffioMemoryPages *next;
-    struct buffioMemoryFragment *data;
+    buffioMemoryFragment *data;
   };
 
 public:
@@ -127,9 +128,9 @@ public:
 
   T *pop() {
     if (fragments == nullptr) {
-      if (makePage() != 0)
-        return nullptr;
-    };
+      if (makePage() != 0) return nullptr;
+    }
+    
     buffioMemoryFragment *tmpFrag = fragments;
     fragments = (buffioMemoryFragment *)fragments->chksum;
     tmpFrag->chksum = chkSum;
@@ -149,17 +150,12 @@ public:
    */
 
   void push(T *data) {
-    if (data == nullptr)
-      return;
-    if (fragments == nullptr)
-      makePage();
+    if (data == nullptr) return;
+    if (fragments == nullptr) makePage();
 
-    uintptr_t *chkSumLocal =
-        (uintptr_t *)((uintptr_t)data -
-                      offsetof(struct buffioMemoryFragment, data));
-    assert(*chkSumLocal == chkSum);
-    *chkSumLocal = (uintptr_t)nullptr;
-    pushFragment((buffioMemoryFragment *)chkSumLocal);
+    uintptr_t chkSumLocal = ((buffioMemoryFragment *)data)->chksum;
+    assert(chkSumLocal == chkSum);
+    pushFragment((buffioMemoryFragment *)data);
     return;
   };
   /**

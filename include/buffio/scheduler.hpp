@@ -1,8 +1,7 @@
 #pragma once
-#include "fd.hpp"
-#include "fiber.hpp"
-#include "promise.hpp"
-
+#include "buffio/fd.hpp"
+#include "buffio/fiber.hpp"
+#include "buffio/promise.hpp"
 #include <iostream>
 #include <unistd.h>
 
@@ -66,7 +65,6 @@ public:
    */
   ~scheduler();
   int init(int workerNum = 2, int queueOrder = 5);
-  void handleThreaded(int cycle = 8);
   /**
    * @brief Starts the main event loop.
    *
@@ -84,6 +82,28 @@ public:
    * @return  error code on initialization or runtime failure
    */
   int run();
+  /**
+   * @brief used to push routine to the execution queue before calling the
+   * run.
+   *
+   * @param[in] handle The handle to the routine.
+   *
+   * @return returns the value returned by the queue push method. and a value
+   * smaller than 0 must be treated as error.
+   *
+   */
+  int push(auto handle) {
+    queue.push(handle.get());
+    return 0;
+  };
+
+  void clean(int tries = 5, int timeout = 100);
+  bool error() const { return (workerlNum < 0); }
+
+private:
+  void startFlow(int cycle = 8);
+  void handleThreaded(int cycle = 8);
+
   /**
    * @brief Processes epoll events and dispatches work.
    *
@@ -142,34 +162,18 @@ public:
    */
 
   int yieldQueue(int chunk);
-  /**
-   * @brief used to push routine to the execution queue before calling the
-   * run.
-   *
-   * @param[in] handle The handle to the routine.
-   *
-   * @return returns the value returned by the queue push method. and a value
-   * smaller than 0 must be treated as error.
-   *
-   */
-  int push(auto handle) {
-    queue.push(handle.get());
-    return 0;
-  };
 
   void processThreadRequest();
   void dequeueThreadQueue(int nentry);
-  void clean(int tries = 5, int timeout = 100);
   void shutWorker(int workerNum, int tries, long wait);
-  bool error() const { return (workerlNum < 0); }
 
-private:
   buffio::Fd evFd;
   buffio::sockBroker poller;
   buffio::Clock timerClock;
   buffio::Queue<> queue;
   buffio::Queue<buffioHeader, void *, buffioQueueNoMem> requestBatch;
   buffio::Queue<buffioHeader, void *, buffioQueueNoMem> threadRequestBatch;
+  buffio::Queue<buffio::flow, void *, buffioQueueNoMem> flowQueue;
   buffio::thread threadPool;
   int workerlNum;
   bool immediateWake = false;

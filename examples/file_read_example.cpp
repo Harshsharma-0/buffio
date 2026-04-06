@@ -7,11 +7,15 @@ buffio::promise<int> helloRead() {
   buffio::Fd fd;
 
   (void)buffio::MakeFd::openFile(fd, "./hello_buffio_test.txt",
-                                 O_RDWR | O_FSYNC);
+                                 O_RDWR  | O_FSYNC);
   char *buffer = new char[13];
   __buffioCall(fd.waitRead(buffer, 12));
   std::cout << "[client read] " << buffer << std::endl;
-  delete buffer;
+  buffio::clockSpec::wait dlay;
+  dlay.ms = 1000;
+  __buffioCall(dlay);
+  
+  delete []buffer;
   buffioreturn 0;
 };
 
@@ -19,7 +23,7 @@ buffio::promise<int> helloWrite() {
   buffio::Fd fd;
 
   (void)buffio::MakeFd::openFile(fd, "./hello_buffio_test.txt",
-                                 O_RDWR | O_TRUNC);
+                                 O_RDWR | O_TRUNC | O_CREAT);
   fd.write("Hello World!", 12);
   std::cout << "[Fd] Write done!" << std::endl;
   buffioreturn 0;
