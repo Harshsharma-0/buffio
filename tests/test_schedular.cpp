@@ -1,6 +1,6 @@
 #include "buffio/scheduler.hpp"
 
-buffio::promise<int> hello() {
+buffio::promise hello() {
 
   std::cout << "hello World" << std::endl;
   buffioreturn 0;

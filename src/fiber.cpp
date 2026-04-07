@@ -20,7 +20,7 @@ std::atomic<ssize_t> queuedCompleted = 0;
 std::atomic <bool> loopWakedUp = false;
 
 void clamper::confSelf() {
-  auto promise = getPromise<char>(info.header->routine);
+  auto promise = getPromise(info.header->routine);
   promise->setAux((uintptr_t)info.header, true);
 };
 }; // namespace fiber

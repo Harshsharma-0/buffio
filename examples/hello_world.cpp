@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-buffio::promise<int> helloWorld() {
+buffio::promise helloWorld() {
 
   std::cout << "hello World" << std::endl;
   buffioreturn 0;

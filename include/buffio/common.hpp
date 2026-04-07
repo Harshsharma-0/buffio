@@ -32,7 +32,7 @@ class scheduler;
 /*
  * Prototypes for promise object
  */
-template <typename T> struct promise;
+struct promise;
 using promiseHandle = std::coroutine_handle<>;
 
 /*
@@ -65,18 +65,18 @@ struct flow{
  */
 struct buffioHeader;
 
-typedef buffio::promise<int> (*asyncAccept_local)(int fd, struct sockaddr_un,
+typedef buffio::promise (*asyncAccept_local)(int fd, struct sockaddr_un,
                                                   socklen_t);
-typedef buffio::promise<int> (*asyncAccept_in)(int fd, struct sockaddr_in,
+typedef buffio::promise (*asyncAccept_in)(int fd, struct sockaddr_in,
                                                socklen_t);
-typedef buffio::promise<int> (*asyncAccept_in6)(int fd, struct sockaddr_in6,
+typedef buffio::promise (*asyncAccept_in6)(int fd, struct sockaddr_in6,
                                                 socklen_t);
 
-typedef buffio::promise<int> (*onAsyncConnects)(int errorCode, buffio::Fd *fd,
+typedef buffio::promise (*onAsyncConnects)(int errorCode, buffio::Fd *fd,
                                                 struct sockaddr *);
-typedef buffio::promise<int> (*onAsyncWrites)(int errorCode, char *buffer,
+typedef buffio::promise (*onAsyncWrites)(int errorCode, char *buffer,
                                               size_t len, buffio::Fd *fd);
-typedef buffio::promise<int> (*onAsyncReads)(int errorCode, char *buffer,
+typedef buffio::promise (*onAsyncReads)(int errorCode, char *buffer,
                                              size_t len, buffio::Fd *fd);
 typedef buffio::promiseHandle (*buffioAction)(buffioHeader *);
 

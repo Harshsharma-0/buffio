@@ -35,7 +35,7 @@ void Clock::pushExpired(buffio::Queue<> &queue) {
 
   while (diff <= 0) {
     auto handle = clockTree.top().task;
-    auto *promise = getPromise<char>(handle);
+    auto promise = getPromise(handle);
     queue.push(handle);
     clockTree.pop();
     if (clockTree.empty())

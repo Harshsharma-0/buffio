@@ -5,7 +5,7 @@
 
 #define SERVER_PORT 8086
 
-buffio::promise<int> asyncReadRoutine(int errorCode, char *buffer, size_t len,
+buffio::promise asyncReadRoutine(int errorCode, char *buffer, size_t len,
                                       buffio::Fd *fd) {
 
   if (len != 0)
@@ -23,7 +23,7 @@ buffio::promise<int> asyncReadRoutine(int errorCode, char *buffer, size_t len,
 
   buffioreturn 0;
 }
-buffio::promise<int> client() {
+buffio::promise client() {
   buffio::Fd *connectFd = new buffio::Fd;
   struct sockaddr_in addr;
 
@@ -62,7 +62,7 @@ buffio::promise<int> client() {
 
   buffioreturn 0;
 };
-buffio::promise<int> asyncAcceptEx(int fd, sockaddr_in addr, socklen_t len) {
+buffio::promise asyncAcceptEx(int fd, sockaddr_in addr, socklen_t len) {
 
   std::cout << "connection accepted : fd - " << fd
             << " ip adress : " << inet_ntoa(addr.sin_addr) << std::endl;
@@ -84,7 +84,7 @@ buffio::promise<int> asyncAcceptEx(int fd, sockaddr_in addr, socklen_t len) {
 
   buffioreturn 0;
 };
-buffio::promise<int> server() {
+buffio::promise server() {
 
   buffio::Fd serverFd;
   struct sockaddr_in addr;

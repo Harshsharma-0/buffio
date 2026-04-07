@@ -23,7 +23,7 @@ struct buffioAwaiter {
 };
 
 namespace buffio {
-template <typename T> struct promise {
+  struct promise {
 
   struct promise_type;
   using coro_handle = std::coroutine_handle<promise_type>;
@@ -31,16 +31,14 @@ template <typename T> struct promise {
 
   struct promise_type {
 
-    template <typename Y> using promiseObject = promise<Y>::promise_type;
-    template <typename U>
-    using buffioTypedHandle = std::coroutine_handle<promiseObject<U>>;
+    using promiseObject = promise::promise_type;
+    using buffioTypedHandle = std::coroutine_handle<promiseObject>;
 
     using promiseHandle = std::coroutine_handle<>;
-    template <typename D>
-
-    inline promiseObject<D> *getPromise(promiseHandle handle) {
+  
+    inline promiseObject *getPromise(promiseHandle handle) {
       void *tmp_ptr = handle.address();
-      buffioTypedHandle<D> typed = buffioTypedHandle<D>::from_address(tmp_ptr);
+      buffioTypedHandle typed = buffioTypedHandle::from_address(tmp_ptr);
       return &typed.promise();
     };
 
@@ -54,7 +52,6 @@ template <typename T> struct promise {
     uintptr_t auxData = 0;
 
   public:
-    T returnData;
 
     void_handle get_return_object() {
       voidSelf = {coro_handle::from_promise(*this)};
@@ -132,8 +129,7 @@ template <typename T> struct promise {
       status = buffioRoutineStatus::unhandledException;
     };
 
-    void return_value(T state) {
-      returnData = state;
+    void return_value(int state) {
       status = threaded ? buffioRoutineStatus::backFromThread
                         : buffioRoutineStatus::wakeParent;
       return;
@@ -155,22 +151,13 @@ private:
   void_handle handle;
 };
 
-template <typename Y> using promiseObject = buffio::promise<Y>::promise_type;
-template <typename U>
-using buffioTypedHandle = std::coroutine_handle<promiseObject<U>>;
+using promiseObject = buffio::promise::promise_type;
+using buffioTypedHandle = std::coroutine_handle<promiseObject>;
 
-template <typename D>
-inline promiseObject<D> *getPromise(promiseHandle handle) {
+inline promiseObject *getPromise(promiseHandle handle) {
   void *tmp_ptr = handle.address();
-  buffioTypedHandle<D> typed = buffioTypedHandle<D>::from_address(tmp_ptr);
+  buffioTypedHandle typed = buffioTypedHandle::from_address(tmp_ptr);
   return &typed.promise();
-};
-
-template <typename G> constexpr G getReturn(promiseHandle handle) {
-  auto tmp = getPromise<G>(handle);
-  G data = tmp->returnData;
-  tmp->setStatus(buffioRoutineStatus::done);
-  return data;
 };
 
 }; // namespace buffio

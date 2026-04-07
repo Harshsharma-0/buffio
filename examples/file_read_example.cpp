@@ -3,7 +3,7 @@
 #include <fcntl.h>
 #include <iostream>
 
-buffio::promise<int> helloRead() {
+buffio::promise helloRead() {
   buffio::Fd fd;
 
   (void)buffio::MakeFd::openFile(fd, "./hello_buffio_test.txt",
@@ -19,7 +19,7 @@ buffio::promise<int> helloRead() {
   buffioreturn 0;
 };
 
-buffio::promise<int> helloWrite() {
+buffio::promise helloWrite() {
   buffio::Fd fd;
 
   (void)buffio::MakeFd::openFile(fd, "./hello_buffio_test.txt",

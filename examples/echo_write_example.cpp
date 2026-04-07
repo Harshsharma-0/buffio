@@ -6,14 +6,14 @@
 #define SERVER_PORT 8084
 buffio::Fd fileFd;
 int j = 0;
-buffio::promise<int> onWrite(int opError, char *buffer, size_t len,
+buffio::promise onWrite(int opError, char *buffer, size_t len,
                              buffio::Fd *fd) {
   std::cout << "file write done : " << j << std::endl;
   j += 1;
 
   buffioreturn 0;
 };
-buffio::promise<int> client() {
+buffio::promise client() {
   buffio::Fd connectFd;
   struct sockaddr_in addr;
 
@@ -52,7 +52,7 @@ buffio::promise<int> client() {
   std::cout << "client exit" << std::endl;
   buffioreturn 0;
 };
-buffio::promise<int> asyncAcceptEx(int fd, sockaddr_in addr, socklen_t len) {
+buffio::promise asyncAcceptEx(int fd, sockaddr_in addr, socklen_t len) {
 
   std::cout << "connection accepted : fd - " << fd
             << " ip adress : " << inet_ntoa(addr.sin_addr) << std::endl;
@@ -70,7 +70,7 @@ buffio::promise<int> asyncAcceptEx(int fd, sockaddr_in addr, socklen_t len) {
   }
   buffioreturn 0;
 };
-buffio::promise<int> server() {
+buffio::promise server() {
 
   buffio::Fd serverFd;
   struct sockaddr_in addr;

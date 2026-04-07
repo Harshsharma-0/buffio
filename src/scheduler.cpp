@@ -194,7 +194,7 @@ int scheduler::yieldQueue(int chunk) {
 
   for (int i = chunk; 0 < i; i--) {
     auto handle = queue.get();
-    auto promise = getPromise<char>(handle->current);
+    auto promise = getPromise(handle->current);
 
     if (promise->checkStatus() == buffioRoutineStatus::executing)
       handle->current.resume();
@@ -245,7 +245,7 @@ int scheduler::yieldQueue(int chunk) {
 
     case buffioRoutineStatus::wakeParent: {
       if (handle->waiter != nullptr) {
-        auto promiseP = getPromise<char>(handle->waiter->current);
+        auto promiseP = getPromise(handle->waiter->current);
         promiseP->setStatus(buffioRoutineStatus::executing);
         promise->setStatus(buffioRoutineStatus::paused);
         queue.push(handle->waiter);

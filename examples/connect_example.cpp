@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-buffio::promise<int> client() {
+buffio::promise client() {
   buffio::Fd connectFd;
   struct sockaddr_in addr;
 
@@ -36,14 +36,14 @@ buffio::promise<int> client() {
   std::cout << "client exiting" << std::endl;
   buffioreturn 0;
 };
-buffio::promise<int> asyncAcceptEx(int fd, sockaddr_in addr, socklen_t len) {
+buffio::promise asyncAcceptEx(int fd, sockaddr_in addr, socklen_t len) {
 
   std::cout << "connection accepted : fd - " << fd
             << " ip adress : " << inet_ntoa(addr.sin_addr) << std::endl;
   ::close(fd);
   buffioreturn 0;
 };
-buffio::promise<int> server() {
+buffio::promise server() {
 
   buffio::Fd serverFd;
   struct sockaddr_in addr;
