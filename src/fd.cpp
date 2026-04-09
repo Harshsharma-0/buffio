@@ -263,6 +263,7 @@ buffioRoutineStatus Fd::asyncConnect(onAsyncConnects then) {
     return buffioRoutineStatus::none;
 
   readHeader.action = buffio::action::asyncConnect;
+  readHeader.entry = buffio::fiber::queue->getEntry();
   readHeader.isFresh = true;
   buffio::fiber::requestBatch->push(&readHeader);
   return buffioRoutineStatus::none;
@@ -374,6 +375,7 @@ buffioRoutineStatus Fd::asyncRead(char *buffer, size_t len, onAsyncReads then) {
 
   make_read_write_header(readHeader, buffer, len);
   readHeader.onAsyncDone.onAsyncRead = then;
+  readHeader.entry = buffio::fiber::queue->getEntry();
 
   if (fdFamily == buffioFdFamily::file) {
     readHeader.action = buffio::action::asyncReadFile;
@@ -401,6 +403,7 @@ buffioRoutineStatus Fd::asyncWrite(char *buffer, size_t len,
 
   make_read_write_header(writeHeader, buffer, len);
   writeHeader.onAsyncDone.onAsyncRead = then;
+  writeHeader.entry = buffio::fiber::queue->getEntry();
 
   if (fdFamily == buffioFdFamily::file) {
     writeHeader.action = buffio::action::asyncWriteFile;

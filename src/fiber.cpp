@@ -5,7 +5,6 @@ namespace buffio {
 namespace fiber {
 
 
-buffio::Queue<buffio::flow, void *, buffioQueueNoMem> *flowQueue = nullptr;
 buffio::Queue<buffioHeader, void *, buffioQueueNoMem> *requestBatch = nullptr;
 buffio::Queue<buffioHeader, void *, buffioQueueNoMem> *threadRequestBatch = nullptr;
 buffio::Queue<> *queue = nullptr;
@@ -19,9 +18,5 @@ std::atomic<ssize_t> sleepingThread = 0;
 std::atomic<ssize_t> queuedCompleted = 0;
 std::atomic <bool> loopWakedUp = false;
 
-void clamper::confSelf() {
-  auto promise = getPromise(info.header->routine);
-  promise->setAux((uintptr_t)info.header, true);
-};
 }; // namespace fiber
 }; // namespace buffio

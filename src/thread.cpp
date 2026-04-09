@@ -52,7 +52,6 @@ int thread::run(const char *name, int (*func)(void *), void *data,
   };
 
   ::memset(tmpThr, '\0', sizeof(struct threadinternal));
-  tmpThr->status = buffioThreadStatus::configOk;
 
   if (::pthread_attr_init(&tmpThr->attr) != 0) {
     delete tmpThr;

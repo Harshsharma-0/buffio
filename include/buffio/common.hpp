@@ -21,6 +21,8 @@
 #define BUFFIO_HEADER_NEWED -11111111
 #include <iostream>
 
+
+class blockQueue;
 namespace buffio {
 /*
  * forward declaration of classes
@@ -32,7 +34,7 @@ class scheduler;
 /*
  * Prototypes for promise object
  */
-struct promise;
+class promise;
 using promiseHandle = std::coroutine_handle<>;
 
 /*
@@ -57,7 +59,7 @@ struct flow{
  runFlow flowing;
  void *data;
 };
-
+struct contaier;
 }; // namespace buffio
 
 /*
@@ -78,7 +80,7 @@ typedef buffio::promise (*onAsyncWrites)(int errorCode, char *buffer,
                                               size_t len, buffio::Fd *fd);
 typedef buffio::promise (*onAsyncReads)(int errorCode, char *buffer,
                                              size_t len, buffio::Fd *fd);
-typedef buffio::promiseHandle (*buffioAction)(buffioHeader *);
+typedef void (*buffioAction)(buffioHeader *);
 
 typedef struct buffioHeader {
 
@@ -117,13 +119,13 @@ typedef struct buffioHeader {
 
   int opError;
   int aux;
+
   /*
    * routine contain the handle of the routine to run after
    * the operation is competed. if not an async request
    */
-  buffio::promiseHandle routine;
-  buffio::promiseHandle then;
-
+ 
+  blockQueue *entry;
   /*
    * routine used for async requests
    * it pointer to the routine and have a strict return

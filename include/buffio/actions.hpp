@@ -6,7 +6,7 @@ namespace buffio {
 
 class action {
 
-  using xeturn = buffio::promiseHandle;
+  using xeturn = void;
 
 public:
   static action::xeturn read(buffioHeader *header);

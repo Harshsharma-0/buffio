@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Queue.hpp"
+#include "buffio/Queue.hpp"
 #include <cassert>
 #include <chrono>
 #include <coroutine>
@@ -12,7 +12,7 @@
 using chrClock = std::chrono::steady_clock;
 struct buffioTimerInfo {
   chrClock::time_point expires;
-  std::coroutine_handle<> task;
+  blockQueue *task;
 };
 
 namespace buffio {
@@ -38,11 +38,10 @@ public:
   int getNext();
   bool empty() const { return clockTree.empty(); }
 
-  void push(uint32_t delay, std::coroutine_handle<> task);
+  void push(uint32_t delay, blockQueue *task);
   void pushExpired(buffio::Queue<> &queue);
 
 private:
   buffioClockTree clockTree;
-  std::coroutine_handle<> nextWork;
 };
 }; // namespace buffio

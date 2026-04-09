@@ -34,7 +34,7 @@ int sockBroker::worker(void *data) {
     if (tmpWork == nullptr)
       continue;
 
-    tmpWork->routine = tmpWork->action(tmpWork);
+    tmpWork->action(tmpWork);
 
     while(!consumeQueue->enqueue(tmpWork)){ 
      struct timespec ts;

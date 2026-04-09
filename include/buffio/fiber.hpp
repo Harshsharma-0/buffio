@@ -20,7 +20,6 @@ namespace fiber {
 
 extern buffio::Queue<buffioHeader, void *, buffioQueueNoMem> *requestBatch;
 extern buffio::Queue<buffioHeader, void *, buffioQueueNoMem> *threadRequestBatch;
-extern buffio::Queue<buffio::flow, void *, buffioQueueNoMem> *flowQueue;
 extern buffio::Queue<> *queue;
 extern buffio::Clock *timerClock;
 extern buffio::sockBroker *poller;
@@ -50,32 +49,25 @@ public:
     if (info.header == nullptr)
       return;
     info.header->action = buffio::action::clampThread;
-    info.header->routine = then.get();
-    confSelf();
   };
   clamper() {
     if (info.header == nullptr)
       return;
     info.header->action = buffio::action::clampThread;
-    info.header->routine = nullptr;
   };
   clampInfo sclamp() const { return info; };
   clampInfo sclamp(auto then) {
-    info.header->routine = then.get();
     return info;
   }
 
   void clamp(auto then) {
-    info.header->then = then.get();
     buffio::fiber::threadRequestBatch->push(info.header);
   }
   void clamp() { 
-    info.header->then = nullptr;
     buffio::fiber::threadRequestBatch->push(info.header);
   }
 
 private:
-  void confSelf();
   clampInfo info = {new buffioHeader};
 };
 

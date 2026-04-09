@@ -7,11 +7,11 @@ namespace buffio {
 action::xeturn action::propBack(buffioHeader *header) {
   header->isFresh = false;
   header->fd->unsetBit(header->aux);
-  return header->routine;
+  return;
 };
 action::xeturn action::clampThread(buffioHeader *header) {
-  header->routine.resume();
-  return header->routine;
+  header->entry->task.run(header->entry->task.storage);
+  return;
 };
 
 action::xeturn action::read(buffioHeader *header) {
@@ -39,9 +39,9 @@ action::xeturn action::read(buffioHeader *header) {
 
   if (errno == EAGAIN || errno == EWOULDBLOCK) {
     header->fd->unsetBit(BUFFIO_READ_READY);
-    return header->routine;
+    return;
   };
-  return header->routine;
+  return;
 };
 
 action::xeturn action::write(buffioHeader *header) {
@@ -65,30 +65,30 @@ action::xeturn action::write(buffioHeader *header) {
 
   header->len.len = cursor - buffer;
   header->isFresh = false;
-  
+
   if (errno == EAGAIN || errno == EWOULDBLOCK) {
     header->fd->unsetBit(BUFFIO_WRITE_READY);
-    return header->routine;
+    return;
   };
-  return header->routine;
+  return;
 };
+
 action::xeturn action::readFile(buffioHeader *header) {
   int rlen = 0;
   rlen = ::read(header->iFd, header->data.buffer, header->len.len);
   header->opError = errno;
   header->len.len = rlen;
   header->isFresh = false;
-
-  return header->routine;
+  return;
 };
+
 action::xeturn action::writeFile(buffioHeader *header) {
   int rlen = 0;
   rlen = ::write(header->iFd, header->data.buffer, header->len.len);
   header->opError = errno;
   header->len.len = rlen;
   header->isFresh = false;
-
-  return header->routine;
+  return;
 };
 
 action::xeturn action::asyncConnect(buffioHeader *header) {
@@ -96,16 +96,16 @@ action::xeturn action::asyncConnect(buffioHeader *header) {
   int code = -1;
   socklen_t len = sizeof(int);
   buffio::Fd *fd = header->fd;
-  action::xeturn handle;
 
   if (::getsockopt(header->iFd, SOL_SOCKET, SO_ERROR, &code, &len) != 0)
     fd = nullptr;
 
-  handle = header->onAsyncDone.onAsyncConnect(code, fd, header->data.socketaddr)
-               .get();
+  auto handle =
+      header->onAsyncDone.onAsyncConnect(code, fd, header->data.socketaddr);
+  buffio::makeContainer::makeFromRoutine(handle, header->entry->task);
   header->isFresh = false;
 
-  return handle;
+  return;
 };
 action::xeturn action::waitConnect(buffioHeader *header) {
 
@@ -115,7 +115,7 @@ action::xeturn action::waitConnect(buffioHeader *header) {
   if (getsockopt(header->iFd, SOL_SOCKET, SO_ERROR, &error, &len) != 0) {
     header->opError = -1;
     header->isFresh = false;
-    return header->routine;
+    return;
   };
 
   if (error != 0) {
@@ -125,11 +125,11 @@ action::xeturn action::waitConnect(buffioHeader *header) {
     };
 
     header->isFresh = false;
-    return header->routine;
+    return;
   }
 
   header->isFresh = false;
-  return header->routine;
+  return;
 };
 
 action::xeturn action::asyncAccept(buffioHeader *header) {
@@ -139,9 +139,12 @@ action::xeturn action::asyncAccept(buffioHeader *header) {
   header->len.socklen = sizeof(addr);
   action::waitAccept(header);
 
-  return header->onAsyncDone
-      .asyncAcceptlocal(header->aux, addr, header->len.socklen)
-      .get();
+  auto handle = header->onAsyncDone.asyncAcceptlocal(header->aux, addr,
+                                                     header->len.socklen);
+
+  header->entry = buffio::fiber::queue->getEntry();
+  buffio::makeContainer::makeFromRoutine(handle, header->entry->task);
+
 };
 action::xeturn action::asyncAcceptIpv4(buffioHeader *header) {
   sockaddr_in addr = {0};
@@ -149,18 +152,24 @@ action::xeturn action::asyncAcceptIpv4(buffioHeader *header) {
   header->len.socklen = sizeof(sockaddr_in);
 
   action::waitAccept(header);
-  return header->onAsyncDone
-      .asyncAcceptin(header->aux, addr, header->len.socklen)
-      .get();
+  auto handle =
+      header->onAsyncDone.asyncAcceptin(header->aux, addr, header->len.socklen);
+
+  header->entry = buffio::fiber::queue->getEntry();
+  buffio::makeContainer::makeFromRoutine(handle, header->entry->task);
+  return;
 };
 action::xeturn action::asyncAcceptIpv6(buffioHeader *header) {
   sockaddr_in6 addr = {0};
   header->data.socketaddr = (sockaddr *)&addr;
   header->len.socklen = sizeof(sockaddr_in6);
   action::waitAccept(header);
-  return header->onAsyncDone
-      .asyncAcceptin6(header->aux, addr, header->len.socklen)
-      .get();
+  auto handle = header->onAsyncDone.asyncAcceptin6(header->aux, addr,
+                                                   header->len.socklen);
+
+  header->entry = buffio::fiber::queue->getEntry();
+  buffio::makeContainer::makeFromRoutine(handle, header->entry->task);
+  return;
 };
 
 action::xeturn action::waitAccept(buffioHeader *header) {
@@ -169,44 +178,39 @@ action::xeturn action::waitAccept(buffioHeader *header) {
       ::accept(header->iFd, header->data.socketaddr, &header->len.socklen);
   header->opError = errno;
   header->aux = afd;
-  return header->routine;
+  return;
 }
 
 action::xeturn action::asyncRead(buffioHeader *header) {
   action::read(header);
-  auto handle = header->onAsyncDone
-                    .onAsyncRead(header->opError, header->data.buffer,
-                                 header->len.len, header->fd)
-                    .get();
+  auto handle = header->onAsyncDone.onAsyncRead(
+      header->opError, header->data.buffer, header->len.len, header->fd);
   header->isFresh = false;
-  return handle;
+  buffio::makeContainer::makeFromRoutine(handle, header->entry->task);
+  return;
 };
 action::xeturn action::asyncWrite(buffioHeader *header) {
   action::write(header);
-  auto handle = header->onAsyncDone
-                    .onAsyncWrite(header->opError, header->data.buffer,
-                                  header->len.len, header->fd)
-                    .get();
+  auto handle = header->onAsyncDone.onAsyncWrite(
+      header->opError, header->data.buffer, header->len.len, header->fd);
   header->isFresh = false;
-  return handle;
+  buffio::makeContainer::makeFromRoutine(handle, header->entry->task);
+  return;
 };
 
 action::xeturn action::asyncReadFile(buffioHeader *header) {
   action::readFile(header);
-  auto handle = header->onAsyncDone
-                    .onAsyncRead(header->opError, header->data.buffer,
-                                 header->len.len, header->fd)
-                    .get();
+  auto handle = header->onAsyncDone.onAsyncRead(
+      header->opError, header->data.buffer, header->len.len, header->fd);
   header->isFresh = false;
-  return handle;
+  buffio::makeContainer::makeFromRoutine(handle, header->entry->task);
+  return;
 };
 action::xeturn action::asyncWriteFile(buffioHeader *header) {
   action::writeFile(header);
-  auto handle = header->onAsyncDone
-                    .onAsyncWrite(header->opError, header->data.buffer,
-                                  header->len.len, header->fd)
-                    .get();
-  header->isFresh = false;
-  return handle;
+  auto handle = header->onAsyncDone.onAsyncWrite(
+      header->opError, header->data.buffer, header->len.len, header->fd);
+  buffio::makeContainer::makeFromRoutine(handle, header->entry->task);
+  return;
 };
 }; // namespace buffio

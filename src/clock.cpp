@@ -18,8 +18,7 @@ int Clock::getNext() {
   return static_cast<int>(diff);
 };
 
-void Clock::push(uint32_t delay, std::coroutine_handle<> task) {
-
+void Clock::push(uint32_t delay, blockQueue *task) {
   assert(this != nullptr);
   clockTree.push({std::chrono::milliseconds(delay) + chrClock::now(), task});
 };
@@ -35,7 +34,6 @@ void Clock::pushExpired(buffio::Queue<> &queue) {
 
   while (diff <= 0) {
     auto handle = clockTree.top().task;
-    auto promise = getPromise(handle);
     queue.push(handle);
     clockTree.pop();
     if (clockTree.empty())

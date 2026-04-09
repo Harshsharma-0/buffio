@@ -1,6 +1,6 @@
 #pragma once
 
-#include "buffio/common.hpp"
+#include "buffio/container.hpp"
 #include "buffio/memory.hpp"
 #include <cassert>
 #include <iostream>
@@ -29,11 +29,7 @@ public:
   blockQueue *next;              ///< next member of the queue.
   blockQueue *prev;              ///< previous member of the queue.
   blockQueue *waiter;            ///< waiter for the task.
-  buffio::promiseHandle current; ///< coroutine handle of the task
-  ~blockQueue() {
-    if (current != nullptr)
-      std::cout << "[Task leaked or not cleaned up]" << std::endl;
-  };
+  buffio::container task;        ///< task handle of the task
 };
 
 /**
@@ -81,15 +77,15 @@ public:
     if ((frag = memory.pop()) == nullptr)
       return -1;
     if constexpr (std::is_same_v<C, blockQueue> &&
-                  std::is_same_v<V, buffio::promiseHandle>) {
-      frag->current = which;
+                  std::is_same_v<V, buffio::contaier>) {
+      frag->task = which;
       frag->waiter = waiter;
     };
     frag->next = nullptr;
     frag->prev = nullptr;
     return push(frag);
   };
-
+    C *getEntry() { return memory.pop();}
   /**
    * @brief method used to remove a entry from the queue, from any position.
    *
@@ -162,7 +158,6 @@ public:
     count -= 1;
     poppedEntry = true;
     if (head == head->next) {
-      memory.push(head);
       head = tail = nullptr;
       return;
     };

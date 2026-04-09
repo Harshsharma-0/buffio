@@ -92,8 +92,10 @@ public:
    * smaller than 0 must be treated as error.
    *
    */
-  int push(auto handle) {
-    queue.push(handle.get());
+  int push(buffio::promise task){
+    auto entry = queue.getEntry();
+    buffio::makeContainer::makeFromRoutine(task,entry->task);
+    queue.push(entry);
     return 0;
   };
 
@@ -101,7 +103,6 @@ public:
   bool error() const { return (workerlNum < 0); }
 
 private:
-  void startFlow(int cycle = 8);
   void handleThreaded(int cycle = 8);
 
   /**
@@ -173,7 +174,6 @@ private:
   buffio::Queue<> queue;
   buffio::Queue<buffioHeader, void *, buffioQueueNoMem> requestBatch;
   buffio::Queue<buffioHeader, void *, buffioQueueNoMem> threadRequestBatch;
-  buffio::Queue<buffio::flow, void *, buffioQueueNoMem> flowQueue;
   buffio::thread threadPool;
   int workerlNum;
   bool immediateWake = false;

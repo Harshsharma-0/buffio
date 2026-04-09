@@ -11,7 +11,6 @@
   buffio::fiber::timerClock = &this->timerClock;                               \
   buffio::fiber::requestBatch = &this->requestBatch;                           \
   buffio::fiber::threadRequestBatch = &this->threadRequestBatch;               \
-  buffio::fiber::flowQueue = &this->flowQueue;                                 \
   AFTER_SETUP
 
 namespace buffio {
@@ -29,7 +28,6 @@ scheduler::~scheduler() {
   buffio::fiber::timerClock = nullptr;
   buffio::fiber::requestBatch = nullptr;
   buffio::fiber::threadRequestBatch = nullptr;
-  buffio::fiber::flowQueue = nullptr;
 };
 void scheduler::clean(int tries, int timeout) {
   cleanQueue();
@@ -54,7 +52,7 @@ int scheduler::init(int workerNum, int queueOrder) {
 int scheduler::run() {
  
   int cycle = 2;
-  if (queue.empty() && flowQueue.empty())
+  if (queue.empty())
     return (int)buffioErrorCode::unknown;
 
   struct epoll_event evnt[1024];
@@ -80,7 +78,6 @@ int scheduler::run() {
    for(int i = 0; i < cycle; i++){
     dequeueThreadQueue(50);
     if(!queue.empty()) yieldQueue(10);
-    if(!flowQueue.empty()) startFlow();
     if(!threadRequestBatch.empty()) processThreadRequest();
     if(!requestBatch.empty()) consumeBatch(8);
    };
@@ -137,8 +134,8 @@ int scheduler::consumeBatch(int cycle) {
   
   for (int i = 0; i < cycle; i++) {
     auto req = requestBatch.get();
-    auto handle = req->action(req);
-    queue.push(handle);
+    req->action(req);
+    queue.push(req->entry);
     requestBatch.pop();
     if (requestBatch.empty())
       return 0;
@@ -153,8 +150,8 @@ void scheduler::cleanQueue() {
   while (!queue.empty()) {
     auto handle = queue.get();
     if (handle->waiter)
-      handle->waiter->current.destroy();
-    handle->current.destroy();
+      handle->waiter->task.destroy(handle->waiter->task.storage);
+    handle->task.destroy(handle->task.storage);
     queue.pop();
   };
 };
@@ -167,7 +164,7 @@ int scheduler::getWakeTime(bool *flag) {
   ssize_t nqueue = buffio::fiber::queuedCompleted.load(std::memory_order_acquire);
   bool n = true;
 
-  if (_CHK(!flowQueue) || _CHK(!queue) || _CHK(!requestBatch) || _CHK(!threadRequestBatch) || nqueue > 0) {
+  if (_CHK(!queue) || _CHK(!requestBatch) || _CHK(!threadRequestBatch) || nqueue > 0) {
     return 0;
   };
 
@@ -179,7 +176,7 @@ int scheduler::getWakeTime(bool *flag) {
     return looptime;
   }
 
-  if (queue.empty() && timerClock.empty() && flowQueue.empty()) {
+  if (queue.empty() && timerClock.empty()) {
     *flag = true;
     return 0;
   };
@@ -193,109 +190,14 @@ int scheduler::getWakeTime(bool *flag) {
 int scheduler::yieldQueue(int chunk) {
 
   for (int i = chunk; 0 < i; i--) {
-    auto handle = queue.get();
-    auto promise = getPromise(handle->current);
-
-    if (promise->checkStatus() == buffioRoutineStatus::executing)
-      handle->current.resume();
-
-    auto status = promise->checkStatus();
-
-    switch (status) {
-    case buffioRoutineStatus::executing:
-      break;
-    case buffioRoutineStatus::yield: {
-    } break;
-    case buffioRoutineStatus::waitingFd: {
-      promise->setStatus(buffioRoutineStatus::executing);
-      handle->current = nullptr;
-      queue.pop();
-    } break;
-    case buffioRoutineStatus::waitingFile: {
-      promise->setStatus(buffioRoutineStatus::executing);
-      handle->current = nullptr;
-      queue.pop();
-      poller.ping();
-      break;
-    };
-    case buffioRoutineStatus::paused: {
-
-    } break;
-    case buffioRoutineStatus::clampThread: {
-      auto header = promise->getAux<buffioHeader *>();
-      threadRequestBatch.push(header);
-      handle->current = nullptr;
-      queue.pop();
-    } break;
-    case buffioRoutineStatus::waiting: {
-      queue.push(promise->getChild(), handle);
-      handle->current = nullptr;
-      queue.pop();
-    } break;
-    case buffioRoutineStatus::waitingTimer: {
-      handle->current = nullptr;
-      promise->setStatus(buffioRoutineStatus::executing);
-      queue.pop();
-    } break;
-    case buffioRoutineStatus::unhandledException:
-      [[fallthrough]];
-
-    case buffioRoutineStatus::error:
-      [[fallthrough]];
-
-    case buffioRoutineStatus::wakeParent: {
-      if (handle->waiter != nullptr) {
-        auto promiseP = getPromise(handle->waiter->current);
-        promiseP->setStatus(buffioRoutineStatus::executing);
-        promise->setStatus(buffioRoutineStatus::paused);
-        queue.push(handle->waiter);
-        break;
-      };
-    };
-    case buffioRoutineStatus::done: {
-      handle->current.destroy();
-      handle->current = nullptr;
-      queue.pop();
-      break;
-    };
-    case buffioRoutineStatus::backFromThread: {
-
-      auto header = promise->getAux<buffioHeader *>();
-      if (header->then != nullptr)
-        queue.push(header->then);
-
-      handle->current.destroy();
-      handle->current = nullptr;
-      queue.pop();
-      delete header;
-
-    } break;
-    };
-    if (queue.empty())
-      break;
-
+    auto task = queue.get();
+    task->task.run(task->task.storage);
+    if (queue.empty()) break;
     queue.mvNext();
   };
   return 0;
 };
 
-void scheduler::startFlow(int cycle){
-  for (int i = cycle; 0 < i; i--){
-
-    buffio::flow *data = flowQueue.get();
-    auto nxt = data->current->chainNext; 
-    data->current->flowing(data->current->data);
-    data->current = nxt;
-
-    if(nxt == nullptr){ 
-      flowQueue.pop(); 
-      delete data;
-    };
-
-    if(flowQueue.empty()) break;
-    flowQueue.mvNext();
-  };
-};
 void scheduler::processThreadRequest(){
 
    size_t i =  0;
@@ -339,7 +241,7 @@ void scheduler::dequeueThreadQueue(int nentry){
 
     for(ssize_t i = 0; i < value; i++){
       auto header = poller.pop();
-      queue.push(header->routine);
+      queue.push(header->entry);
     };
     auto nvalue = buffio::fiber::queuedCompleted.fetch_sub(value,std::memory_order_acq_rel);
 
