@@ -46,7 +46,7 @@ Buffio only provides you with a eventloop and fd operations function, all the lo
     #include "buffio/scheduler.hpp"
     #include <iostream>
     
-    buffio::promise<int> task(int val){
+    buffio::promise task(int val){
      std::cout<<"Hello World! - "<<val<<std::endl;
      buffioreturn 0;
     }
