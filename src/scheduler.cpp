@@ -38,7 +38,7 @@ int scheduler::init(int workerNum, int queueOrder) {
   int error = 0;
   if ((error = poller.start(threadPool, workerNum, queueOrder)) != 0)
     return error;
-  if ((error = buffio::MakeFd::eventFd(evFd,0)) != 0)
+  if ((error = buffio::MakeFd::eventFd(evFd, 0)) != 0)
     return error;
   if ((error = poller.pollMod(evFd.getFd(), &evFd, EPOLLIN | EPOLLET)) != 0) {
     evFd.release();
@@ -46,12 +46,11 @@ int scheduler::init(int workerNum, int queueOrder) {
   };
   workerlNum = workerNum;
   poller.mountFd(evFd.getFd());
-   
+
   return 0;
 }
 int scheduler::run() {
- 
-  int cycle = 2;
+
   if (queue.empty())
     return (int)buffioErrorCode::unknown;
 
@@ -64,25 +63,27 @@ int scheduler::run() {
 
   while (exit != true) {
 
-    timeout = getWakeTime(&exit);        
-    if (exit == true) break;
-
-    if(immediateWake) timeout = 0;
-
+    timeout = getWakeTime(&exit);
     int nfd = poller.poll(evnt, 1024, timeout);
 
-    if(timeout < 0) buffio::fiber::loopWakedUp.compare_exchange_weak(check,true,std::memory_order_release);
-    if (nfd < 0) break;
-    if (nfd != 0) processEvents(evnt, nfd);
-    
-   for(int i = 0; i < cycle; i++){
-    dequeueThreadQueue(50);
-    if(!queue.empty()) yieldQueue(10);
-    if(!threadRequestBatch.empty()) processThreadRequest();
-    if(!requestBatch.empty()) consumeBatch(8);
-   };
+    if (timeout < 0)
+      buffio::fiber::loopWakedUp.compare_exchange_weak(
+          check, true, std::memory_order_acq_rel);
 
-    timerClock.pushExpired(queue);
+    if (nfd < 0)
+      break;
+    if (nfd != 0)
+      processEvents(evnt, nfd);
+
+    dequeueThreadQueue(100);
+    yieldQueue(100);
+
+    if (!threadRequestBatch.empty())
+      processThreadRequest();
+    if (!requestBatch.empty())
+      consumeBatch(100);
+    if (!timerClock.empty())
+      timerClock.pushExpired(queue);
   };
   return 0;
 };
@@ -116,11 +117,11 @@ int scheduler::processEvents(struct epoll_event evnts[], int len) {
   for (int i = 0; i < len; i++) {
     auto handle = (buffio::Fd *)evnts[i].data.ptr;
 
-    if (evnts[i].events & EPOLLIN) 
-        handle->takeEventReadAction();
+    if (evnts[i].events & EPOLLIN)
+      handle->takeEventReadAction();
 
     if (evnts[i].events & EPOLLOUT)
-        handle->takeEventWriteAction();
+      handle->takeEventWriteAction();
 
     auto req = handle->getReserveHeader();
     if (req->isFresh) {
@@ -131,18 +132,14 @@ int scheduler::processEvents(struct epoll_event evnts[], int len) {
 };
 
 int scheduler::consumeBatch(int cycle) {
-  
-  for (int i = 0; i < cycle; i++) {
+
+  int count = cycle < requestBatch.gcount() ? cycle : requestBatch.gcount();
+  while (0 < count) {
     auto req = requestBatch.get();
     req->action(req);
     queue.push(req->entry);
     requestBatch.pop();
-    if (requestBatch.empty())
-      return 0;
-
-    requestBatch.mvNext();
   };
-
   return 0;
 };
 
@@ -161,93 +158,85 @@ void scheduler::cleanQueue() {
 int scheduler::getWakeTime(bool *flag) {
 
   int looptime = timerClock.getNext();
-  ssize_t nqueue = buffio::fiber::queuedCompleted.load(std::memory_order_acquire);
+  ssize_t nqueue =
+      buffio::fiber::queuedCompleted.load(std::memory_order_acquire);
   bool n = true;
 
-  if (_CHK(!queue) || _CHK(!requestBatch) || _CHK(!threadRequestBatch) || nqueue > 0) {
+  if (_CHK(!queue) || _CHK(!requestBatch) || _CHK(!threadRequestBatch) ||
+      nqueue > 0) {
     return 0;
   };
 
   ssize_t req = buffio::fiber::pendingReq.load(std::memory_order_acquire);
-  if (req > 0){
-      if(looptime < 0)
-        buffio::fiber::loopWakedUp.compare_exchange_weak(n,false,std::memory_order_release);
+  if (req > 0) {
+    if (looptime < 0)
+      buffio::fiber::loopWakedUp.compare_exchange_weak(
+          n, false, std::memory_order_acq_rel);
 
     return looptime;
   }
 
-  if (queue.empty() && timerClock.empty()) {
-    *flag = true;
-    return 0;
-  };
-  if(looptime < 0)
-     buffio::fiber::loopWakedUp.compare_exchange_weak(n,false,std::memory_order_release);
+  *flag = (queue.empty() & timerClock.empty()) == true ? true : false;
+  buffio::fiber::loopWakedUp.store(false, std::memory_order_release);
 
-  return looptime;
+  return 0;
 };
 #undef _CHK
 
 int scheduler::yieldQueue(int chunk) {
 
-  for (int i = chunk; 0 < i; i--) {
+  int count = chunk < queue.gcount() ? chunk : queue.gcount();
+  while (0 < count && !queue.empty()) {
     auto task = queue.get();
     task->task.run(task->task.storage);
-    if (queue.empty()) break;
-    queue.mvNext();
   };
   return 0;
 };
 
-void scheduler::processThreadRequest(){
+void scheduler::processThreadRequest() {
 
-   size_t i =  0;
+  size_t i = 0;
 
-   for(; i < threadRequestBatch.gcount();){
-      buffioHeader *header = threadRequestBatch.get();
-      if(!poller.push(header)) break;
-      i += 1;
-      threadRequestBatch.pop();
-      if(threadRequestBatch.empty()) break;
-      threadRequestBatch.mvNext();
-    };
+  while (!threadRequestBatch.empty()) {
+    buffioHeader *header = threadRequestBatch.get();
+    poller.push(header);
+    threadRequestBatch.pop();
+    i += 1;
+  };
 
-    buffio::fiber::pendingReq.fetch_add(i,std::memory_order_acq_rel);
+  buffio::fiber::pendingReq.fetch_add(i, std::memory_order_acq_rel);
 
-    auto sleeping = buffio::fiber::sleepingThread.load(std::memory_order_acquire);
-    ssize_t value = 0;
-    size_t wakevalue = workerlNum;
+  auto sleeping = buffio::fiber::sleepingThread.load(std::memory_order_acquire);
+  ssize_t value = 0;
+  size_t wakevalue = i;
 
-    if((value = (workerlNum - sleeping)) >  0)
-        wakevalue = sleeping;
+  wakevalue = (i - sleeping) > 0 ? sleeping : i;
 
-    for(ssize_t i = 0; i < wakevalue ; i++){
-      poller.ping();
-    }
- };
+  for (ssize_t i = 0; i < wakevalue; i++) {
+    poller.ping();
+  }
+};
 
-void scheduler::dequeueThreadQueue(int nentry){
- ssize_t nqueue = buffio::fiber::queuedCompleted.load(std::memory_order_acquire);
- ssize_t value = nqueue;
+void scheduler::dequeueThreadQueue(int nentry) {
+  ssize_t nqueue =
+      buffio::fiber::queuedCompleted.load(std::memory_order_acquire);
+  ssize_t value = nqueue;
+  if (value == 0)
+    return;
 
+  eventfd_t eval;
+  eventfd_read(evFd.getFd(), &eval);
 
- eventfd_t eval;
- eventfd_read(evFd.getFd(),&eval);
+  if ((nentry - nqueue) < 0)
+    value = nentry;
 
+  for (ssize_t i = 0; i < value; i++) {
+    auto header = poller.pop();
+    queue.push(header->entry);
+  };
+  auto nvalue = buffio::fiber::queuedCompleted.fetch_sub(
+      value, std::memory_order_acq_rel);
 
- if(value == 0) return;
-
-  if((nentry - nqueue) < 0)
-      value = nentry;
-
-    for(ssize_t i = 0; i < value; i++){
-      auto header = poller.pop();
-      queue.push(header->entry);
-    };
-    auto nvalue = buffio::fiber::queuedCompleted.fetch_sub(value,std::memory_order_acq_rel);
-
-
-    if((nvalue - value) > 0){immediateWake = true;}
-    else {immediateWake = false;}
   return;
 };
 }; // namespace buffio

@@ -11,7 +11,6 @@
 #include "buffio/common.hpp"
 #include "buffio/memory.hpp"
 #include "buffio/sockbroker.hpp"
-#include "buffio/flow.hpp"
 #include <atomic>
 
 namespace buffio {

@@ -27,9 +27,9 @@ enum class buffioQueueNoMem : int { no = 1 };
 class blockQueue {
 public:
   blockQueue *next;              ///< next member of the queue.
-  blockQueue *prev;              ///< previous member of the queue.
-  blockQueue *waiter;            ///< waiter for the task.
   buffio::container task;        ///< task handle of the task
+  blockQueue *waiter;            ///< waiter for the task.
+  blockQueue *prev;              ///< previous member of the queue.
 };
 
 /**
@@ -51,7 +51,7 @@ public:
 
 namespace buffio {
 
-template <typename C = blockQueue, typename V = buffio::promiseHandle,
+template <typename C = blockQueue, typename V = buffio::container,
           typename D = void>
 
 class Queue {
@@ -62,7 +62,7 @@ public:
    * @brief Default constructor of queue.
    *
    */
-  Queue() : head(nullptr), tail(nullptr), count(0), poppedEntry(false) {
+  Queue() : head(nullptr), count(0){
     assert(memory.init() == 0);
   };
   /**
@@ -77,12 +77,10 @@ public:
     if ((frag = memory.pop()) == nullptr)
       return -1;
     if constexpr (std::is_same_v<C, blockQueue> &&
-                  std::is_same_v<V, buffio::contaier>) {
+                  std::is_same_v<V, buffio::container>) {
       frag->task = which;
       frag->waiter = waiter;
     };
-    frag->next = nullptr;
-    frag->prev = nullptr;
     return push(frag);
   };
     C *getEntry() { return memory.pop();}
@@ -100,7 +98,7 @@ public:
         memory.push(frag);
       };
 
-      head = tail = nullptr;
+      head =  nullptr;
       return 0;
     };
 
@@ -108,11 +106,8 @@ public:
     frag->next->prev = frag->prev;
 
     if (head == frag) {
-      poppedEntry = true;
       head = frag->next;
     };
-    if (tail == frag)
-      tail = frag->next;
 
     if constexpr (std::is_same_v<D, void>) {
       memory.push(frag);
@@ -129,16 +124,15 @@ public:
     count += 1;
     if (head == nullptr) {
       head = frag;
-      tail = frag;
       frag->next = frag;
       frag->prev = frag;
       return 0;
     }
 
-    frag->prev = tail->prev;
-    frag->next = tail;
-    tail->prev->next = frag;
-    tail->prev = frag;
+    frag->prev = head->prev;
+    frag->next = head;
+    head->prev->next = frag;
+    head->prev = frag;
 
     return 0;
   };
@@ -156,42 +150,34 @@ public:
   void erase() {
     assert(count != 0 && head != nullptr);
     count -= 1;
-    poppedEntry = true;
     if (head == head->next) {
-      head = tail = nullptr;
+      head = nullptr;
       return;
     };
+
     head->prev->next = head->next;
     head->next->prev = head->prev;
-    auto tmpHead = head;
-
-    if (tail == head)
-      tail = head->next;
     head = head->next;
   };
 
   void pop() {
     assert(count != 0 && head != nullptr);
     count -= 1;
-    poppedEntry = true;
     if (head == head->next) {
       if constexpr (std::is_same_v<D, void>) {
         memory.push(head);
       };
-      head = tail = nullptr;
+      head =  nullptr;
       return;
     };
     head->prev->next = head->next;
     head->next->prev = head->prev;
-    auto tmpHead = head;
-
-    if (tail == head)
-      tail = head->next;
-    head = head->next;
-
+    
     if constexpr (std::is_same_v<D, void>) {
+      auto tmpHead = head;
       memory.push(tmpHead);
     };
+    head = head->next;
   };
 
   C *get() const {
@@ -200,10 +186,6 @@ public:
   };
   void mvNext() {
     assert(head != nullptr && count != 0);
-    if (poppedEntry) {
-      poppedEntry = false;
-      return;
-    }
     head = head->next;
   };
 
@@ -212,9 +194,7 @@ public:
 
 private:
   C *head;
-  C *tail;
   size_t count;
-  bool poppedEntry;
   memoryQueue memory;
 };
 

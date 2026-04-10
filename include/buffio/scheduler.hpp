@@ -94,10 +94,16 @@ public:
    */
   int push(buffio::promise task){
     auto entry = queue.getEntry();
-    buffio::makeContainer::makeFromRoutine(task,entry->task);
+    buffio::makeContainer::routine(task,entry->task);
     queue.push(entry);
     return 0;
   };
+  int push(buffio::containerCallback callback,void *data){
+    auto entry = queue.getEntry();
+    buffio::makeContainer::function(callback,data,entry->task);
+    queue.push(entry);
+    return 0;
+  }
 
   void clean(int tries = 5, int timeout = 100);
   bool error() const { return (workerlNum < 0); }

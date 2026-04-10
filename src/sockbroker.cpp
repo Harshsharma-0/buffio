@@ -62,6 +62,7 @@ int sockBroker::start(buffio::thread &thread, int &workerNum,
   size_t queueSizeRel = 1 << queueOrder;
   if (workerNum > queueSizeRel)
     return (int)buffioErrorCode::workerNum;
+
   if (queueOrder < BUFFIO_RING_MIN || queueOrder > buffioatomix_max_order)
     return (int)buffioErrorCode::queueSize;
 

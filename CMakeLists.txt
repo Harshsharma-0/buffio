@@ -26,7 +26,6 @@ add_library(buffio
   src/promise.cpp
   src/container.cpp
   src/actions.cpp
-  src/flow.cpp
   src/queue.cpp
 )
 

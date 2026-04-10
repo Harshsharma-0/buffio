@@ -1,16 +1,22 @@
 #include "buffio/common.hpp"
 #include "buffio/promise.hpp"
+
 using pstripped = buffio::promise::promise_type;
 
 namespace buffio {
 void promise::run(void *data){
+
+  auto queue = buffio::fiber::queue;
   auto task = (buffio::promise*)data;
   task->handle.resume();
   auto status = task->paddr->status;
+
   if(status == buffioRoutineStatus::done){
       task->handle.destroy();
-      buffio::fiber::queue->pop();
+      queue->pop();
   }
+
+
 };
 
 void promise::destroy(void *data){
@@ -30,7 +36,7 @@ buffioHeader *promise::getHeader(void *data){
 buffioAwaiter pstripped::await_transform(buffio::promise _promise) {
 
   auto entry = buffio::fiber::queue->getEntry();
-  buffio::makeContainer::makeFromRoutine(_promise,entry->task);
+  buffio::makeContainer::routine(_promise,entry->task);
   entry->waiter = buffio::fiber::queue->get();
   buffio::fiber::queue->erase();
   buffio::fiber::queue->push(entry);

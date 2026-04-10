@@ -38,6 +38,7 @@ public:
     using promiseObject = promise::promise_type;
     using buffioTypedHandle = std::coroutine_handle<promiseObject>;
     using promiseHandle = std::coroutine_handle<>;
+    promiseHandle self;
 
     inline promiseObject *getPromise(promiseHandle handle) {
       void *tmp_ptr = handle.address();
@@ -45,8 +46,9 @@ public:
       return &typed.promise();
     };
 
-    void_handle get_return_object() {
-         return {coro_handle::from_promise(*this)};
+    void_handle get_return_object(){
+        self = {coro_handle::from_promise(*this)};
+         return self;
     };
 
     std::suspend_always initial_suspend() noexcept {
@@ -71,8 +73,8 @@ public:
       status = buffioRoutineStatus::done;
       return;
     };
-
-  };
+  
+   };
 
   promise(void_handle _handle) : handle(_handle) {
     assert(_handle);
