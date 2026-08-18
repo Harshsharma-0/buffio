@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BUFFIO_LFCORE
+#define BUFFIO_LFCORE
 
 #include <atomic>
 #include <cstdint>
@@ -9,24 +10,31 @@
 #define buffioint uint32_t
 #define buffiosint int32_t
 
-#define buffioatomix_max_order 25
+#define buffioatomix_max_order 15
+
 #define BUFFIO_CACHE_FACTOR 7U
 #define BUFFIO_CACHE_BYTES 1 << BUFFIO_CACHE_FACTOR
 #define BUFFIO_RING_MIN (BUFFIO_CACHE_FACTOR - 3)
+#define BUFFIO_RING_MAX buffioatomix_max_order
+
+
 #define BUFFIO_LFQUEUE_MIN BUFFIO_RING_MIN
 #define BUFFIO_LFQUEUE_MAX buffioatomix_max_order
-
 #endif
+
 #if defined(__aarch64__) || defined(__x86_64__) || defined(__powerpc64__)
 #define buffioatomix std::atomic<uint64_t>
 #define buffiosatomix std::atomic<int64_t>
 #define buffioint uint64_t
 #define buffiosint int64_t
-#define buffioatomix_max_order 55
+#define buffioatomix_max_order 15
 
 #define BUFFIO_CACHE_FACTOR 7U
 #define BUFFIO_CACHE_BYTES 1 << BUFFIO_CACHE_FACTOR
+
 #define BUFFIO_RING_MIN (BUFFIO_CACHE_FACTOR - 4)
+#define BUFFIO_RING_MAX buffioatomix_max_order
+
 #define BUFFIO_LFQUEUE_MIN BUFFIO_RING_MIN
 #define BUFFIO_LFQUEUE_MAX buffioatomix_max_order
 
@@ -34,7 +42,7 @@
 
 #define cache_remap(index, order, n)                                           \
   (size_t)(((index & (n - 1)) >> (order - BUFFIO_RING_MIN)) |                  \
-           ((index << BUFFIO_RING_MIN) & n - 1))
+          ((index << BUFFIO_RING_MIN) & n - 1))
 
 #define cache_remap2(index, order, n) cache_remap(index, order + 1, n)
 #define buffio_cmp(a, op, b) ((buffiosint)((a) - (b)) op 0)
@@ -59,3 +67,6 @@ void initfull(struct queueconf *which, size_t _order);
 
 }; // namespace lfCore
 }; // namespace buffio
+
+
+#endif
