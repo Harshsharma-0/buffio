@@ -12,7 +12,9 @@
 #define BUFFIO_OS_LINUX 1
 
 #define BUFFIO_OS_INSERT(lin,bsd,wind) lin
-#define BUFFIO_IN_WIN(val)
+#define BUFFIO_LIN_INSERT(codeSection) codeSection
+
+#define BUFFIO_WIN_INSERT(codeSection)
 
 #elif defined(_MSC_VER) || defined(_WIN32)
 
@@ -21,10 +23,13 @@
 #include <BaseTsd.h>
 
 typedef SSIZE_T ssize_t;
+typedef SIZE_T size_t;
 
-#define BUFFIO_IN_WIN(name) name
+
+#define BUFFIO_WIN_INSERT(codeSection) codeSection
 #define BUFFIO_OS_INSERT(lin,bsd,wind) wind
 
+#define BUFFIO_LIN_INSERT(codeSection) codeSection
 #endif
 
 #define BUFFIO_FILE_VEC_MAX 10

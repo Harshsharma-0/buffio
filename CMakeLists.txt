@@ -24,20 +24,13 @@ include_directories(
 
 include(CheckCXXSymbolExists)
 check_cxx_symbol_exists(__linux__ "" HAVE_LINUX_MACRO)
+check_cxx_symbol_exists(_MSC_VER "" HAVE_MSC_VER)
+check_cxx_symbol_exists(_WIN32 "" HAVE_WIN)
 
 if(HAVE_LINUX_MACRO)
-  if(DEFINED linux_backend)
-     if(linux_backend STREQUAL "epoll")
-       set(BUFFIO_OS_LINUX_IO_URING 1)
-      elseif(linux_backend STREQUAL "io_uring")
-       set(BUFFIO_OS_LINUX_EPOLL 1)
-      else()
-        message(FATAL_ERROR "UNSUPPORTED backend ${linux_backend},supported backends [epoll,io_uring]")
-      endif()
-  else()
-    message(FATAL_ERROR "specify a  backend for ${buffio_os} ,supported backends [epoll,io_uring], -Dlinux_backend")
-  endif()
-
+  set(BUFFIO_LINK_LIBRARY pthread) 
+elseif(HAVE_MSC_VER || HAVE_WIN)
+  set(BUFFIO_LINK_LIBRARY )
 else()
   message(FATAL_ERROR "UNSUPPORTED PLATFORM , supported platform are [linux]")
 endif()
@@ -57,7 +50,7 @@ target_include_directories(buffio PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utility>
 )
-target_link_libraries(buffio PRIVATE pthread)
+target_link_libraries(buffio PRIVATE ${BUFFIO_LINK_LIBRARY})
 #enable_testing()
 add_executable(hello ${CMAKE_CURRENT_SOURCE_DIR}/examples/hello_world.cpp)
 target_link_libraries(hello PRIVATE buffio)

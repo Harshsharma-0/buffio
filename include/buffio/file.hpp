@@ -36,7 +36,7 @@ struct readFile {
  
   buffio::vTask task;
   BFRWOPT rval;
-  BUFFIO_IN_WIN(OVERLAPPED win_over);
+  BUFFIO_WIN_INSERT(OVERLAPPED win_over);
 };
 
 struct readFilev {
@@ -51,7 +51,7 @@ struct readFilev {
 
   buffio::vTask task;
   BFRWOPT rval; 
-  BUFFIO_IN_WIN(OVERLAPPED win_over);
+  BUFFIO_WIN_INSERT(OVERLAPPED win_over);
 
 };
 
@@ -67,7 +67,7 @@ struct writeFile {
 
   buffio::vTask task;
   BFRWOPT rval; 
-  BUFFIO_IN_WIN(OVERLAPPED win_over);
+  BUFFIO_WIN_INSERT(OVERLAPPED win_over);
 
 };
 
@@ -84,7 +84,7 @@ struct writeFilev {
 
   buffio::vTask task;
   BFRWOPT rval; 
-  BUFFIO_IN_WIN(OVERLAPPED win_over);
+  BUFFIO_WIN_INSERT(OVERLAPPED win_over);
 
 };
 

@@ -14,7 +14,7 @@ public:
 
   int init();
   int start();
-
+  
   int push(buffio::vTask task) {
     runQueue.push(task);
     return 1;

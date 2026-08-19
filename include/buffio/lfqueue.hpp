@@ -67,11 +67,10 @@ public:
   {
 
     if (data != nullptr)
-      return -1;
+      return 1;
 
-    _order = (_order > buffioatomix_max_order || _order < BUFFIO_RING_MIN)
-                 ? BUFFIO_RING_MIN
-                 : _order;
+    if(_order > buffioatomix_max_order || _order < BUFFIO_RING_MIN) return -1;
+    
 
     size_t queueSize = 1 << _order;
     buffioatomix *acptr = nullptr;
@@ -137,7 +136,7 @@ public:
       return onEmpty;
     T tmp;
     if constexpr (lfmode == buffio::lfMemMode::dynamic) {
-      tmp = static_cast<T[]>(data)[idx];
+      tmp = static_cast<T*>(data)[idx];
     }
     if constexpr (lfmode == buffio::lfMemMode::stack) {
       tmp = data[idx];
