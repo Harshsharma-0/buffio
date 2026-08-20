@@ -26,10 +26,10 @@ BFFDOPT buffio::openFile::await_resume(){
 };
 
 void buffio::readFile::await_suspend(buffio::vTask _task){};
-void buffio::readFile::action(struct buffio::readFile *me){};
-void buffio::readFilev::action(struct buffio::readFilev *me){};
-void buffio::writeFile::action(struct buffio::writeFile *me){};
-void buffio::writeFilev::action(struct buffio::writeFilev *me){};
+void buffio::readFile::action(buffio::readFile *me){};
+void buffio::readFilev::action(buffio::readFilev *me){};
+void buffio::writeFile::action(buffio::writeFile *me){};
+void buffio::writeFilev::action(buffio::writeFilev *me){};
 
 
 

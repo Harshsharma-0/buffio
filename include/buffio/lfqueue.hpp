@@ -22,12 +22,20 @@ enum lfMemMode {
 };
 
 namespace lfSpec {
+
 template <size_t _order> constexpr size_t getSize() {
   if constexpr (_order > BUFFIO_RING_MAX || _order < BUFFIO_RING_MIN) {
     static_assert(false, BUFFIO_ARGS_STRINGFY(
                              order must be within range of[BUFFIO_RING_MIN] <=
                              order <= [BUFFIO_RING_MAX]));
     return 1; // just to supress other errors
+  };
+  return (1 << _order);
+};
+
+inline size_t get_size(size_t _order) {
+  if (_order > BUFFIO_RING_MAX || _order < BUFFIO_RING_MIN) {
+      return 0; // just to supress other errors
   };
   return (1 << _order);
 };

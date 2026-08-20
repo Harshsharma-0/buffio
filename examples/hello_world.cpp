@@ -30,7 +30,7 @@ int main() {
   
   instance.run();
   buffio::Worker worker;
-  worker.init(4,4);
+  worker.init(4);
 
 
   return 0;

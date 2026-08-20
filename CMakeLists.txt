@@ -51,9 +51,14 @@ if(HAVE_LINUX_MACRO)
   if(BUFFIO_WORKER_IO_URING)
     set(BUFFIO_BACKEND_NAME "worker_iouring.hpp")
     set(BUFFIO_BACKEND_SRC "src/backend/worker_iouring.cpp")
+    set(BUFFIO_LINK_LIBRARY pthread uring)
+    set(BUFFIO_OS_LINUX_IO_URING ON)
+
   else()
     set(BUFFIO_BACKEND_NAME "worker_default.hpp")
     set(BUFFIO_BACKEND_SRC "src/backend/worker_default.cpp")
+    set(BUFFIO_LINK_LIBRARY pthread)
+
   endif()
 
   configure_file(
@@ -61,8 +66,7 @@ if(HAVE_LINUX_MACRO)
     ${CMAKE_CURRENT_BINARY_DIR}/include/buffio/config.hpp
    )
 
-   set(BUFFIO_LINK_LIBRARY pthread) 
-
+ 
 elseif(HAVE_MSC_VER || HAVE_WIN)
 
   option(BUFFIO_OS_WINDOWS "platfrom is set to linux" ON)

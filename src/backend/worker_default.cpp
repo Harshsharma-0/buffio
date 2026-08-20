@@ -81,13 +81,17 @@ buffio::Worker::~Worker(){
  delete []static_cast<WorkerParameters*>(state_.workers);
 };
 
+int buffio::Worker::init(int numWorker){
+ return this->init(numWorker,BUFFIO_WORKER_QUEUE_ORDER);
+};
+
 int buffio::Worker::init(int numWorker,int queueOrder){
     
   WorkerParameters *winfo = nullptr;
   WorkerParameters wparam = {};
 
   /* evaluating the maximum worker thread that can concurrently access the queue*/
-  size_t maxWorker =  buffio::lfSpec::getSize<BUFFIO_WORKER_QUEUE_ORDER>();
+  size_t maxWorker =  buffio::lfSpec::get_size(queueOrder);
 
   /* checking it the maxWorker exceeds the maximun supported worker */
   maxWorker = maxWorker > BUFFIO_MAX_WORKER ? maxWorker : BUFFIO_MAX_WORKER;
@@ -160,5 +164,6 @@ int buffio::Worker::init(int numWorker,int queueOrder){
   return 0; 
 };
 
-void buffio::Worker::pushWork(BGLOBOPVEC vec){  };
+bool buffio::Worker::push(BGLOBOPVEC vec){  };
+bool buffio::Worker::flush(){};
 
