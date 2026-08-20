@@ -29,8 +29,9 @@ int main() {
   };
   
   instance.run();
-  buffio::worker worker;
-  worker.init(4);
+  buffio::Worker worker;
+  worker.init(4,4);
+
 
   return 0;
 };

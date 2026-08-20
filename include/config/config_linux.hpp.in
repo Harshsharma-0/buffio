@@ -1,0 +1,38 @@
+#ifndef BUFFIO_OS
+#define BUFFIO_OS
+
+
+#include <utility>
+#include <cstdint>
+#include <cstddef>
+#include <errno.h>
+#include <sys/mman.h>
+#include <sys/syscall.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <cstring>
+#include <pthread.h>
+#include <semaphore.h>
+
+
+#define BUFFIO_OS_INSERT(lin,bsd,wind) lin
+#define BUFFIO_LIN_INSERT(codeSection) codeSection
+#define BUFFIO_WIN_INSERT(codeSection)
+
+#define BUFFIO_WORKER_QUEUE_ORDER @BUFFIO_WORKER_QUEUE_ORDER@
+#define BUFFIO_FILE_VEC_MAX @BUFFIO_FILE_VEC_MAX@
+
+#define BUFFIO_SLEEP_QUEUE_ORDER 4
+#define BUFFIO_MAX_WORKER 16
+
+
+#cmakedefine BUFFIO_OS_LINUX
+#cmakedefine BUFFIO_OS_WINDOWS
+#cmakedefine BUFFIO_OS_BSD
+
+using BFLAG = int;
+using BMODE = uint32_t;
+using BFDDEF = int;
+constexpr int BFD_INVALID = -1;
+
+#endif

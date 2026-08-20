@@ -7,7 +7,7 @@
 
 namespace buffio {
 
-class instance : private buffio::worker{
+class instance{
 public:
   BUFFIO_CLASS_PROTECT(instance)
   instance();
@@ -39,6 +39,7 @@ public:
 
 private:
   taskQueueDef runQueue;
+  buffio::Worker worker;
 };
 } // namespace buffio
 

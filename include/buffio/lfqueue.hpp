@@ -10,6 +10,7 @@
 
 #include "buffio/lfcore.hpp"
 #include "buffio/macro.hpp"
+#include "buffio/thread.hpp"
 #include <concepts>
 #include <iostream>
 #include <memory>
@@ -62,18 +63,33 @@ public:
     lfCore::initfull(&freeQueue, queueOrder);
   };
 
+  int lfstart(size_t _order) requires(lfmode == buffio::lfMemMode::stack){
+    constexpr size_t queueSize = buffio::lfSpec::getSize<orderT>();
+     if(elock.create(queueSize) < 0) return -1;
+     if(dlock.create(queueSize) < 0){
+      elock.destroy();
+      return -1;
+    }
+    return 0;
+  };
+
   int lfstart(size_t _order)
     requires(lfmode == buffio::lfMemMode::dynamic)
   {
 
-    if (data != nullptr)
-      return 1;
 
+    if (data != nullptr) return 1;
     if(_order > buffioatomix_max_order || _order < BUFFIO_RING_MIN) return -1;
     
 
     size_t queueSize = 1 << _order;
     buffioatomix *acptr = nullptr;
+
+    if(elock.create(queueSize) < 0) return -1;
+    if(dlock.create(queueSize) < 0){
+      elock.destroy();
+      return -1;
+    }
 
     if ((data = new (std::nothrow) T[queueSize]) == nullptr)
       return -1;
@@ -112,6 +128,8 @@ public:
   }
 
   bool enqueue(T data_) {
+    elock.wait();
+
     size_t idx = lfCore::lfdequeue(&freeQueue, queueOrder);
     if (idx == BUFFIO_EMPTY)
       return false;
@@ -123,6 +141,8 @@ public:
     }
 
     lfCore::lfenqueue(&acQueue, queueOrder, idx);
+
+    elock.post();
     return true;
   };
 
@@ -131,9 +151,13 @@ public:
   }
 
   T dequeue(T onEmpty) {
+    dlock.wait();
     size_t idx = lfCore::lfdequeue(&acQueue, queueOrder);
-    if (idx == BUFFIO_EMPTY)
+    if (idx == BUFFIO_EMPTY){
+      dlock.post();
       return onEmpty;
+    };
+
     T tmp;
     if constexpr (lfmode == buffio::lfMemMode::dynamic) {
       tmp = static_cast<T*>(data)[idx];
@@ -142,6 +166,8 @@ public:
       tmp = data[idx];
     }
     lfCore::lfenqueue(&freeQueue, queueOrder, idx);
+
+    dlock.post();
     return tmp;
   }
 
@@ -160,6 +186,8 @@ private:
   qStorage fqQueue;
   qStorage aqQueue;
   size_t queueOrder;
+  buffio::semaphore elock;
+  buffio::semaphore dlock;
   struct queueconf acQueue;
   struct queueconf freeQueue;
 };

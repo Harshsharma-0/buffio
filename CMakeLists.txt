@@ -15,6 +15,23 @@ endif()
 
 set(CMAKE_BUILD_TYPE Debug)
 
+set(BUFFIO_WORKER_QUEUE_ORDER 4 CACHE STRING
+    "Worker queue order")
+
+set(BUFFIO_MAX_WORKER 16 CACHE STRING
+    "Maximum number of workers")
+
+set(BUFFIO_FILE_VEC_MAX 16 CACHE STRING
+    "Maximum number of workers")
+
+option(BUFFIO_WORKER_DEFAULT
+  "Use default worker backend" ON)
+
+option(BUFFIO_WORKER_IO_URING
+    "Use io_uring worker backend" OFF)
+
+option(BUFFIO_WORKER_IOCP
+    "Use IOCP worker backend" OFF)
 
 # Public include directory
 include_directories(
@@ -28,13 +45,53 @@ check_cxx_symbol_exists(_MSC_VER "" HAVE_MSC_VER)
 check_cxx_symbol_exists(_WIN32 "" HAVE_WIN)
 
 if(HAVE_LINUX_MACRO)
-  set(BUFFIO_LINK_LIBRARY pthread) 
+
+  option(BUFFIO_OS_LINUX "platfrom is set to linux" ON)
+
+  if(BUFFIO_WORKER_IO_URING)
+    set(BUFFIO_BACKEND_NAME "worker_iouring.hpp")
+    set(BUFFIO_BACKEND_SRC "src/backend/worker_iouring.cpp")
+  else()
+    set(BUFFIO_BACKEND_NAME "worker_default.hpp")
+    set(BUFFIO_BACKEND_SRC "src/backend/worker_default.cpp")
+  endif()
+
+  configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/config/config_linux.hpp.in
+    ${CMAKE_CURRENT_BINARY_DIR}/include/buffio/config.hpp
+   )
+
+   set(BUFFIO_LINK_LIBRARY pthread) 
+
 elseif(HAVE_MSC_VER || HAVE_WIN)
+
+  option(BUFFIO_OS_WINDOWS "platfrom is set to linux" ON)
   set(BUFFIO_LINK_LIBRARY )
+
+  if(BUFFIO_WORKER_IOCP)
+    set(BUFFIO_BACKEND_NAME "worker_iocp.hpp")
+    set(BUFFIO_BACKEND_SRC "src/backend/worker_iocp.cpp")
+  else()
+    set(BUFFIO_BACKEND_NAME "worker_win_default.hpp")
+    set(BUFFIO_BACKEND_SRC "src/backend/worker_win_default.cpp")
+  endif()
+
+  configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/config/config_windows.hpp.in
+    ${CMAKE_CURRENT_BINARY_DIR}/include/buffio/config.hpp
+  )
+
 else()
   message(FATAL_ERROR "UNSUPPORTED PLATFORM , supported platform are [linux]")
 endif()
 
+set(BUFFIO_WORKER_BACKEND_INCLUDE 
+  "#include \"backend/${BUFFIO_BACKEND_NAME}\"")
+
+ configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/buffio/worker.hpp.in
+    ${CMAKE_CURRENT_BINARY_DIR}/include/buffio/worker.hpp
+  )
 
 
 # Library target
@@ -43,16 +100,25 @@ add_library(buffio
   src/core/instance.cpp
   src/instance.cpp
   src/file.cpp
-  src/worker.cpp
+  ${BUFFIO_BACKEND_SRC}
+  src/thread.cpp
 )
 
+
 target_include_directories(buffio PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utility>
 )
+
 target_link_libraries(buffio PRIVATE ${BUFFIO_LINK_LIBRARY})
 #enable_testing()
-add_executable(hello ${CMAKE_CURRENT_SOURCE_DIR}/examples/hello_world.cpp)
+
+
+add_executable(hello 
+  examples/hello_world.cpp
+)
+
 target_link_libraries(hello PRIVATE buffio)
 
 #add_subdirectory(tests)

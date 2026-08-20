@@ -1,0 +1,23 @@
+#ifndef BUFFIO_WORKER
+#define BUFFIO_WORKER
+
+@BUFFIO_WORKER_BACKEND_INCLUDE@
+#include "buffio/macro.hpp"
+
+
+namespace buffio{
+class Worker{
+
+  public:
+    BUFFIO_CLASS_PROTECT(Worker);
+    int init(int numWorker,int queueOrder);
+    void pushWork(BGLOBOPVEC vec);
+    int notify();
+    int consume();
+    ~Worker();
+     Worker();
+  private:
+  WorkerState state_;
+};
+};
+#endif

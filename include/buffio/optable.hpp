@@ -1,12 +1,13 @@
 #ifndef BUFFIO_OP_TABLE
 #define BUFFIO_OP_TABLE
-#include "buffio/os.hpp"
+#include "buffio/config.hpp"
 #include "buffio/core.hpp"
 #include <variant>
 
 
 /* ADD FIELDS BEFORE noOp */
-using BGLOBOPVEC = std::variant<
+namespace buffio{
+using op_vec = std::variant<
                  buffio::readFile*,
                  buffio::readFilev*,
                  buffio::writeFile*,
@@ -14,6 +15,8 @@ using BGLOBOPVEC = std::variant<
                  buffio::noOp *
                  >;
 
+};
+using BGLOBOPVEC = buffio::op_vec; 
 
 
 
