@@ -11,10 +11,12 @@
 #include <atomic>
 #include <latch>
 
-using WorkQueue= 
-     buffio::lfQueue<BGLOBOPVEC,buffio::lfMemMode::stack,4>;
 
-using SleepQueue = buffio::lfQueue<buffio::semaphore *>;
+using WorkQueue= 
+     buffio::lfQueue<buffio::op_vec>;
+
+using SleepQueue = buffio::lfQueue<std::varient<buffio::semaphore,int>,
+                        buffio::lfMemMode::stack,BUFFIO_SLEEP_QUEUE_ORDER>;
 
 struct WorkerState {
     int worker_count;

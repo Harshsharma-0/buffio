@@ -6,25 +6,22 @@
 
 /* BUFFIO FORWARD DECLARED */
 namespace buffio{
-class instance;
-class instanceCore;
+class Worker;
+using instance = Worker;
 };
 
 /* BUFFIO TASK DECLARTION */
 namespace buffio {
+
 template <typename promiseT> class promise;
 using vTask = std::coroutine_handle<>;
 
-template <typename promisePackedT> struct promisePacked {
+struct promise_packed {
   buffio::instance *instance;
   buffio::vTask waiter;
   bool waiterAvailable; 
-  promisePackedT val;
 };
-struct taskExt {
-  buffio::vTask task;
-  struct taskExt *next;
-};
+
 };
 
 /* BUFFIO CORE */
@@ -33,6 +30,11 @@ namespace core {
 class awaitable {};
 class promise {};
 class instance {};
+struct task{ 
+ bool core_schedule(buffio::instance &_instance,buffio::vTask task);
+ bool core_promise_and_push(promise_packed &promise,
+                   buffio::vTask task,buffio::vTask self);
+};
 }; // namespace core
 };
 
@@ -44,7 +46,7 @@ struct writeFile;
 struct writeFilev;
 struct closeFile;
 struct noOp{
- static void action(struct noOP *no){};
+  void action(void *no){};
 };
 };
 /* BUFFIO SOCKETOPS FORWARD DECLARATION */

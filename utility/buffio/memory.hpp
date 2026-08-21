@@ -1,18 +1,37 @@
 #ifndef BUFFIO_UTILITY_MEMORY
 #define BUFFIO_UTILITY_MEMORY
 
+#include "buffio/config.hpp"
 #include "buffio/macro.hpp"
-#include <cstddef>
-#include <cstdint>
-#include <cstdlib>
-#include <iostream>
+#include <utility>
+#include <optional>
+#include <new>
 
 #define BUFFIO_MEMORY_MINSIZE sizeof(uintptr_t)
+
 namespace buffio {
+
+namespace utility{
+inline std::pair<unsigned int,int> get_pow2(unsigned int size){
+  
+  /* check if the number is power of 2 or not it, then returns the order */
+  if(size > 0 && (size & (size - 1)) == 0)
+     return {size,(8 * sizeof(size) - __builtin_clz(size - 1))};
+  
+  int depth = ((int) size - 1);
+  if(!depth)
+      return {1U << 0 , -1};
+  
+  depth = 8 * sizeof(size) - __builtin_clz(size);
+
+  return {1U << depth , depth};
+}; 
+};
+
 
 namespace memory {
 namespace utility {
-template <typename mainT, size_t chunkSizeN> constexpr size_t getStorageSize() {
+template <typename mainT, size_t chunkSizeN> constexpr size_t GetStorageSize() {
   if constexpr (sizeof(mainT) <= BUFFIO_MEMORY_MINSIZE)
     return (BUFFIO_MEMORY_MINSIZE * chunkSizeN);
 
@@ -23,54 +42,39 @@ template <typename mainT, size_t chunkSizeN> constexpr size_t getStorageSize() {
 template <typename poolT, size_t chunkSize> class pool {
 public:
   struct poolChunk {
-    static void *operator new(std::size_t size) noexcept {
-      if (size == 0)
-        size = 1;
-
-      void *allocated = NULL;
-      if ((allocated = std::malloc(size)) != NULL)
-        return allocated;
-
-      return nullptr;
-    };
-    static void operator delete(void *ptr) noexcept {
-      if (ptr != nullptr)
-        std::free(ptr);
-    };
-
     struct poolChunk *next;
     size_t count;
     alignas(std::max_align_t) char storage
-        [buffio::memory::utility::getStorageSize<poolT, chunkSize>()];
+        [memory::utility::GetStorageSize<poolT, chunkSize>()];
   };
 
   BUFFIO_CLASS_PROTECT(pool)
-  pool() {
-    chunkCount = freeCount = 0;
-    chunks = nullptr;
-    freeChunks = nullptr;
-  };
+  pool() {};
+  
  ~pool(){
-   if(chunks == nullptr) return;
-   auto ptr = chunks;
-   auto ptrTmp = chunks;
 
-   while(ptr != nullptr){
+   if(chunks == nullptr) return;
+   struct poolChunk *ptr = chunks;
+   struct poolChunk *ptrTmp= nullptr;
+
+   do{
+     
      ptrTmp = ptr;
      ptr = ptr->next;
      delete ptrTmp;
-   }
+
+   }while(ptr != nullptr);
+  
  }
-  poolT *operator()() noexcept { return pullOptimal(); };
+  poolT *operator()() noexcept { return pull_optimal(); };
   void operator[](poolT *ptr) { pushToFreeChunk(ptr); };
 
 private:
-  using poolFreeType = uintptr_t *;
 
-  poolT *pullOptimal() {
+  poolT *pull_optimal() {
 
     if (freeCount > 0) {
-      poolFreeType *next = reinterpret_cast<poolFreeType*>(freeChunks[0]);
+      uintptr_t *next = reinterpret_cast<uintptr_t*>(freeChunks[0]);
       poolT *data = reinterpret_cast<poolT *>(freeChunks);
       freeChunks = next;
       freeCount -= 1;
@@ -87,19 +91,19 @@ private:
     };
 
     if (makeChunk()) {
-      return pullOptimal();
+      return pull_optimal();
     }
     return nullptr;
   }
   void pushToFreeChunk(poolT *ptr) {
-    poolFreeType *tmp = reinterpret_cast<poolFreeType*>(ptr);
-    *tmp = reinterpret_cast<poolFreeType>(freeChunks);
+    uintptr_t *tmp = reinterpret_cast<uintptr_t*>(ptr);
+    *tmp = reinterpret_cast<uintptr_t>(freeChunks);
     freeChunks = tmp;
     freeCount += 1;
   };
 
   bool makeChunk() {
-    struct poolChunk *_chunk = new struct poolChunk;
+    struct poolChunk *_chunk = new(std::nothrow) struct poolChunk;
     if (_chunk == nullptr)
       return false;
     _chunk->count = 0;
@@ -109,10 +113,10 @@ private:
     return true;
   };
 
-  ssize_t chunkCount;
-  ssize_t freeCount;
-  struct poolChunk *chunks;
-  poolFreeType *freeChunks;
+  ssize_t chunkCount = 0;
+  ssize_t freeCount = 0;
+  struct poolChunk *chunks = nullptr;
+  uintptr_t *freeChunks = nullptr;
 };
 }; // namespace memory
 }; // namespace buffio

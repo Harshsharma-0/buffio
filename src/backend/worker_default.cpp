@@ -1,7 +1,8 @@
 #include "buffio/worker.hpp"
+#include "buffio/memory.hpp"
 
 #define BUFFIO_WORKER_ABORT -100
-/* NAMING CONVENTION CAN BE IMPROVED */
+
 
 static void buffioWorkerFunc(void *args);
 
@@ -30,40 +31,46 @@ static void buffioWorkerFunc(void *args){
   state.pactive_count->fetch_add(1);
   state.psync->count_down();
 
-   int exitCode = state.pcontrol->load(std::memory_order_acquire);
-
-  while(exitCode != BUFFIO_WORKER_ABORT){
-
-   auto val = state.pwork_queue->dequeue(&nullOp);
-   BUFFIO_OP_ACTION_TABLE(val,val.index(),{
-
-        /** code block for noOp **/
+  int exitCode = state.pcontrol->load(std::memory_order_acquire);
+  
+  do{
+   auto[op,ecode] = state.pwork_queue->dequeue();
+   
+   if(ecode == 1){
         state.psleep_count->fetch_add(1);
         state.psleep_queue->enqueue(lock_self);
         lock_self->wait(); // wait for the semephore
         state.psleep_count->fetch_add(-1);
         exitCode = state.pcontrol->load(std::memory_order_acquire);
-
         continue;
-        break;
+   };
+ 
+   buffio::dispatch_op(val,nullptr);
 
-    });
+   
+   /* code block to try to enqueue until val it's enqueued, only here if there's work done 
+    int tries_max = 1000;
+    do{
+      if(state.pcomplete_queue->(val)) break;
+      
+      if()
+    }while(1);
+    */
 
-   /* code block to try to enqueue until val it's enqueued, only here if there's work donw */
     while(!state.pcomplete_queue->enqueue(val)){
-      /** code block for noOp **/
+
         state.psleep_count->fetch_add(1);
         state.psleep_queue->enqueue(lock_self);
         lock_self->wait(); // wait for the semephore
         state.psleep_count->fetch_add(-1);
-        exitCode = state.pcontrol->load(std::memory_order_acquire);
 
     };
-
+    /* insert code to signal back that work is done, or notify the main loop */
     exitCode = state.pcontrol->load(std::memory_order_acquire);
-  };
 
-   state.pactive_count->fetch_add(-1);
+  }while(exitCode != BUFFIO_WORKER_ABORT); 
+
+  state.pactive_count->fetch_add(-1);
 
   return;
 };
@@ -82,16 +89,16 @@ buffio::Worker::~Worker(){
 };
 
 int buffio::Worker::init(int numWorker){
- return this->init(numWorker,BUFFIO_WORKER_QUEUE_ORDER);
+ return this->init(numWorker,(1U << BUFFIO_WORKER_QUEUE_ORDER));
 };
 
-int buffio::Worker::init(int numWorker,int queueOrder){
+int buffio::Worker::init(int numWorker,unsigned int queueSize){
     
   WorkerParameters *winfo = nullptr;
   WorkerParameters wparam = {};
 
   /* evaluating the maximum worker thread that can concurrently access the queue*/
-  size_t maxWorker =  buffio::lfSpec::get_size(queueOrder);
+  auto[maxWorker,order] =  buffio::utility::getPow2(queueSize);
 
   /* checking it the maxWorker exceeds the maximun supported worker */
   maxWorker = maxWorker > BUFFIO_MAX_WORKER ? maxWorker : BUFFIO_MAX_WORKER;
@@ -164,6 +171,6 @@ int buffio::Worker::init(int numWorker,int queueOrder){
   return 0; 
 };
 
-bool buffio::Worker::push(BGLOBOPVEC vec){  };
+bool buffio::Worker::push(buffio::op_vec vec){  };
 bool buffio::Worker::flush(){};
 

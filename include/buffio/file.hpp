@@ -28,7 +28,7 @@ struct readFile {
   void await_suspend(buffio::vTask _task);
   BFRWOPT await_resume() const {return rval;};
  
-  static void action(struct readFile *me);
+  void action(void *me);
  
   BFILE fd;
   char *buffer;
@@ -43,7 +43,8 @@ struct readFilev {
   bool await_ready() { return false; };
   void await_suspend(buffio::vTask _task) {};
   BFRWOPT await_resume() const { return rval; };
-  static void action(struct readFilev *me);
+ 
+  void action(void *me);
 
   BFILE fd;
   fileOpVec *vec;
@@ -59,8 +60,8 @@ struct writeFile {
   bool await_ready() { return false; }
   void await_suspend(buffio::vTask _task) {};
   BFRWOPT await_resume() const { return rval; }
-  static void action(struct writeFile *me);
- 
+  void action(void *me);
+
   BFILE fd;
   char *bufffer;
   ssize_t size;
@@ -76,7 +77,7 @@ struct writeFilev {
   bool await_ready() { return false; }
   void await_suspend(buffio::vTask _task) {}
   BFRWOPT await_resume() const { return rval; }
-  static void action(struct writeFilev *me);
+  void action(void *me);
 
   BFILE fd;
   fileOpVec *vec;

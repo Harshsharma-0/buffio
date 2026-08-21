@@ -4,6 +4,11 @@
 #include "buffio/config.hpp"
 #include "buffio/macro.hpp"
 
+#if defined(BUFFIO_OS_LINUX) || defined(BUFFIO_OS_BSD)
+ #include <pthread.h>
+ #include <semaphore.h>
+#endif
+
 namespace buffio{
 
  using threadFuncSig = void(*)(void *);

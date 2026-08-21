@@ -100,12 +100,12 @@ set(BUFFIO_WORKER_BACKEND_INCLUDE
 
 # Library target
 add_library(buffio
+  src/core/task.cpp
   src/lfcore.cpp
-  src/core/instance.cpp
-  src/instance.cpp
   src/file.cpp
   ${BUFFIO_BACKEND_SRC}
   src/thread.cpp
+  src/optable.cpp
 )
 
 

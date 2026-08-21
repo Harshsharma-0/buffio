@@ -2,18 +2,11 @@
 #define BUFFIO_OS
 
 
-#include <utility>
 #include <cstdint>
 #include <cstddef>
 #include <errno.h>
-#include <sys/mman.h>
-#include <sys/syscall.h>
 #include <sys/types.h>
-#include <unistd.h>
 #include <cstring>
-#include <pthread.h>
-#include <semaphore.h>
-
 
 #define BUFFIO_OS_INSERT(lin,bsd,wind) lin
 #define BUFFIO_LIN_INSERT(codeSection) codeSection

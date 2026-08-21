@@ -11,8 +11,9 @@
 #include "buffio/lfcore.hpp"
 #include "buffio/macro.hpp"
 #include "buffio/thread.hpp"
+#include <optional>
 #include <concepts>
-#include <iostream>
+#include <utility>
 #include <memory>
 
 namespace buffio {
@@ -158,15 +159,16 @@ public:
     return acQueue.threshold.load(std::memory_order_acquire) < 0 ? true : false;
   }
 
-  T dequeue(T onEmpty) {
+  std::optional<T> dequeue() {
     dlock.wait();
     size_t idx = lfCore::lfdequeue(&acQueue, queueOrder);
+    T tmp;
+
     if (idx == BUFFIO_EMPTY){
       dlock.post();
-      return onEmpty;
+      return std::nullopt;
     };
 
-    T tmp;
     if constexpr (lfmode == buffio::lfMemMode::dynamic) {
       tmp = static_cast<T*>(data)[idx];
     }

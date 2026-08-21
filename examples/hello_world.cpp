@@ -17,21 +17,24 @@ std::filesystem::path path = "";
 
 buffio::task<size_t> helloWorld(int id) {
   std::cout << "hello world! " << id << std::endl;
-  BFILE file;
-  BFRWOPT ret = co_await buffio::readFile{file,nullptr,100};
+ // BFILE file;
+ // BFRWOPT ret = co_await buffio::readFile{file,nullptr,100};
   co_return 0;
 };
 
 int main() {
   buffio::instance instance;
-  for (int i = 0; i < 1; i++) {
+  instance.init(4,1024);
+  for (int i = 0; i < 64; i++) {
     helloWorld(i).schedule(instance);
   };
   
-  instance.run();
+  std::cout<<instance.run()<<std::endl;
+
+  /*
   buffio::Worker worker;
   worker.init(4);
-
+ */
 
   return 0;
-};
+}; 

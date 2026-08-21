@@ -3,15 +3,16 @@
 
 #include "buffio/defs.hpp"
 #include "buffio/config.hpp"
-#include "buffio/lfqueue.hpp"
+#include "buffio/queue.hpp"
 #include <liburing.h>
 #include <linux/io_uring.h>
 #include <atomic>
 
 struct WorkerState {
   struct io_uring ring;
-  buffio::lfQueue<buffio::op_vec> submit_queue;
-  std::atomic<ssize_t> submit_count = 0;
+  buffio::Queue<buffio::op_vec> submit_queue;
+  unsigned int ring_size;
+  int fd;
 };
 
 #endif

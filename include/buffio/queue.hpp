@@ -1,63 +1,133 @@
 #ifndef BUFFIO_QUEUE
 #define BUFFIO_QUEUE
+#include "buffio/config.hpp"
 #include "buffio/core.hpp"
 #include "buffio/memory.hpp"
+#include <cstring>
+#include <optional>
 #include <cassert>
-#include <sys/types.h>
+#include <iostream>
 
 namespace buffio {
-template <
-    typename taskQueueT = buffio::taskExt, typename mainValT = buffio::vTask,
-    typename taskQueueAllocatorT = buffio::memory::pool<buffio::taskExt, 64>>
-class taskQueue {
+
+template <typename QueueT>
+class Queue {
+  
+static constexpr unsigned int queue_internal_order = 6;
+static constexpr unsigned int queue_internal_max = (1 << 6);
+struct queue_internal{
+    struct{
+     struct queue_internal *next = nullptr;
+     unsigned int head  = 0;
+     unsigned int tail  = 0;
+    }state;
+    QueueT data[queue_internal_max];
+};
+  
+
 public:
-  BUFFIO_CLASS_PROTECT(taskQueue)
-  taskQueue() { taskCount = 0; };
+  BUFFIO_CLASS_PROTECT(Queue)
+  Queue(){};
+  
+  
+  bool init(){
 
-  bool push(mainValT entry) {
-    auto val = allocator();
+   if(sp_head != nullptr) return true;
+   sp_head = allocator();
+   sp_tail = sp_head;
+   return sp_head == nullptr ? false : true;
 
-    if (val == nullptr){
-      return false;
-    }
- 
-    val->task = entry;
-    val->next = nullptr;
+  }
 
-    head = head == nullptr ? val : head;
-    head->next = val;
-    head = val;
+  bool enqueue(QueueT entry) {
+    if(sp_head == nullptr) return false;   
+   
+    auto [next,head,tail] = sp_tail->state;
+    QueueT *data = &sp_tail->data[0];
+
+    unsigned int cycle_tail = (tail >> queue_internal_order);
+    unsigned int cycle_head = (head >> queue_internal_order); 
+    int cycle = 
+        static_cast<int>(cycle_tail) - static_cast<int>(cycle_head);
+
+    head ^= (cycle_head << queue_internal_order);
+    tail ^= (cycle_tail << queue_internal_order);
+
+    /* case : if difference positive then cycle not same.
+     * case : if negative tail is wraps around in cycle with head;
+     * case : if 0 queue is empty
+     */
     
-    
-    if (tail == nullptr)
-      tail = head;
+    /* code handle full queue */
+     bool cycle_check = (cycle < 0 || cycle > 0);
+    if(head == tail && cycle_check){
 
-    taskCount += 1;
+
+      struct queue_internal *tmp = nullptr;
+      if((tmp = allocator()) == nullptr) return false;
+
+      sp_tail->state.next = tmp;
+      sp_tail = tmp;
+
+      std::memset((void *)sp_tail,'\0',sizeof(struct queue_internal));
+
+      data = &sp_tail->data[0];
+      cycle_tail = tail = 0;
+    };
+   
+    data[tail] = entry;
+    sp_tail->state.tail = tail + 1;
+
     return true;
   };
 
-  mainValT pop(mainValT onEmpty) {
-    if (taskCount <= 0)
-      return onEmpty;
+  std::optional<QueueT> dequeue() {
+    if(sp_head == nullptr) return std::nullopt;   
+ 
 
-    auto tmp = tail;
-    mainValT work = tmp->task;
-    tail = tail->next;
-    allocator[tmp];
-    taskCount -= 1;
+    auto [next,head,tail] = sp_head->state;
+    QueueT *data = &sp_head->data[0];
 
-    assert((taskCount >= 0));
+    unsigned int cycle_tail = (tail >> queue_internal_order);
+    unsigned int cycle_head = (head >> queue_internal_order); 
+    int cycle = 
+      static_cast<int>(cycle_tail) - static_cast<int>(cycle_head);
 
-    return work;
+    head ^= (cycle_head << queue_internal_order);
+    tail ^= (cycle_tail << queue_internal_order);
+
+  /* case : if difference positive then cycle not same.
+   * case : if negative tail is wraps around in cycle with head;
+   * case : if 0 queue is empty
+   */
+
+   if(tail == head && cycle == 0){
+     if(next == nullptr) return std::nullopt;
+     allocator[sp_head];
+
+     sp_head = next;
+     data = &sp_head->data[0];
+     head = sp_head->state.head;
+
+   };
+
+   QueueT dtmp = data[head];
+   sp_head->state.head = head + 1;
+    
+   return dtmp;
   };
+  
+  bool empty()const{
+    auto [next,head,tail] = sp_head->state; 
 
-  bool empty() const { return (taskCount <= 0); }
+    return (head == tail);
+  }
 
 private:
-  ssize_t taskCount;
-  taskQueueT *head = nullptr;
-  taskQueueT *tail = nullptr;
-  taskQueueAllocatorT allocator;
+  ssize_t count = 0;
+  queue_internal *sp_tail = nullptr; // enqueue from tail entry
+  queue_internal *sp_head = nullptr; // dequeue from head entry
+  buffio::memory::pool<queue_internal, 1> allocator;
 };
 
 } // namespace buffio

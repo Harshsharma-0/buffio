@@ -3,6 +3,7 @@
 
 @BUFFIO_WORKER_BACKEND_INCLUDE@
 #include "buffio/macro.hpp"
+#include "buffio/task.hpp"
 
 namespace buffio{
 class Worker{
@@ -10,13 +11,17 @@ class Worker{
   public:
     BUFFIO_CLASS_PROTECT(Worker);
     int init(int numWorker);
-    int init(int numWorker,int queueOrder);
+    int init(int numWorker,unsigned int queueOrder);
+    bool push(buffio::vTask task) {
+      return task_queue.enqueue(task);
+    };
     bool push(buffio::op_vec vec);
-    bool flush();
-    int consume();
+    int run();
     ~Worker();
      Worker();
   private:
+  int flush();
+  buffio::Queue<buffio::vTask> task_queue;
   WorkerState state_;
 };
 };

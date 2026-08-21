@@ -16,25 +16,26 @@ typedef struct taskSelfDestruct {
 } taskSelfDestruct;
 
 
-template <typename taskT> struct task : std::coroutine_handle<promise<taskT>> {
+template <typename taskT> struct task :
+  std::coroutine_handle<promise<taskT>>,
+  core::task
+ {
   using promise_type = buffio::promise<taskT>;
+
   bool schedule(buffio::instance &_instance) {
     instance = &_instance;
-    this->promise().storage.instance = instance;
-    return _instance.push({this->from_address(this->address())});
+    this->promise().storage.instance = &_instance;
+    return core_schedule(_instance,{this->from_address(this->address())});
   }
 
   bool await_ready() { return false; }
-  bool await_suspend(buffio::vTask waitingTask) {
-    auto ptr = &this->promise().storage;
-    ptr->waiter = waitingTask;
-    ptr->waiterAvailable = true;
-    instance = task<char>::from_address(waitingTask.address())
-                   .promise()
-                   .storage.instance;
-    ptr->instance = instance;
+  bool await_suspend(buffio::vTask waiting_task) {
+
     //if scheduling failed, immeadiately return control to the caller
-    return instance->push(this->from_address(this->address()));
+    return core_promise_and_push(this->promise().storage,
+          waiting_task,
+          {this->from_address(this->address()).promise()});
+
   };
 
   taskT await_resume() noexcept {
@@ -61,19 +62,19 @@ public:
 
   template <std::convertible_to<promiseT> yFrom>
   std::suspend_always yield_value(yFrom &&from) {
-    storage.val = std::forward<yFrom>(from);
+    return_val = std::forward<yFrom>(from);
     return {};
   }
 
   template <std::convertible_to<promiseT> rFrom>
   void return_value(rFrom &&from) {
-    storage.val = std::forward<rFrom>(from);
+    return_val = std::forward<rFrom>(from);
   };
   void unhandled_exception() {};
-  promisePacked<promiseT> storage;
+  promise_packed storage;
+  promiseT return_val;
 };
 
-using taskQueueDef = buffio::taskQueue<>;
 
 }; // namespace buffio
 
