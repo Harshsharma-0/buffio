@@ -49,14 +49,20 @@ if(HAVE_LINUX_MACRO)
   option(BUFFIO_OS_LINUX "platfrom is set to linux" ON)
 
   if(BUFFIO_WORKER_IO_URING)
-    set(BUFFIO_BACKEND_NAME "worker_iouring.hpp")
-    set(BUFFIO_BACKEND_SRC "src/backend/worker_iouring.cpp")
+    set(BUFFIO_BACKEND_NAME "worker/iouring.hpp")
+    set(BUFFIO_BACKEND_SRC
+      "src/backend/worker/iouring.cpp" 
+      "src/backend/file/linux.cpp"
+    )
     set(BUFFIO_LINK_LIBRARY pthread uring)
-    set(BUFFIO_OS_LINUX_IO_URING ON)
+    set(BUFFIO_BACKEND_IO_URING ON)
 
   else()
-    set(BUFFIO_BACKEND_NAME "worker_default.hpp")
-    set(BUFFIO_BACKEND_SRC "src/backend/worker_default.cpp")
+    set(BUFFIO_BACKEND_NAME "worker/default.hpp")
+    set(BUFFIO_BACKEND_SRC
+      "src/backend/worker/default.cpp"
+      "src/backend/file/linux.cpp"
+    )
     set(BUFFIO_LINK_LIBRARY pthread)
 
   endif()
@@ -72,13 +78,11 @@ elseif(HAVE_MSC_VER || HAVE_WIN)
   option(BUFFIO_OS_WINDOWS "platfrom is set to linux" ON)
   set(BUFFIO_LINK_LIBRARY )
 
-  if(BUFFIO_WORKER_IOCP)
-    set(BUFFIO_BACKEND_NAME "worker_iocp.hpp")
-    set(BUFFIO_BACKEND_SRC "src/backend/worker_iocp.cpp")
-  else()
-    set(BUFFIO_BACKEND_NAME "worker_win_default.hpp")
-    set(BUFFIO_BACKEND_SRC "src/backend/worker_win_default.cpp")
-  endif()
+  set(BUFFIO_BACKEND_NAME "worker/iocp.hpp")
+  set(BUFFIO_BACKEND_SRC 
+      "src/backend/worker/iocp.cpp"
+      "src/backend/file/windows.cpp"
+      )
 
   configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/include/config/config_windows.hpp.in
@@ -101,11 +105,12 @@ set(BUFFIO_WORKER_BACKEND_INCLUDE
 # Library target
 add_library(buffio
   src/core/task.cpp
-  src/lfcore.cpp
-  src/file.cpp
+  src/core/promise.cpp
   ${BUFFIO_BACKEND_SRC}
+  src/lfcore.cpp
   src/thread.cpp
   src/optable.cpp
+  src/file.cpp
 )
 
 

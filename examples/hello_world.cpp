@@ -14,20 +14,29 @@ buffio::task<size_t> hello(int id) {
 }
 
 std::filesystem::path path = "";
+char buffer[1024];
 
 buffio::task<size_t> helloWorld(int id) {
-  std::cout << "hello world! " << id << std::endl;
- // BFILE file;
- // BFRWOPT ret = co_await buffio::readFile{file,nullptr,100};
+  buffio::File file;
+  
+  file.fd = 0;
+  std::cout<<"[hello world init] "<<std::endl;
+  auto reas = co_await file.read(buffer,1024);
+  std::cout << "hello world! " << buffer << std::endl;
+  auto res  = co_await hello(32);
+  std::cout<< "hello world after hello"<<std::endl;
   co_return 0;
 };
 
 int main() {
-  buffio::instance instance;
+  
+  buffio::Worker instance;
   instance.init(4,1024);
-  for (int i = 0; i < 64; i++) {
-    helloWorld(i).schedule(instance);
-  };
+  helloWorld(0).schedule(instance);
+
+  for (int i = 0; i < 10; i++) {
+    hello(i).schedule(instance);
+   };
   
   std::cout<<instance.run()<<std::endl;
 
@@ -35,6 +44,6 @@ int main() {
   buffio::Worker worker;
   worker.init(4);
  */
-
+ // std::cout<<sizeof(std::optional<std::variant<long int>>)<<std::endl;
   return 0;
 }; 

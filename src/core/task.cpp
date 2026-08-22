@@ -4,17 +4,20 @@
 
 namespace buffio{
 namespace core{
-bool task::core_schedule(buffio::instance& _instance,buffio::vTask task){
- return _instance.push(task);
+bool Task::core_schedule(buffio::Worker& worker,
+                          buffio::CoroutineHandle task){
+ return worker.push(task);
 }
 
-bool task::core_promise_and_push(promise_packed &promise,
-                   buffio::vTask task,buffio::vTask self){
-  buffio::instance *_instance = buffio::task<char>::from_address(task.address())
-             .promise().storage.instance;
-  promise = {_instance,task,true};
+bool Task::promise_and_push(PromiseState &promise,
+                            buffio::CoroutineHandle task,
+                            buffio::CoroutineHandle self){
 
- return _instance->push(self);
+  buffio::Worker *worker = buffio::task<char>::from_address(task.address())
+             .promise().state.worker;
+  promise = {worker,task,true};
+
+ return worker->push(self);
 };
 
 }

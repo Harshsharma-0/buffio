@@ -12,16 +12,17 @@ class Worker{
     BUFFIO_CLASS_PROTECT(Worker);
     int init(int numWorker);
     int init(int numWorker,unsigned int queueOrder);
-    bool push(buffio::vTask task) {
+    bool push(buffio::CoroutineHandle task) {
       return task_queue.enqueue(task);
     };
-    bool push(buffio::op_vec vec);
+    bool push(buffio::op_vec &vec);
     int run();
     ~Worker();
      Worker();
   private:
   int flush();
-  buffio::Queue<buffio::vTask> task_queue;
+  void consume_done(int cycle = 64); 
+  buffio::Queue<buffio::CoroutineHandle> task_queue;
   WorkerState state_;
 };
 };

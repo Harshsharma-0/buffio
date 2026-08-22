@@ -19,7 +19,7 @@
 #define BUFFIO_MAX_WORKER 16
 
 
-#cmakedefine BUFFIO_OS_LINUX_IO_URING
+#cmakedefine BUFFIO_BACKEND_IO_URING
 #cmakedefine BUFFIO_OS_LINUX
 #cmakedefine BUFFIO_OS_WINDOWS
 #cmakedefine BUFFIO_OS_BSD
@@ -27,6 +27,8 @@
 using BFLAG = int;
 using BMODE = uint32_t;
 using BFDDEF = int;
+
+using buffio_fd = int;
 constexpr int BFD_INVALID = -1;
 
 #endif

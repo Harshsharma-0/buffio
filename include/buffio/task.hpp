@@ -7,58 +7,49 @@
 
 namespace buffio {
 
+template<typename promiseT>
+class promise;
 
-typedef struct taskSelfDestruct {
-  bool await_ready() noexcept { return ready; };
-  void await_suspend(buffio::vTask) noexcept {}
-  void await_resume() noexcept {}
-  bool ready;
-} taskSelfDestruct;
 
 
 template <typename taskT> struct task :
   std::coroutine_handle<promise<taskT>>,
-  core::task
+  core::Task
  {
   using promise_type = buffio::promise<taskT>;
 
-  bool schedule(buffio::instance &_instance) {
-    instance = &_instance;
-    this->promise().storage.instance = &_instance;
-    return core_schedule(_instance,{this->from_address(this->address())});
+  bool schedule(buffio::Worker &worker) {
+    this->promise().state.worker = &worker;
+    return core_schedule(worker,{this->from_address(this->address())});
   }
 
   bool await_ready() { return false; }
-  bool await_suspend(buffio::vTask waiting_task) {
+  bool await_suspend(buffio::CoroutineHandle waiting_task) {
 
     //if scheduling failed, immeadiately return control to the caller
-    return core_promise_and_push(this->promise().storage,
+    return promise_and_push(
+          this->promise().state,
           waiting_task,
-          {this->from_address(this->address()).promise()});
+          {this->from_address(this->address())});
 
   };
 
   taskT await_resume() noexcept {
-    taskT rval = this->promise().storage.val;
+    taskT rval = this->promise().return_val;
     this->destroy();
     return rval;
   };
-  buffio::instance *instance;
 };
 
-template <typename promiseT> class promise : private buffio::core::promise {
+template <typename promiseT> class promise : public buffio::core::Promise {
 public:
   task<promiseT> get_return_object() {
-    storage.waiterAvailable = false;
+    state.waiter_available = false;
+    state.self = {task<promiseT>::from_promise(*this)};
     return {task<promiseT>::from_promise(*this)};
   };
 
   std::suspend_always initial_suspend() noexcept { return {}; };
-  taskSelfDestruct final_suspend() noexcept {
-    if (storage.waiterAvailable)
-      storage.instance->push(storage.waiter);
-    return {!storage.waiterAvailable};
-  };
 
   template <std::convertible_to<promiseT> yFrom>
   std::suspend_always yield_value(yFrom &&from) {
@@ -71,7 +62,7 @@ public:
     return_val = std::forward<rFrom>(from);
   };
   void unhandled_exception() {};
-  promise_packed storage;
+
   promiseT return_val;
 };
 

@@ -1,102 +1,118 @@
-#ifndef BUFFIO_FILE
-#define BUFFIO_FILE
+#ifndef BUFFIO_FILE_HPP
+#define BUFFIO_FILE_HPP
 
 #include "buffio/core.hpp"
-#include "buffio/defs.hpp"
-#include <iostream>
-#include <filesystem>
-
-using BF_PATH_PREFIX=std::filesystem::path;
 
 namespace buffio {
 
-struct openDir{};
-
-struct openFile{
-  bool await_ready() {return true;}
-  void await_suspend(buffio::vTask){};
-  BFFDOPT await_resume();
-
-  BF_PATH_PREFIX const &path;
-  BFLAG flags;
-  BMODE mode;
-};
-
-struct readFile {
+struct ReadFileAwaiter {
 
   bool await_ready() { return false; }
-  void await_suspend(buffio::vTask _task);
-  BFRWOPT await_resume() const {return rval;};
+  void await_suspend(buffio::CoroutineHandle task_);
+  ssize_t await_resume() const {return rval;};
  
   void action(void *me);
- 
-  BFILE fd;
-  char *buffer;
-  ssize_t size;
- 
-  buffio::vTask task;
-  BFRWOPT rval;
+  
+  buffio::ReadFile state;
+  buffio::CoroutineHandle task;
+  buffio::op_vec identifier;
+  Worker *worker;
+  ssize_t rval;
+
   BUFFIO_WIN_INSERT(OVERLAPPED win_over);
 };
 
-struct readFilev {
+struct ReadvFileAwaiter {
   bool await_ready() { return false; };
-  void await_suspend(buffio::vTask _task) {};
-  BFRWOPT await_resume() const { return rval; };
+  void await_suspend(buffio::CoroutineHandle task_);
+  ssize_t await_resume() const { return rval; };
  
   void action(void *me);
+  
+  buffio::ReadvFile state;
+  buffio::CoroutineHandle task;
+  buffio::op_vec identifier;
+  Worker* worker;
 
-  BFILE fd;
-  fileOpVec *vec;
-  size_t count;
+  ssize_t rval;
 
-  buffio::vTask task;
-  BFRWOPT rval; 
   BUFFIO_WIN_INSERT(OVERLAPPED win_over);
 
 };
 
-struct writeFile {
+struct WriteFileAwaiter {
   bool await_ready() { return false; }
-  void await_suspend(buffio::vTask _task) {};
-  BFRWOPT await_resume() const { return rval; }
+  void await_suspend(buffio::CoroutineHandle task_);
+  ssize_t await_resume() const { return rval; }
   void action(void *me);
 
-  BFILE fd;
-  char *bufffer;
-  ssize_t size;
+  buffio::WriteFile state;
+  buffio::CoroutineHandle task;
+  buffio::op_vec identifier;
+  Worker* worker;
 
-  buffio::vTask task;
-  BFRWOPT rval; 
+  ssize_t rval;
+
   BUFFIO_WIN_INSERT(OVERLAPPED win_over);
 
 };
 
 
-struct writeFilev {
+struct WritevFileAwaiter {
+
   bool await_ready() { return false; }
-  void await_suspend(buffio::vTask _task) {}
-  BFRWOPT await_resume() const { return rval; }
+  void await_suspend(buffio::CoroutineHandle task_);
+  ssize_t await_resume() const { return rval; }
   void action(void *me);
 
-  BFILE fd;
-  fileOpVec *vec;
-  size_t count;
+  buffio::WritevFile state;
+  buffio::CoroutineHandle task;
+  Worker* worker;
 
-  buffio::vTask task;
-  BFRWOPT rval; 
+  buffio::op_vec identifier;
+ 
+  ssize_t rval;
+
   BUFFIO_WIN_INSERT(OVERLAPPED win_over);
 
 };
 
-struct closeFile{
+struct CloseFileAwaiter{
   bool await_ready()  { return true; }
-  void await_suspend(buffio::vTask) noexcept{};
+  void await_suspend(buffio::CoroutineHandle) noexcept{};
   void await_resume() const { return; }
   BFILE fd;
 };
 
+
+struct File{
+  public:
+
+   inline buffio::ReadFileAwaiter read(char *buffer,size_t size) const { 
+      return buffio::ReadFileAwaiter{{this->fd,buffer,size,(size_t*)&loffset}}; 
+    };
+
+    buffio::ReadvFile readv(buffio::ReadFile *vec,size_t size){
+      return buffio::ReadvFile{this->fd,vec,size,&loffset};
+    };
+
+    buffio::WriteFile write(char *buffer,size_t size){
+      return buffio::WriteFile{this->fd,buffer,size,&loffset};
+    };
+
+    buffio::WritevFile writev(buffio::WriteFile *vec,size_t size){
+     return buffio::WritevFile{this->fd,vec,size,&loffset};
+    };
+    
+ buffio_fd fd;
+private:
+
+ size_t loffset = 0;
+ int flags = 0;
+};
+
+
 }; // namespace buffio
-#undef BF_FILE_API
+
 
 #endif

@@ -31,8 +31,9 @@ public:
   
   
   bool init(){
+   
+   assert(sp_head == nullptr);
 
-   if(sp_head != nullptr) return true;
    sp_head = allocator();
    sp_tail = sp_head;
    return sp_head == nullptr ? false : true;
@@ -40,7 +41,7 @@ public:
   }
 
   bool enqueue(QueueT entry) {
-    if(sp_head == nullptr) return false;   
+    assert(sp_head != nullptr);
    
     auto [next,head,tail] = sp_tail->state;
     QueueT *data = &sp_tail->data[0];
@@ -60,30 +61,31 @@ public:
     
     /* code handle full queue */
      bool cycle_check = (cycle < 0 || cycle > 0);
-    if(head == tail && cycle_check){
+
+      if(head == tail && cycle_check){
 
 
-      struct queue_internal *tmp = nullptr;
-      if((tmp = allocator()) == nullptr) return false;
+       struct queue_internal *tmp = nullptr;
+       if((tmp = allocator()) == nullptr) return false;
 
-      sp_tail->state.next = tmp;
-      sp_tail = tmp;
+       sp_tail->state.next = tmp;
+       sp_tail = tmp;
 
-      std::memset((void *)sp_tail,'\0',sizeof(struct queue_internal));
+       std::memset((void *)sp_tail,'\0',sizeof(struct queue_internal));
 
-      data = &sp_tail->data[0];
-      cycle_tail = tail = 0;
-    };
+       data = &sp_tail->data[0];
+       cycle_tail = tail = 0;
+      };
    
     data[tail] = entry;
     sp_tail->state.tail = tail + 1;
-
+    count_ += 1;
     return true;
   };
 
   std::optional<QueueT> dequeue() {
-    if(sp_head == nullptr) return std::nullopt;   
- 
+
+    assert(sp_head != nullptr); 
 
     auto [next,head,tail] = sp_head->state;
     QueueT *data = &sp_head->data[0];
@@ -113,18 +115,15 @@ public:
 
    QueueT dtmp = data[head];
    sp_head->state.head = head + 1;
-    
+   
+   count_ -= 1;
    return dtmp;
   };
   
-  bool empty()const{
-    auto [next,head,tail] = sp_head->state; 
-
-    return (head == tail);
-  }
-
+  bool empty() const { return (count_ <= 0); };
+  ssize_t count() const { return count_; };
 private:
-  ssize_t count = 0;
+  ssize_t count_ = 0;
   queue_internal *sp_tail = nullptr; // enqueue from tail entry
   queue_internal *sp_head = nullptr; // dequeue from head entry
   buffio::memory::pool<queue_internal, 1> allocator;
