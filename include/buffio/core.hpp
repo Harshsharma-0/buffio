@@ -12,17 +12,11 @@
 
 using BF_PATH_PREFIX=std::filesystem::path;
 
-
-using BFILE = buffio_fd;
-using BFFDOPT = std::pair<int,int>;
-using BFRWOPT = std::pair<ssize_t,int>;
-using BFOPT   = std::pair<int,int>;
-using BFSRWOPT = std::pair<ssize_t,uintptr_t>;
-
 namespace buffio{
 
 
 class Worker;
+class File;
 
 using CoroutineHandle = std::coroutine_handle<>;
 
@@ -34,72 +28,102 @@ struct PromiseState {
 
 };
 
+
+struct OpenFileAwaiter;
 struct ReadFileAwaiter;
 struct ReadvFileAwaiter;
 struct WriteFileAwaiter;
 struct WritevFileAwaiter;
 struct CloseFileAwaiter;
 
-struct ReadFile;
-struct ReadvFile;
-struct WriteFile;
-struct WritevFile;
-struct CloseFile;
 
 struct NoOp {
     void action(void*) {}
 };
 
-using op_vec =  std::variant<
-                 std::monostate,
-                 buffio::ReadFileAwaiter*,
-                 buffio::ReadvFileAwaiter*,
-                 buffio::WriteFileAwaiter*,
-                 buffio::WritevFileAwaiter*,
-                 buffio::NoOp *
-                 >;
+struct OpState{
+  CoroutineHandle task;
+
+ union{
+   bool(*action)(std::pair<void*,void*> );
+  };
+ union{
+  void *data;
+  int32_t op_done;
+  size_t nread;
+  size_t nwrite;
+  ssize_t s_nread;
+  ssize_t s_nwrite;
+  intptr_t pfd;
+  int fd;
+ };
+};
 
 
-
-
-struct ReadFile{
+struct BufferState{
  buffio_fd fd;
  char *buffer;
  size_t size;
  size_t *offset;
 };
 
-struct ReadvFile{
- buffio_fd fd;
- buffio::ReadFile *buffers;
- size_t size;
- size_t *offset;
+class BuffervState{
+  using BuffervStateType = BUFFIO_OS_INSERT(struct iovec *, 
+                                   void* ,FILE_SEGMENT_ELEMENT *);
+ public:
+  void operator()(BuffervState const &buff){
+    assert(!iown);
+    io_vecs = buff.io_vecs;
+    size = buff.size;
+  };
+
+ void operator()(BuffervState const &&buff){
+    assert(!iown);
+    io_vecs = buff.io_vecs;
+    size = buff.size;
+  };
+  std::pair<BuffervStateType,int>get() const {
+    return {io_vecs,size};
+  };
+  
+
+  bool CreateVec(int num);
+  bool MakeEntry(int idx,char *buffer,uint32_t bufSize);
+  BuffervState() = default;
+
+  private:
+
+  BuffervStateType io_vecs = nullptr;
+  int size = 0;
+  bool iown = false;
 };
 
-struct WriteFile{
- buffio_fd fd;
- char *buffer;
- size_t size;
- size_t *offset;
+/*
+class FileStat{
+  using FileStatType = BUFFIO_OS_INSERT(
+      struct stat,
+      struct stat,
+      BY_HANDLE_FILE_INFORMATION 
+      ); 
+  public:
+    FileStat() = default;
+    ~FileStat() = default;
+    
+    
+    //64 bytes for both 64-bit and 32-bit system.
+    uint64_t Size() const { 
+      BUFFIO_OS_INSERT(
+       return (uint64_t)stat_buf.st_size; ,
+       return (uint64_t)stat_buf.st_size; ,
+       return stat_buf.
+      }
+    };
+
+  private:
+    FileStateType stat_buf;
+
 };
-
-struct WritevFile{
-  buffio_fd fd;
-  buffio::WriteFile *buffers;
-  size_t size;
-  size_t *offset;
-};
-
-struct OpenFile{
-  bool await_ready() {return true;}
-  void await_suspend(buffio::CoroutineHandle){};
-  ssize_t await_resume();
-
-  BF_PATH_PREFIX const &path;
-  BFLAG flags;
-  BMODE mode;
-};
-
+*/
 
 struct TaskFinalSuspendAwaitable {
   bool await_ready() noexcept { return ready; };
@@ -115,43 +139,6 @@ class Awaitable {};
 class Promise {
 public:
    
-   /*
-    removed so the tasks can wait for other task also
-   inline ReadFileAwaiter await_transform(ReadFile const &fields) const{
-     return ReadFileAwaiter{
-                    fields,
-                    state.self,
-                    std::monostate{},
-                    state.worker
-                   };
-   };
-   
-   inline ReadvFileAwaiter await_transform(ReadvFile const &fields) const{
-     return ReadvFileAwaiter{
-                     fields,
-                     nullptr,
-                     std::monostate{},
-                     state.worker
-                    };
-   };
-
-   inline WriteFileAwaiter await_transform(WriteFile const &fields) const{
-     return WriteFileAwaiter{
-                     fields,
-                     nullptr,
-                     std::monostate{},
-                     state.worker
-                    };
-   };
-   inline WritevFileAwaiter await_transform(WritevFile const &fields) const{
-     return WritevFileAwaiter{
-                      fields,
-                      nullptr,
-                      std::monostate{},
-                      state.worker
-                    };
-   };
-   */
    TaskFinalSuspendAwaitable final_suspend() noexcept;
    PromiseState state;
 };

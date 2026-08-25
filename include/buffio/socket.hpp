@@ -1,7 +1,6 @@
 #ifndef BUFFIO_SOCKET
 #define BUFFIO_SOCKET
 
-#include "buffio/optable.hpp"
 #include "buffio/defs.hpp"
 
 #define BF_SOCKET_API inline

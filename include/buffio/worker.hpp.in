@@ -6,24 +6,6 @@
 #include "buffio/task.hpp"
 
 namespace buffio{
-class Worker{
-
-  public:
-    BUFFIO_CLASS_PROTECT(Worker);
-    int init(int numWorker);
-    int init(int numWorker,unsigned int queueOrder);
-    bool push(buffio::CoroutineHandle task) {
-      return task_queue.enqueue(task);
-    };
-    bool push(buffio::op_vec &vec);
-    int run();
-    ~Worker();
-     Worker();
-  private:
-  int flush();
-  void consume_done(int cycle = 64); 
-  buffio::Queue<buffio::CoroutineHandle> task_queue;
-  WorkerState state_;
-};
+using Instance = Worker; 
 };
 #endif

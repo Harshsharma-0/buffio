@@ -52,7 +52,8 @@ if(HAVE_LINUX_MACRO)
     set(BUFFIO_BACKEND_NAME "worker/iouring.hpp")
     set(BUFFIO_BACKEND_SRC
       "src/backend/worker/iouring.cpp" 
-      "src/backend/file/linux.cpp"
+      "src/backend/fs/linux.cpp"
+      "src/backend/core/linux.cpp"
     )
     set(BUFFIO_LINK_LIBRARY pthread uring)
     set(BUFFIO_BACKEND_IO_URING ON)
@@ -61,7 +62,8 @@ if(HAVE_LINUX_MACRO)
     set(BUFFIO_BACKEND_NAME "worker/default.hpp")
     set(BUFFIO_BACKEND_SRC
       "src/backend/worker/default.cpp"
-      "src/backend/file/linux.cpp"
+      "src/backend/fs/linux.cpp"
+      "src/backend/core/linux.cpp"
     )
     set(BUFFIO_LINK_LIBRARY pthread)
 
@@ -81,7 +83,8 @@ elseif(HAVE_MSC_VER || HAVE_WIN)
   set(BUFFIO_BACKEND_NAME "worker/iocp.hpp")
   set(BUFFIO_BACKEND_SRC 
       "src/backend/worker/iocp.cpp"
-      "src/backend/file/windows.cpp"
+      "src/backend/fs/windows.cpp"
+      "src/backend/core/windows.cpp"
       )
 
   configure_file(
@@ -109,8 +112,7 @@ add_library(buffio
   ${BUFFIO_BACKEND_SRC}
   src/lfcore.cpp
   src/thread.cpp
-  src/optable.cpp
-  src/file.cpp
+  src/fs.cpp
 )
 
 

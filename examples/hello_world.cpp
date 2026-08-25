@@ -1,42 +1,47 @@
-#include "buffio/file.hpp"
+#include "buffio/flags.hpp"
+#include "buffio/fs.hpp"
 #include "buffio/socket.hpp"
 #include "buffio/worker.hpp"
 #include "buffio/instance.hpp"
 #include <iostream>
 
-volatile int he = 10;
 
 
-buffio::task<size_t> hello(int id) {
-  std::cout << "hello world! baby - id " << id << std::endl;
-  id += 1;
-  co_return 20;
-}
+
 
 std::filesystem::path path = "";
+const char data[] = "Hello this is the buffio test!";
 char buffer[1024];
 
 buffio::task<size_t> helloWorld(int id) {
   buffio::File file;
-  
-  file.fd = 0;
-  std::cout<<"[hello world init] "<<std::endl;
-  auto reas = co_await file.read(buffer,1024);
-  std::cout << "hello world! " << buffer << std::endl;
-  auto res  = co_await hello(32);
-  std::cout<< "hello world after hello"<<std::endl;
+ 
+
+  const char *loc = "./hello";
+  int isOpen = co_await file.Open("./test.txt",B_RDWR | B_CREAT,0644);
+  std::cout<<"[file] "<<isOpen<<std::endl;
+
+  auto reas = co_await file.Write((char *)data,(uint32_t)sizeof(data));
+  assert(reas == sizeof(data));
+  std::cout<<"[total writen] "<<reas<<" "<<sizeof(data)<<std::endl;
+ 
+  buffio::BuffervState iovec;
+  iovec.CreateVec(1);
+  iovec.MakeEntry(1,buffer,(uint32_t)sizeof(data));
+
+  auto res = co_await file.Readv(iovec);
+  buffer[sizeof(data)] = '\0';
+  std::cout<<buffer<<std::endl;
+
   co_return 0;
 };
 
 int main() {
   
-  buffio::Worker instance;
-  instance.init(4,1024);
+  buffio::Instance instance;
+  instance.init(4);
   helloWorld(0).schedule(instance);
 
-  for (int i = 0; i < 10; i++) {
-    hello(i).schedule(instance);
-   };
   
   std::cout<<instance.run()<<std::endl;
 

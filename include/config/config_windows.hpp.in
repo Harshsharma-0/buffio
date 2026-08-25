@@ -26,21 +26,16 @@
 #define BUFFIO_OS_WINDOWS 1
 
 
-#cmakedefine BUFFIO_WORKER_DEFAULT
-#cmakedefine BUFFIO_WORKER_IO_URING
 #cmakedefine BUFFIO_WORKER_IOCP
-
 #cmakedefine BUFFIO_OS_LINUX
 #cmakedefine BUFFIO_OS_WINDOWS
 #cmakedefine BUFFIO_OS_BSD
 
-typedef SSIZE_T ssize_t;
-typedef SIZE_T size_t;
+typedef intptr_t ssize_t;
+typedef uintptr_t size_t;
 
 
-using BFLAG = int;
-using BMODE = uint32_t;
-using BFDDEF = uintptr_t;
-constexpr int BFD_INVALID = -1;
+using buffio_fd = intptr_t;
+constexpr int BUFFIO_FD_INVALID = -1;
 
 #endif
