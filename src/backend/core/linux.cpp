@@ -10,22 +10,26 @@ bool buffio::BuffervState::CreateVec(int num){
  memset((char *)iov,'\0',sizeof(struct iovec) * num);
  
  io_vecs = iov;
- size = num;
+ size_max = num;
  iown = true;
 
  return true;
 };
 
 bool buffio::BuffervState::MakeEntry(int idx, char *buffer, 
-                          uint32_t bufSize){
+                           size_t bufSize){
 
-  assert(idx <= size && io_vecs != nullptr);
+
+  assert(idx <= size_max && io_vecs != nullptr);
+  assert(size != size_max);
+
   struct iovec *iov = io_vecs;
    
   iov = (iov + (idx - 1));
   iov->iov_base = static_cast<void*>(buffer);
-  iov->iov_len = static_cast<size_t>(bufSize);
-  
+  iov->iov_len = bufSize;
+
   size += 1;
+  
   return true;
 };

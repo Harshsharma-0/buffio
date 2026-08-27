@@ -10,36 +10,42 @@
 
 
 std::filesystem::path path = "";
-const char data[] = "Hello this is the buffio test!";
+const char data[] = "Hello this is the buffio test new test!\n";
 char buffer[1024];
 
 buffio::task<size_t> helloWorld(int id) {
   buffio::File file;
- 
-
-  const char *loc = "./hello";
-  int isOpen = co_await file.Open("./test.txt",B_RDWR | B_CREAT,0644);
+  
+  int isOpen = co_await file.Open("./test.txt",B_RDWR | B_CREAT | B_APPEND,0644);
   std::cout<<"[file] "<<isOpen<<std::endl;
 
   auto reas = co_await file.Write((char *)data,(uint32_t)sizeof(data));
   assert(reas == sizeof(data));
   std::cout<<"[total writen] "<<reas<<" "<<sizeof(data)<<std::endl;
+
+  
+  
  
   buffio::BuffervState iovec;
   iovec.CreateVec(1);
-  iovec.MakeEntry(1,buffer,(uint32_t)sizeof(data));
+  iovec.MakeEntry(1,buffer,sizeof(buffer));
 
   auto res = co_await file.Readv(iovec);
-  buffer[sizeof(data)] = '\0';
-  std::cout<<buffer<<std::endl;
+  std::cout<<"[total read] "<<res<<std::endl;
 
+  for(int i = 0 ; i < res ; i++){
+     std::cout<<buffer[i];
+   };
   co_return 0;
 };
 
 int main() {
   
   buffio::Instance instance;
-  instance.init(4);
+  int val = instance.init(4);
+  if(val < 0){
+    std::cout<<"[initlisation failed] "<<val<<std::endl;
+  };
   helloWorld(0).schedule(instance);
 
   

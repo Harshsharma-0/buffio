@@ -1,0 +1,91 @@
+#ifndef BUFFIO_OS
+#define BUFFIO_OS
+
+
+#define BUFFIO_WORKER_QUEUE_ORDER @BUFFIO_WORKER_QUEUE_ORDER@
+#define BUFFIO_FILE_VEC_MAX @BUFFIO_FILE_VEC_MAX@
+
+#define BUFFIO_SLEEP_QUEUE_ORDER 4
+#define BUFFIO_MAX_WORKER 16
+
+
+
+/*
+ * ============================================================================
+ * Platform detection
+ * ============================================================================
+ */
+
+#if defined(_WIN32)
+    #ifndef WIN32_LEAN_AND_MEAN
+        #define WIN32_LEAN_AND_MEAN
+    #endif
+
+    #include <windows.h>
+    #include <winsock2.h>
+ 
+    #define BUFFIO_OS_LINUX 0
+    #define BUFFIO_OS_BSD   0
+    #define BUFFIO_OS_WINDOWS 1
+
+    #define BUFFIO_OS_INSERT(linux_section,bsd_section,windows_section) windows_section
+    #define BUFFIO_LIN_INSERT(code_section) code_section
+    #define BUFFIO_WIN_INSERT(code_section)
+    #define BUFFIO_BSD_INSERT(code_section)
+
+#endif
+
+#if defined(__linux__)
+
+    #define BUFFIO_OS_LINUX 1
+    #define BUFFIO_OS_BSD   0
+    #define BUFFIO_OS_WINDOWS 0
+
+    #include <cstdint>
+    #include <cstddef>
+    #include <errno.h>
+    #include <sys/types.h>
+    #include <sys/uio.h>
+    #include <sys/stat.h>
+    #include <cstring>
+    #include <fcntl.h>
+    #include <cassert>
+
+    #define BUFFIO_OS_INSERT(lin,bsd,wind) lin
+    #define BUFFIO_LIN_INSERT(code_section) code_section
+    #define BUFFIO_WIN_INSERT(code_section)
+    #define BUFFIO_BSD_INSERT(code_section)
+
+    using buffio_fd = int;
+    constexpr int BUFFIO_FD_INVALID = -1;
+
+    #cmakedefine BUFFIO_WORKER_IOURING
+   
+   #ifdef BUFFIO_WORKER_IOURING
+     #define BUFFIO_BACKEND_IOURING
+   #else
+     #define BUFFIO_BACKEND_EPOLL
+  #endif
+
+#elif defined(__FreeBSD__) || defined(__OpenBSD__) || \
+    defined(__NetBSD__) || defined(__DragonFly__)
+
+    #define BUFFIO_OS_LINUX 0
+    #define BUFFIO_OS_BSD   1
+    #define BUFFIO_OS_WINDOWS 0
+
+    #define BUFFIO_OS_INSERT(linux_section,bsd_section,wind_section) bsd_section
+    #define BUFFIO_LIN_INSERT(code_section) 
+    #define BUFFIO_WIN_INSERT(code_section)
+    #define BUFFIO_BSD_INSERT(code_section) code_section
+
+    using buffio_fd = int;
+    constexpr int BUFFIO_FD_INVALID = -1;
+
+#else
+
+    #error "BuffIO: unsupported operating system"
+
+#endif
+
+#endif

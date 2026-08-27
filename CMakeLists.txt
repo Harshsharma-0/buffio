@@ -27,7 +27,7 @@ set(BUFFIO_FILE_VEC_MAX 16 CACHE STRING
 option(BUFFIO_WORKER_DEFAULT
   "Use default worker backend" ON)
 
-option(BUFFIO_WORKER_IO_URING
+option(BUFFIO_WORKER_IOURING
     "Use io_uring worker backend" OFF)
 
 option(BUFFIO_WORKER_IOCP
@@ -48,33 +48,26 @@ if(HAVE_LINUX_MACRO)
 
   option(BUFFIO_OS_LINUX "platfrom is set to linux" ON)
 
-  if(BUFFIO_WORKER_IO_URING)
+  if(BUFFIO_WORKER_IOURING)
+
     set(BUFFIO_BACKEND_NAME "worker/iouring.hpp")
-    set(BUFFIO_BACKEND_SRC
-      "src/backend/worker/iouring.cpp" 
-      "src/backend/fs/linux.cpp"
-      "src/backend/core/linux.cpp"
-    )
+    set(BACKEND_SRC "src/backend/worker/iouring.cpp")
     set(BUFFIO_LINK_LIBRARY pthread uring)
-    set(BUFFIO_BACKEND_IO_URING ON)
 
   else()
-    set(BUFFIO_BACKEND_NAME "worker/default.hpp")
-    set(BUFFIO_BACKEND_SRC
-      "src/backend/worker/default.cpp"
-      "src/backend/fs/linux.cpp"
-      "src/backend/core/linux.cpp"
-    )
+    set(BUFFIO_BACKEND_NAME "worker/epoll.hpp")
+    set(BACKEND_SRC "src/backend/worker/epoll.cpp")
     set(BUFFIO_LINK_LIBRARY pthread)
 
   endif()
 
-  configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/config/config_linux.hpp.in
-    ${CMAKE_CURRENT_BINARY_DIR}/include/buffio/config.hpp
-   )
 
- 
+   set(BUFFIO_BACKEND_SRC
+      ${BACKEND_SRC}
+      "src/backend/fs/linux.cpp"
+      "src/backend/core/linux.cpp"
+    )
+
 elseif(HAVE_MSC_VER || HAVE_WIN)
 
   option(BUFFIO_OS_WINDOWS "platfrom is set to linux" ON)
@@ -87,22 +80,16 @@ elseif(HAVE_MSC_VER || HAVE_WIN)
       "src/backend/core/windows.cpp"
       )
 
-  configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/config/config_windows.hpp.in
-    ${CMAKE_CURRENT_BINARY_DIR}/include/buffio/config.hpp
-  )
 
 else()
   message(FATAL_ERROR "UNSUPPORTED PLATFORM , supported platform are [linux]")
 endif()
 
-set(BUFFIO_WORKER_BACKEND_INCLUDE 
-  "#include \"backend/${BUFFIO_BACKEND_NAME}\"")
 
- configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/buffio/worker.hpp.in
-    ${CMAKE_CURRENT_BINARY_DIR}/include/buffio/worker.hpp
-  )
+  configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/config/config.hpp.in
+    ${CMAKE_CURRENT_BINARY_DIR}/include/buffio/config.hpp
+   )
 
 
 # Library target

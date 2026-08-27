@@ -7,32 +7,23 @@ namespace buffio{
 
 
 struct AwaitableFileBase{
-
  void await_suspend(CoroutineHandle task_);
   ssize_t await_resume() {
     if (op_state.op_done > 0)
       *state.offset += op_state.op_done;
     return op_state.op_done;
   };
+ 
+  static bool action(std::pair<void *,void*> info);
+ 
+  struct{
+   buffio_fd fd;
+   char *buffer;
+   size_t size;
+   uint64_t *offset;
+  }state;
 
-  BufferState state; 
   BUFFIO_OS_INSERT(OpState op_state, OpState op_state, OVERLAPPED op_state);
-};
-
-struct AwaitableFilevBase{
-
- void await_suspend(CoroutineHandle task_);
- ssize_t await_resume() const {
-    if (op_state.op_done > 0)
-      *offset += op_state.op_done;
-    return op_state.op_done;
-  };
-
-  buffio_fd fd;
-  BuffervState state;
-  size_t *offset;
-  BUFFIO_OS_INSERT(OpState op_state, OpState op_state, OVERLAPPED op_state);
-
 };
 
 struct OpenFileAwaiter {
@@ -54,51 +45,42 @@ struct OpenFileAwaiter {
   BUFFIO_OS_INSERT(OpState op_state, OpState op_state, OVERLAPPED op_state);
 };
 
-struct ReadFileAwaiter : AwaitableFileBase {
 
+struct ReadFileAwaiter : AwaitableFileBase{
   bool await_ready() { 
-    op_state.action = ReadFileAwaiter::action;
+    op_state.action = AwaitableFileBase::action;
     op_state.data = static_cast<void *>(this);
+    op_state.op_code = OpCode::Read;
     return false;
-  }
-//  void await_suspend(CoroutineHandle task_);
-  static bool action(std::pair<void *, void *> info);
-
+  };
 };
 
 
 struct WriteFileAwaiter : AwaitableFileBase{
   bool await_ready() {
-    op_state.action = WriteFileAwaiter::action;
+    op_state.action = AwaitableFileBase::action;
     op_state.data = static_cast<void *>(this);
+    op_state.op_code = OpCode::Write;
     return false;
-  }
-//  void await_suspend(CoroutineHandle task_);
-  static bool action(std::pair<void *, void *> info);
-
+  };
 };
 
-struct ReadvFileAwaiter: AwaitableFilevBase {
+struct ReadvFileAwaiter: AwaitableFileBase {
   bool await_ready() {
-    op_state.action = ReadvFileAwaiter::action;
+    op_state.action = AwaitableFileBase::action;
+    op_state.op_code = OpCode::Readv;
     op_state.data = static_cast<void *>(this);
     return false; 
   };
-//  void await_suspend(CoroutineHandle task_); 
-  static bool action(std::pair<void *, void *> info);
-
 };
 
-struct WritevFileAwaiter: AwaitableFilevBase {
-
+struct WritevFileAwaiter: AwaitableFileBase {
   bool await_ready() {
-    op_state.action = WritevFileAwaiter::action;
+    op_state.action = AwaitableFileBase::action;
+    op_state.op_code = OpCode::Writev;
     op_state.data = static_cast<void *>(this);
     return false;
   }
-//  void await_suspend(CoroutineHandle task_);
- 
-  static bool action(std::pair<void *, void *> info);
 };
 
 struct FsMkDirAwaitable {

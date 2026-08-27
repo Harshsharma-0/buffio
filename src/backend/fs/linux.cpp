@@ -1,3 +1,4 @@
+#include "buffio/config.hpp"
 #include "buffio/fs.hpp"
 #include "buffio/worker.hpp"
 #include <unistd.h>
@@ -27,7 +28,7 @@ int buffio::OpenFileAwaiter::await_resume(){
   return 0;
 };
 
-#ifdef BUFFIO_WORKER_IOURING_HPP
+#ifdef BUFFIO_BACKEND_IOURING
 
 
 bool buffio::OpenFileAwaiter::action(std::pair<void*,void*> info){
@@ -45,95 +46,64 @@ bool buffio::OpenFileAwaiter::action(std::pair<void*,void*> info){
       (mode_t)obj->mode);
 
   io_uring_sqe_set_data(sqe,(void *)&obj->op_state);
-    
-  return true;
-};
-
-bool buffio::ReadFileAwaiter::action(std::pair<void *,void*> info){
-
-  auto[p_sqe,p_self] = info;
-
-  buffio::ReadFileAwaiter *obj =
-       static_cast<buffio::ReadFileAwaiter *>(p_self);
-
-  struct io_uring_sqe *sqe = 
-       static_cast<struct io_uring_sqe *>(p_sqe);
- 
-  auto[fd,buffer,size,offset] = obj->state;
-
-  io_uring_prep_read(sqe,
-            fd,buffer,size,*offset);
-  io_uring_sqe_set_data(sqe,(void *)&obj->op_state);
-  
-
- return true;
-};
-
-bool buffio::WriteFileAwaiter::action(std::pair<void*,void*> info){
-
-
-  auto[p_sqe,p_self] = info;
-  buffio::ReadFileAwaiter *obj =
-       static_cast<buffio::ReadFileAwaiter *>(p_self);
-
-  struct io_uring_sqe *sqe = 
-       static_cast<struct io_uring_sqe *>(p_sqe);
- 
-  auto[fd,buffer,size,offset] = obj->state;
- 
-  io_uring_prep_write(sqe,
-           fd,buffer,size,*offset);
-  io_uring_sqe_set_data(sqe,(void *)&obj->op_state);
-
- return true;
-};
-
-#include <iostream>
-bool buffio::ReadvFileAwaiter::action(std::pair<void*,void*> info){
-
-  auto[p_sqe,p_self] = info;
-  buffio::ReadvFileAwaiter *obj = 
-       static_cast<buffio::ReadvFileAwaiter *>(p_self);
-
-  int fd = obj->fd;
-  auto[buffer,size] = obj->state.get();
-  size_t offset = *(obj->offset);
-  struct io_uring_sqe *sqe = 
-      static_cast<struct io_uring_sqe *>(p_sqe);
-  
-  io_uring_prep_readv(sqe,fd,buffer,1,offset);
-  io_uring_sqe_set_data(sqe,(void *)&obj->op_state);
-
+   
   return true;
 };
 
 
-bool buffio::WritevFileAwaiter::action(std::pair<void*,void*> info){
+bool buffio::AwaitableFileBase::action(std::pair<void*,void*> info){
 
-  auto[p_sqe,p_self] = info;
-  buffio::WritevFileAwaiter *obj =
-       static_cast<buffio::WritevFileAwaiter *>(p_self);
+ auto[p_sqe,p_self] = info;
+ buffio::AwaitableFileBase *obj =
+               static_cast<buffio::AwaitableFileBase *>(p_self);
 
+ struct io_uring_sqe *sqe = 
+       static_cast<struct io_uring_sqe *>(p_sqe);
+ 
+  auto[fd,buffer,size,offset] = obj->state;
 
-  int fd = obj->fd;
-  auto[buffer,size] = obj->state.get();
-  size_t offset = *(obj->offset);
-  struct io_uring_sqe *sqe = 
-    static_cast<struct io_uring_sqe *>(p_sqe);
+  uint8_t op = 0;
+  uint64_t buffer64 = reinterpret_cast<uint64_t>(buffer);
+  uint32_t len = static_cast<uint32_t>(size);
+
+  switch(obj->op_state.op_code){
+    case OpCode::Read: 
+      op = IORING_OP_READ;
+    break;
+    case OpCode::Write: 
+      op = IORING_OP_WRITE;
+    break;
+    case OpCode::Readv:
+      op = IORING_OP_READV;
+    break;
+    case OpCode::Writev:
+      op = IORING_OP_WRITEV;
+    break;
+    default: 
+      return false;
+    break;
+  };
+ 
   
-  io_uring_prep_writev(sqe,fd,buffer,size,offset);
-  io_uring_sqe_set_data(sqe,(void *)&obj->op_state);
+  io_uring_initialize_sqe(sqe);
 
-return true;
+  sqe->opcode = op;  
+  sqe->fd = fd;
+  sqe->addr = buffer64;
+
+  sqe->off = *offset;
+  sqe->len = static_cast<uint32_t>(size);
+  sqe->user_data = reinterpret_cast<uint64_t>(&obj->op_state);
+
+
+  return true;
 };
 
-#else
+#elif defined(BUFFIO_BACKEND_EPOLL)
 
 /* BELOW CODE FOR NON-IO URING */
 
 bool buffio::OpenFileAwaiter::action(std::pair<void*,void*> info){
-
-  
   auto[p_sqe,p_self] = info;
   buffio::OpenFileAwaiter *obj =
            static_cast<buffio::OpenFileAwaiter *>(p_self);
@@ -144,69 +114,29 @@ bool buffio::OpenFileAwaiter::action(std::pair<void*,void*> info){
   return true;
 };
 
-bool buffio::ReadFileAwaiter::action(std::pair<void *,void*> info){
+bool buffio::AwaitableFileBase::action(std::pair<void*,void*> info){
 
  auto[p_sqe,p_self] = info;
- buffio::ReadFileAwaiter *obj =
-               static_cast<buffio::ReadFileAwaiter *>(p_self);
+ buffio::AwaitableFileBase *obj =
+               static_cast<buffio::AwaitableFileBase *>(p_self);
 
  auto[fd,buffer,size,offset] = obj->state;
+ ssize_t rval = 0;
 
- ssize_t rval = read(fd,buffer,size);
- obj->op_state.op_done = rval;
- obj->op_state.data = static_cast<void *>(&obj->op_state);
-
- return true;
-};
-
-
-bool buffio::WriteFileAwaiter::action(std::pair<void*,void*> info){
-
-  auto[p_sqe,p_self] = info;
-  buffio::WriteFileAwaiter *obj =
-               static_cast<buffio::WriteFileAwaiter *>(p_self);
-
-  auto[fd,buffer,size,offset] = obj->state;
-  ssize_t rval = write(fd,buffer,size);
+ switch(obj->op_state.op_code){
+  case OpCode::Read:  rval = pread(fd,buffer,size,*offset); break;
+  case OpCode::Write: rval = pwrite(fd,buffer,size,*offset); break;
+  case OpCode::Readv: rval = preadv(fd,(struct iovec*)buffer,size,*offset); break;
+  case OpCode::Writev: rval = pwritev(fd,(struct iovec*)buffer,size,*offset); break;
+  default: rval = -1; break;
+ };
 
   obj->op_state.op_done = rval;
-  obj->op_state.data = static_cast<void *>(&obj->op_state);
-
-
- return true;
-};
-
-bool buffio::ReadvFileAwaiter::action(std::pair<void *,void *> info){
-
-  auto[p_sqe,p_self] = info;
-  buffio::ReadvFileAwaiter *obj =
-               static_cast<buffio::ReadvFileAwaiter *>(p_self);
-
-  auto[buffer,size] = obj->state.get();
-  ssize_t rval = readv(obj->fd,buffer,size);
-
-
-  obj->op_state.op_done = rval;
-  obj->op_state.data = static_cast<void *>(&obj->op_state);
-
   return true;
 };
 
-bool buffio::WritevFileAwaiter::action(std::pair<void*,void*> info){
- 
- auto[p_sqe,p_self] = info;
- buffio::WritevFileAwaiter *obj =
-             static_cast<buffio::WritevFileAwaiter *>(p_self);
-
- auto[buffer,size] = obj->state.get();
- ssize_t rval = writev(obj->fd,buffer,size);
-
- obj->op_state.op_done = rval;
- obj->op_state.data = static_cast<void*>(&obj->op_state);
-
- return true;
-};
-
-#endif
+#else
+ #error file src/backend/fs/linuc.cpp cannot see BACKEND macro defination
+#endif 
 
 

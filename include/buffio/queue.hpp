@@ -115,15 +115,17 @@ public:
 
    QueueT dtmp = data[head];
    sp_head->state.head = head + 1;
-   
+  
+   assert(count_ != 0);
+
    count_ -= 1;
    return dtmp;
   };
   
   bool empty() const { return (count_ <= 0); };
-  ssize_t count() const { return count_; };
+  size_t count() const { return count_; };
 private:
-  ssize_t count_ = 0;
+  size_t count_ = 0;
   queue_internal *sp_tail = nullptr; // enqueue from tail entry
   queue_internal *sp_head = nullptr; // dequeue from head entry
   buffio::memory::pool<queue_internal, 1> allocator;

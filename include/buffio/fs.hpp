@@ -32,28 +32,33 @@ public:
     return OpenFileAwaiter{(char *)path.c_str(), flags, mode, (void *)this};
   };
 
-  inline ReadFileAwaiter Read(char *buffer, uint32_t size) const {
+  inline ReadFileAwaiter Read(char *buffer, size_t size) const {
     return ReadFileAwaiter{{this->fd, buffer, size, (size_t *)&loffset}};
   };
 
-  inline WriteFileAwaiter Write(char *buffer, uint32_t size) const {
+  inline WriteFileAwaiter Write(char *buffer, size_t size) const {
     return WriteFileAwaiter{{this->fd, buffer, size, (size_t *)&woffset}};
   };
 
+  
   inline ReadvFileAwaiter Readv(BuffervState &iovec) const {
-    return ReadvFileAwaiter{this->fd, iovec, (size_t *)&loffset};
+    auto [buffer,size] = iovec.get();
+    return ReadvFileAwaiter{{this->fd,(char*)buffer,size, (uint64_t *)&loffset}};
   };
 
+  
   inline WritevFileAwaiter Writev(BuffervState &iovec) const {
-    return WritevFileAwaiter{this->fd, iovec, (size_t *)&woffset};
+   auto [buffer,size] = iovec.get();
+   return WritevFileAwaiter{this->fd,(char*)buffer,size, (uint64_t *)&woffset};
   };
+  
 
   friend struct OpenFileAwaiter;
 
 private:
   buffio_fd fd = BUFFIO_FD_INVALID;
-  size_t loffset = 0;
-  size_t woffset = 0;
+  uint64_t loffset = 0;
+  uint64_t woffset = 0;
   int flags = 0;
 };
 

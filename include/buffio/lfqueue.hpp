@@ -142,15 +142,18 @@ public:
     size_t idx = lfCore::lfdequeue(&freeQueue, queueOrder);
     if (idx == BUFFIO_EMPTY)
       return false;
+
     if constexpr (lfmode == buffio::lfMemMode::dynamic) {
       static_cast<T*>(data)[idx] = data_;
     }
+
     if constexpr (lfmode == buffio::lfMemMode::stack) {
       data[idx] = data_;
     }
 
     lfCore::lfenqueue(&acQueue, queueOrder, idx);
-
+    
+    entry_count.fetch_add(1,std::memory_order_acq_rel);
     elock.post();
     return true;
   };
@@ -176,10 +179,12 @@ public:
       tmp = data[idx];
     }
     lfCore::lfenqueue(&freeQueue, queueOrder, idx);
-
+    entry_count.fetch_add(1,std::memory_order_acq_rel);
     dlock.post();
     return tmp;
-  }
+  };
+   
+   size_t count() const { return entry_count.load(std::memory_order_acquire); };
 
 private:
   struct empty {};
@@ -195,6 +200,7 @@ private:
   dataType data;
   qStorage fqQueue;
   qStorage aqQueue;
+  buffioatomix entry_count;
   size_t queueOrder;
   buffio::semaphore elock;
   buffio::semaphore dlock;
