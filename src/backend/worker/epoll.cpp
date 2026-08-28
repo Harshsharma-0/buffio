@@ -1,70 +1,58 @@
 #include "buffio/worker.hpp"
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
-#include <unistd.h>
 #include <time.h>
+#include <unistd.h>
 
 static void buffioWorkerFunc(void *args);
 
 struct WorkerParameters {
   int event_fd;
-  std::atomic<int> *psleep_count;
-  std::atomic<int> *pactive_count;
   std::atomic<buffio::LoopStatusCode> *pcontrol;
   std::latch *psync;
   WorkQueue *pwork_queue;
   WorkQueue *pcompletion_queue;
-  SleepQueue *psleeping_queue;
-  buffio::semaphore lock_self;
+  WorkerSignal *plocked;
   buffio::thread thread;
 };
 
 static void buffioWorkerFunc(void *args) {
+  auto &state = *static_cast<WorkerParameters *>(args);
 
-  WorkerParameters state = *(WorkerParameters *)args;
-  buffio::semaphore *lock_self = &state.lock_self;
-
-  state.pactive_count->fetch_add(1);
   state.psync->count_down();
 
-  buffio::LoopStatusCode status_code =
-      state.pcontrol->load(std::memory_order_acquire);
+  for (;;) {
 
-  while (status_code != buffio::LoopStatusCode::abort){
+    state.plocked->wait();
 
-    std::optional<buffio::OpState *> op = state.pwork_queue->dequeue();
+    auto status = state.pcontrol->load(std::memory_order_acquire);
+
+    if (status == buffio::LoopStatusCode::abort)
+      break;
+
+    auto op = state.pwork_queue->dequeue();
 
     if (!op) {
-      state.psleep_count->fetch_add(1);
-      state.psleeping_queue->enqueue(lock_self);
-      lock_self->wait(); // wait for the semephore
-      state.psleep_count->fetch_add(-1);
-      status_code = state.pcontrol->load(std::memory_order_acquire);
+      // Broken queue/signal invariant.
       continue;
-    };
-
-    buffio::OpState *action = *op;
-    action->action({nullptr, action->data});
-
-    while (!state.pcompletion_queue->enqueue(action)){
-      state.psleep_count->fetch_add(1);
-      state.psleeping_queue->enqueue(lock_self);
-      lock_self->wait(); // wait for the semephore
-      state.psleep_count->fetch_add(-1);
-    };
-
-    /* insert code to signal back that work is done, or notify the main loop */
-    status_code = state.pcontrol->load(std::memory_order_acquire);
-
-    if (status_code == buffio::LoopStatusCode::inactive) {
-      uint64_t evnt_op = (uint64_t)buffio::LoopStatusCode::event_wake;
-      write(state.event_fd, (char *)&evnt_op, sizeof(uint64_t));
     }
 
-  }; 
+    auto *action = *op;
 
-  state.pactive_count->fetch_add(-1);
-  return;
+    action->action({nullptr, action->data});
+    state.pcompletion_queue->enqueue(action);
+
+    status = state.pcontrol->load(std::memory_order_acquire);
+
+    if (status == buffio::LoopStatusCode::inactive) {
+      uint64_t event =
+          static_cast<uint64_t>(buffio::LoopStatusCode::event_wake);
+
+      ssize_t ret = write(state.event_fd, &event, sizeof(event));
+
+      (void)ret;
+    }
+  }
 };
 
 buffio::Worker::~Worker() {
@@ -79,22 +67,18 @@ buffio::Worker::~Worker() {
   delete[] static_cast<WorkerParameters *>(state.workers);
 };
 
-int buffio::Worker::init(int numWorker) {
-  return this->init(numWorker, (1U << BUFFIO_WORKER_QUEUE_ORDER));
-};
-
 int buffio::Worker::init_task_queues(unsigned int order) {
   /* initlising the sleeping Queue */
+  std::cout<<"order "<<order<<std::endl;
   if (!state.task_queue.init())
     return -1;
   if (!state.io.pending_queue.init())
     return -2;
   if (state.io.submit_queue.lfstart(order) != 0)
     return -3;
-  if (state.io.completed.lfstart(order) != 0)
+  if (state.io.completed.lfstart(order) != 0) {
     return -4;
-  if (state.event.sleeping_queue.lfstart(BUFFIO_SLEEP_QUEUE_ORDER) != 0)
-    return -5;
+  }
 
   return 0;
 };
@@ -114,26 +98,14 @@ int buffio::Worker::init_worker_threads(int num) {
   std::latch sync{num};
   int nWorker = num;
 
-  wparam = {
-      state.event.event_fd,
-      &state.sleep_count,
-      &state.active_count,
-      &state.control,
-      &sync,
-      &state.io.submit_queue,
-      &state.io.completed,
-      &state.event.sleeping_queue,
-  };
+  wparam = {state.event.event_fd,   &state.control,      &sync,
+            &state.io.submit_queue, &state.io.completed, &state.locked};
 
   for (int i = 0; i < num; i++) {
     winfo[i] = wparam;
+    if (winfo[i].thread.run(buffioWorkerFunc, (void *)(winfo + i)) != 0)
+      break;
 
-    if (winfo[i].lock_self.create(0) < 0)
-      break;
-    if (winfo[i].thread.run(buffioWorkerFunc, (void *)(winfo + i)) != 0) {
-      winfo[i].lock_self.destroy();
-      break;
-    }
     nWorker -= 1;
   };
 
@@ -159,6 +131,10 @@ int buffio::Worker::init_worker_threads(int num) {
   return 0;
 };
 
+int buffio::Worker::init(int numWorker) {
+  return this->init(numWorker, (1U << BUFFIO_WORKER_QUEUE_ORDER));
+};
+
 int buffio::Worker::init(int numWorker, unsigned int queueSize) {
 
   /* evaluating the maximum worker thread that can concurrently access the
@@ -166,7 +142,7 @@ int buffio::Worker::init(int numWorker, unsigned int queueSize) {
   auto [maxWorker, order] = buffio::utility::get_pow2(queueSize);
 
   /* checking it the maxWorker exceeds the maximun supported worker */
-  maxWorker = maxWorker > BUFFIO_MAX_WORKER ? maxWorker : BUFFIO_MAX_WORKER;
+  maxWorker = maxWorker < BUFFIO_MAX_WORKER ? maxWorker : BUFFIO_MAX_WORKER;
 
   /* checking numWorker for negative value */
   numWorker = numWorker <= 0 ? 4 : numWorker;
@@ -196,7 +172,7 @@ int buffio::Worker::init_poller(unsigned int order) {
   };
 
   struct epoll_event evnt;
-  evnt.events = EPOLLIN | EPOLLET;
+  evnt.events = EPOLLIN;
   evnt.data.fd = evntfd;
 
   if (epoll_ctl(epfd, EPOLL_CTL_ADD, evntfd, &evnt) < 0) {
@@ -218,9 +194,10 @@ int buffio::Worker::run() {
     run_tasks(64);
     flush();
   };
-  
-  //TODO notify tasks in the task queue
-  abort_loop();
+
+  // TODO notify tasks in the task queue
+  //  abort_loop();
+
   return 0;
 };
 
@@ -236,13 +213,11 @@ int buffio::Worker::wait_event() {
   struct epoll_event events[1024];
 
   int timeout = state.task_queue.empty() && state.io.pending != 0 ? -1 : 0;
-
   if (timeout < 0)
     state.control.store(buffio::LoopStatusCode::inactive,
                         std::memory_order_release);
 
   int count = epoll_wait(epoll_fd, events, event_size, timeout);
-
   if (timeout < 0)
     state.control.store(buffio::LoopStatusCode::active,
                         std::memory_order_release);
@@ -253,9 +228,19 @@ int buffio::Worker::wait_event() {
   struct epoll_event *evnt = nullptr;
   for (int i = 0; i < count; i++) {
     evnt = (events + i);
+
     if (evnt->data.fd == event_fd) {
+      std::cout<<"[received event on event fd] "<<std::endl;
+      uint64_t value;
+
+      while (read(event_fd, &value, sizeof(value)) == sizeof(value)) {
+        // Drain/coalesce notifications.
+      }
+
       flush_io_completed(64);
-    };
+
+      continue;
+    }
 
     buffio::OpState *op = static_cast<buffio::OpState *>(evnt->data.ptr);
 
@@ -265,47 +250,25 @@ int buffio::Worker::wait_event() {
   return 0;
 };
 
-void buffio::Worker::wakeup_sleeping_workers() {
-
-  int sleeping = state.sleep_count.load(std::memory_order_acquire);
-  size_t count = state.io.submit_queue.count();
-
-  assert(sleeping >= 0);
-
-  if (sleeping == 0)
-    return;
-  if (count == 0)
-    return;
-
-  size_t nwake =
-      count >= (size_t)sleeping ? sleeping : ((size_t)sleeping - count);
-
-  while (nwake--) {
-    std::optional<buffio::semaphore *> sem =
-        state.event.sleeping_queue.dequeue();
-    if (!sem)
-      break;
-    (*sem)->post();
-  };
-
-  return;
-};
+void buffio::Worker::wakeup_sleeping_workers() { return; };
 
 int buffio::Worker::run_tasks(unsigned int budget) {
   while (budget--) {
     std::optional<buffio::CoroutineHandle> task = state.task_queue.dequeue();
-    if (!task)
+   
+    if (!task){
       break;
+    }
+    
     task->resume();
   };
   return 0;
 };
 
 bool buffio::Worker::flush() {
-
-  flush_io_requests(64);
+  flush_io_requests(100);
   wakeup_sleeping_workers();
-  flush_io_completed(64);
+  flush_io_completed(100);
   flush_timers();
   return true;
 };
@@ -313,12 +276,13 @@ bool buffio::Worker::flush() {
 int buffio::Worker::flush_io_completed(unsigned int budget) {
 
   while (budget--) {
-
+  
     std::optional<buffio::OpState *> workd = state.io.completed.dequeue();
     if (!workd)
       break;
 
-    if (!state.task_queue.enqueue((*workd)->task)) {
+    buffio::CoroutineHandle handle = (*workd)->task;
+    if (!state.task_queue.enqueue(handle)) {
       return -1;
     }
 
@@ -331,88 +295,68 @@ int buffio::Worker::flush_io_requests(unsigned int budget) {
 
   int pending = 0;
   while (budget--) {
+
     std::optional<buffio::OpState *> workd = state.io.pending_queue.dequeue();
     if (!workd)
       break;
 
     if (!state.io.submit_queue.enqueue(*workd)) {
       state.io.pending_queue.enqueue(*workd);
-      return 0;
+      break;
     };
     pending += 1;
   };
+
   state.io.pending += pending;
+  state.locked.post(pending);
+  if(pending > 0)
+  std::cout<<"[total posted] "<<pending<<std::endl;
   return 0;
 };
 
 bool buffio::Worker::push(buffio::OpState &vec) {
-  state.io.pending_queue.enqueue(&vec);
+  if(!state.io.pending_queue.enqueue(&vec)){
+    return false;
+  };
   return true;
 };
 
-static void sleep_ms(unsigned long int ms){
+static void sleep_ms(unsigned long int ms) {
 
   struct timespec ts;
   struct timespec rem;
   ts.tv_sec = ms / 1000;
   ts.tv_nsec = (ms % 1000) * 1000000L;
 
-  if(nanosleep(&ts,&rem) < 0){
-    if(errno == EINTR)
-       nanosleep(&rem,&ts);
+  if (nanosleep(&ts, &rem) < 0) {
+    if (errno == EINTR)
+      nanosleep(&rem, &ts);
   };
-
 };
 
-static void notify_abort_task(WorkQueue &queue,auto &task_queue){
+static void notify_abort_task(WorkQueue &queue, auto &task_queue) {
   /* we will flush the completion queue first and notify tasks of abort */
-  do{
+  do {
 
-   std::optional<buffio::OpState*> entry = queue.dequeue();
-   if(!entry) break;
+    std::optional<buffio::OpState *> entry = queue.dequeue();
+    if (!entry)
+      break;
 
-   (*entry)->op_done = 0; // present error abort;
-   (*entry)->task.resume();                        
+    (*entry)->op_done = 0; // present error abort;
+    (*entry)->task.resume();
 
-  }while(!queue.empty());
-
+  } while (!queue.empty());
 };
 
-static void notify_workers_and_wait_abort(buffio::WorkerState &state){
+static void notify_workers_and_wait_abort(buffio::WorkerState &state) {
 
-  /* getting number of active worker doing works */
-  int worker_active = state.active_count.load(std::memory_order_acquire);
-
-  /* getting number of sleeping(inactive) workers doring works */
-  int sleep_count = state.sleep_count.load(std::memory_order_acquire);
- 
-  /* waking up the sleeping workers so they can abort */
-  while (sleep_count--) {
-    std::optional<buffio::semaphore *> sem =
-        state.event.sleeping_queue.dequeue();
-    if (!sem) break;
-    (*sem)->post(); // waking the workers asking for gracefull shutdown
-  };
-
- unsigned int tries = 100;
- 
- do{
-   if(state.active_count.load(std::memory_order_acquire) == 0) break;
-   sleep_ms(100);
- }while(tries--);
-
+  unsigned int tries = 100;
 };
 
-void buffio::Worker::abort_loop(){
+void buffio::Worker::abort_loop() {
 
   /* updating status to abort in contorl field of state */
-  state.control.store(buffio::LoopStatusCode::abort,
-      std::memory_order_release);
-
-  notify_abort_task(state.io.completed,state.task_queue);
-  notify_workers_and_wait_abort(state); 
-  notify_abort_task(state.io.completed,state.task_queue);
-
+  state.control.store(buffio::LoopStatusCode::abort, std::memory_order_release);
 };
 
 void buffio::Worker::flush_timers() {

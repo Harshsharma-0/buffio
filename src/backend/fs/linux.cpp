@@ -110,7 +110,6 @@ bool buffio::OpenFileAwaiter::action(std::pair<void*,void*> info){
 
   int fd = open(obj->path,obj->flags,(mode_t)obj->mode); 
   obj->op_state.op_done = fd;
-
   return true;
 };
 
@@ -130,7 +129,6 @@ bool buffio::AwaitableFileBase::action(std::pair<void*,void*> info){
   case OpCode::Writev: rval = pwritev(fd,(struct iovec*)buffer,size,*offset); break;
   default: rval = -1; break;
  };
-
   obj->op_state.op_done = rval;
   return true;
 };

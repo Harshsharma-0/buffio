@@ -11,6 +11,7 @@
 #include "buffio/lfcore.hpp"
 #include "buffio/macro.hpp"
 #include "buffio/thread.hpp"
+#include <iostream>
 #include <optional>
 #include <concepts>
 #include <utility>
@@ -90,7 +91,6 @@ public:
     if (data != nullptr) return 1;
     if(_order > buffioatomix_max_order || _order < BUFFIO_RING_MIN) return -1;
     
-
     size_t queueSize = 1 << _order;
     buffioatomix *acptr = nullptr;
 
@@ -179,7 +179,7 @@ public:
       tmp = data[idx];
     }
     lfCore::lfenqueue(&freeQueue, queueOrder, idx);
-    entry_count.fetch_add(1,std::memory_order_acq_rel);
+    entry_count.fetch_add(-1,std::memory_order_acq_rel);
     dlock.post();
     return tmp;
   };

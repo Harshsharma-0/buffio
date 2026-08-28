@@ -11,12 +11,66 @@
 #include "buffio/lfqueue.hpp"
 #include "buffio/queue.hpp"
 #include "buffio/thread.hpp"
-
+#include <linux/futex.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+#include <iostream>
 using WorkQueue = buffio::lfQueue<buffio::OpState *>;
 
-using SleepQueue =
-    buffio::lfQueue<buffio::semaphore *, buffio::lfMemMode::stack,
-                    BUFFIO_SLEEP_QUEUE_ORDER>;
+class WorkerSignal{
+  private:
+  std::atomic<uint32_t> work_count = 0;
+  std::atomic<uint32_t> sleeping_count = 0;
+  
+  static inline int futex_wait(std::atomic<uint32_t>* addr, uint32_t expected){
+   return syscall(SYS_futex,(uint32_t*)addr,FUTEX_WAIT_PRIVATE,expected,NULL,NULL,0);
+  };
+  static inline int futex_wake(std::atomic<uint32_t>* addr, uint32_t num_threads){
+    return syscall(SYS_futex,(uint32_t*)addr,FUTEX_WAKE_PRIVATE,num_threads);
+  };
+  public:
+
+  void post(uint32_t n){
+    work_count.fetch_add(n,std::memory_order_release);
+    uint32_t inactive = sleeping_count.load(std::memory_order_acquire);
+    int minWake = inactive > n ? n : inactive;
+    WorkerSignal::futex_wake(&work_count,(uint32_t)minWake);
+  };
+
+  void wait(){
+
+    for(;;){
+     uint32_t w_cnt = work_count.load(std::memory_order_acquire);
+
+     /* try acquiring a slot in the work */
+     while(w_cnt > 0){
+       if(work_count.compare_exchange_weak(
+                 w_cnt,w_cnt - 1,
+                 std::memory_order_acquire,
+                 std::memory_order_acquire)){
+         return;
+       }
+     };
+     
+     /* announce that we are going to be sleeping */
+     sleeping_count.fetch_add(1,std::memory_order_relaxed);
+     
+     // checking for work once more
+     w_cnt = work_count.load(std::memory_order_acquire);
+
+     
+     if(w_cnt != 0){
+         sleeping_count.fetch_sub(1,std::memory_order_relaxed);
+         continue;
+     };
+        
+       WorkerSignal::futex_wait(&work_count,0);
+        /* code to wait */
+       sleeping_count.fetch_sub(1,std::memory_order_relaxed);
+    };
+  };
+};
+
 #endif
 
 #if defined(BUFFIO_BACKEND_IOURING)
@@ -41,7 +95,6 @@ struct EventState {
 
   int epoll_fd = -1;
   int event_fd = -1;
-  SleepQueue sleeping_queue;
 
 #elif defined(BUFFIO_BACKEND_IOCP)
 
@@ -77,11 +130,13 @@ struct WorkerState {
 #if defined(BUFFIO_BACKEND_IOURING)
 
 #elif defined(BUFFIO_BACKEND_EPOLL)
+
   int worker_count = 0;
-  std::atomic<int> sleep_count = 0;
-  std::atomic<int> active_count = 0;
+  uint32_t pending_commit = 0;
   std::atomic<LoopStatusCode> control = LoopStatusCode::active;
+  WorkerSignal locked;
   void *workers = nullptr;
+
 #elif defined(BUFFIO_BACKEND_IOCP)
 
 #else

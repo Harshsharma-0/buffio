@@ -3,127 +3,180 @@
 #include "buffio/config.hpp"
 #include "buffio/core.hpp"
 #include "buffio/memory.hpp"
-#include <cstring>
-#include <optional>
 #include <cassert>
+#include <cstring>
 #include <iostream>
-
+#include <optional>
+#include <bitset>
 namespace buffio {
 
-template <typename QueueT>
-class Queue {
-  
-static constexpr unsigned int queue_internal_order = 6;
-static constexpr unsigned int queue_internal_max = (1 << 6);
-struct queue_internal{
-    struct{
-     struct queue_internal *next = nullptr;
-     unsigned int head  = 0;
-     unsigned int tail  = 0;
-    }state;
+template <typename QueueT> class Queue {
+
+  static constexpr unsigned int queue_internal_order = 6;
+  static constexpr unsigned int queue_internal_max = (1 << 6);
+  struct queue_internal {
+    struct {
+      struct queue_internal *next = nullptr;
+      unsigned int head = 0;
+      unsigned int tail = 0;
+    } state;
     QueueT data[queue_internal_max];
-};
-  
+  };
 
 public:
   BUFFIO_CLASS_PROTECT(Queue)
-  Queue(){};
-  
-  
-  bool init(){
-   
-   assert(sp_head == nullptr);
+  Queue() {};
 
-   sp_head = allocator();
-   sp_tail = sp_head;
-   return sp_head == nullptr ? false : true;
+  bool init() {
 
+    assert(sp_head == nullptr);
+
+    sp_head = allocator();
+    sp_tail = sp_head;
+    return sp_head == nullptr ? false : true;
   }
+  /*
+   bool enqueue(QueueT entry) {
+     assert(sp_head != nullptr);
+     QueueT *data = &sp_tail->data[0];
 
+
+
+     /* case : if difference positive then cycle not same.
+      * case : if negative tail is wraps around in cycle with head;
+      * case : if 0 queue is empty
+
+
+
+       if(sp_tail->state.tail == queue_internal_max){
+
+        struct queue_internal *tmp = nullptr;
+        if((tmp = allocator()) == nullptr) assert(false);
+
+        sp_tail->state.next = tmp;
+        sp_tail = tmp;
+
+        std::memset((void *)tmp,'\0',sizeof(struct queue_internal));
+
+        data = &sp_tail->data[0];
+       };
+
+     data[sp_tail->state.tail++] = entry;
+
+     count_ += 1;
+     return true;
+   };
+  */
   bool enqueue(QueueT entry) {
     assert(sp_head != nullptr);
-   
-    auto [next,head,tail] = sp_tail->state;
+
     QueueT *data = &sp_tail->data[0];
-
-    unsigned int cycle_tail = (tail >> queue_internal_order);
-    unsigned int cycle_head = (head >> queue_internal_order); 
-    int cycle = 
-        static_cast<int>(cycle_tail) - static_cast<int>(cycle_head);
-
-    head ^= (cycle_head << queue_internal_order);
-    tail ^= (cycle_tail << queue_internal_order);
-
-    /* case : if difference positive then cycle not same.
-     * case : if negative tail is wraps around in cycle with head;
-     * case : if 0 queue is empty
-     */
+    auto [next, head, tail] = sp_tail->state;
     
-    /* code handle full queue */
-     bool cycle_check = (cycle < 0 || cycle > 0);
+    unsigned int size = queue_internal_max - 1;
+    unsigned int cycle_tail = (tail | (size - 1));
+    unsigned int cycle_head = (head | (size - 1));
 
-      if(head == tail && cycle_check){
+    int cycle = static_cast<int>(cycle_tail) - static_cast<int>(cycle_head);
+
+    head &= size;
+    tail &= size;
 
 
-       struct queue_internal *tmp = nullptr;
-       if((tmp = allocator()) == nullptr) return false;
+    if (head == tail && cycle > 0) {
 
-       sp_tail->state.next = tmp;
-       sp_tail = tmp;
+      struct queue_internal *tmp = nullptr;
+      if ((tmp = allocator()) == nullptr) return false;
+      sp_tail->state.next = tmp;
+      sp_tail = tmp;
+      
+      tmp->state.head = 0;
+      tmp->state.tail = 0;
+      tmp->state.next = nullptr;
 
-       std::memset((void *)sp_tail,'\0',sizeof(struct queue_internal));
+      data = &sp_tail->data[0];
+      cycle_tail = tail = 0;
 
-       data = &sp_tail->data[0];
-       cycle_tail = tail = 0;
-      };
-   
-    data[tail] = entry;
-    sp_tail->state.tail = tail + 1;
+    };
+    auto *val = &entry;
+
+    data[tail++] = entry;
+
+    // incrementing the tail directly to preserve cycle
+    sp_tail->state.tail += 1;
     count_ += 1;
+
     return true;
   };
 
   std::optional<QueueT> dequeue() {
+    assert(sp_head != nullptr);
 
-    assert(sp_head != nullptr); 
-
-    auto [next,head,tail] = sp_head->state;
+    auto [next, head, tail] = sp_head->state;
     QueueT *data = &sp_head->data[0];
 
-    unsigned int cycle_tail = (tail >> queue_internal_order);
-    unsigned int cycle_head = (head >> queue_internal_order); 
-    int cycle = 
-      static_cast<int>(cycle_tail) - static_cast<int>(cycle_head);
+    unsigned int size = queue_internal_max - 1;
+    unsigned int cycle_tail = (tail | (size - 1));
+    unsigned int cycle_head = (head | (size - 1));
 
-    head ^= (cycle_head << queue_internal_order);
-    tail ^= (cycle_tail << queue_internal_order);
-
-  /* case : if difference positive then cycle not same.
-   * case : if negative tail is wraps around in cycle with head;
-   * case : if 0 queue is empty
-   */
-
-   if(tail == head && cycle == 0){
-     if(next == nullptr) return std::nullopt;
-     allocator[sp_head];
-
-     sp_head = next;
-     data = &sp_head->data[0];
-     head = sp_head->state.head;
-
-   };
-
-   QueueT dtmp = data[head];
-   sp_head->state.head = head + 1;
+    head &= size;
+    tail &= size;
   
-   assert(count_ != 0);
+    int cycle = static_cast<int>(cycle_tail) - static_cast<int>(cycle_head);
 
-   count_ -= 1;
-   return dtmp;
+
+    if (head == tail && cycle == 0) {
+      if (next == nullptr)
+         return std::nullopt;
+
+      allocator[sp_head];
+      sp_head = next;
+      data = &sp_head->data[0];
+      head = sp_head->state.head;
+
+    };
+
+    QueueT dtmp = data[head++];
+
+    // incrementing the head directly to preserve cycle
+    sp_head->state.head += 1;
+
+    assert(count_ != 0);
+    count_ -= 1;
+
+    return dtmp;
   };
-  
+  /*
+  std::optional<QueueT> dequeue() {
+
+    assert(sp_head != nullptr);
+    QueueT *data = &sp_head->data[0];
+
+     * case : if difference positive then cycle not same.
+     * case : if negative tail is wraps around in cycle with head;
+     * case : if 0 queue is empty
+
+
+    if (sp_head->state.tail == sp_head->state.head) {
+      if (sp_head->state.next == nullptr)
+        return std::nullopt;
+
+      auto tmp = sp_head;
+      sp_head = sp_head->state.next;
+      allocator[tmp];
+      data = &sp_head->data[0];
+    };
+
+    QueueT dtmp = data[sp_head->state.head++];
+
+    assert(count_ != 0);
+    count_ -= 1;
+    return dtmp;
+  };
+  */
   bool empty() const { return (count_ <= 0); };
   size_t count() const { return count_; };
+
 private:
   size_t count_ = 0;
   queue_internal *sp_tail = nullptr; // enqueue from tail entry

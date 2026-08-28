@@ -20,6 +20,7 @@ namespace buffio{
   
    int run(threadFuncSig start,void *args);
    int join();
+
   private:
    BUFFIO_OS_INSERT(pthread_t,pthread_t,HANDLE) handle;
    threadFuncSig routine;
