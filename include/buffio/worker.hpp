@@ -134,7 +134,10 @@ struct WorkerState {
   int worker_count = 0;
   uint32_t pending_commit = 0;
   std::atomic<LoopStatusCode> control = LoopStatusCode::active;
-  WorkerSignal locked;
+
+  WorkerSignal submit_lock;
+  WorkerSignal completion_lock;
+
   void *workers = nullptr;
 
 #elif defined(BUFFIO_BACKEND_IOCP)

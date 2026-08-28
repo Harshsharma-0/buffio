@@ -12,7 +12,8 @@ struct WorkerParameters {
   std::latch *psync;
   WorkQueue *pwork_queue;
   WorkQueue *pcompletion_queue;
-  WorkerSignal *plocked;
+  WorkerSignal *pwork_lock;
+  WorkerSignal *psubmit_lock;
   buffio::thread thread;
 };
 
@@ -23,7 +24,7 @@ static void buffioWorkerFunc(void *args) {
 
   for (;;) {
 
-    state.plocked->wait();
+    state.pwork_lock->wait();
 
     auto status = state.pcontrol->load(std::memory_order_acquire);
 
@@ -38,8 +39,9 @@ static void buffioWorkerFunc(void *args) {
     }
 
     auto *action = *op;
-
     action->action({nullptr, action->data});
+    
+    state.psubmit_lock->wait();
     state.pcompletion_queue->enqueue(action);
 
     status = state.pcontrol->load(std::memory_order_acquire);
@@ -53,6 +55,7 @@ static void buffioWorkerFunc(void *args) {
       (void)ret;
     }
   }
+  std::cout<<"exiting "<<std::endl;
 };
 
 buffio::Worker::~Worker() {
@@ -69,7 +72,8 @@ buffio::Worker::~Worker() {
 
 int buffio::Worker::init_task_queues(unsigned int order) {
   /* initlising the sleeping Queue */
-  std::cout<<"order "<<order<<std::endl;
+  
+
   if (!state.task_queue.init())
     return -1;
   if (!state.io.pending_queue.init())
@@ -99,8 +103,9 @@ int buffio::Worker::init_worker_threads(int num) {
   int nWorker = num;
 
   wparam = {state.event.event_fd,   &state.control,      &sync,
-            &state.io.submit_queue, &state.io.completed, &state.locked};
-
+            &state.io.submit_queue, &state.io.completed, &state.submit_lock ,
+            &state.completion_lock};
+   
   for (int i = 0; i < num; i++) {
     winfo[i] = wparam;
     if (winfo[i].thread.run(buffioWorkerFunc, (void *)(winfo + i)) != 0)
@@ -149,6 +154,8 @@ int buffio::Worker::init(int numWorker, unsigned int queueSize) {
 
   /* if numWorker exceed maxWorker set it to max worker */
   numWorker = numWorker > maxWorker ? maxWorker : numWorker;
+  state.completion_lock.post(maxWorker);
+  
   if (init_task_queues(order) != 0)
     return -1;
   if (init_poller(order) != 0)
@@ -195,8 +202,8 @@ int buffio::Worker::run() {
     flush();
   };
 
-  // TODO notify tasks in the task queue
-  //  abort_loop();
+   // TODO notify tasks in the task queue
+    abort_loop();
 
   return 0;
 };
@@ -216,7 +223,6 @@ int buffio::Worker::wait_event() {
   if (timeout < 0)
     state.control.store(buffio::LoopStatusCode::inactive,
                         std::memory_order_release);
-
   int count = epoll_wait(epoll_fd, events, event_size, timeout);
   if (timeout < 0)
     state.control.store(buffio::LoopStatusCode::active,
@@ -230,7 +236,6 @@ int buffio::Worker::wait_event() {
     evnt = (events + i);
 
     if (evnt->data.fd == event_fd) {
-      std::cout<<"[received event on event fd] "<<std::endl;
       uint64_t value;
 
       while (read(event_fd, &value, sizeof(value)) == sizeof(value)) {
@@ -275,19 +280,25 @@ bool buffio::Worker::flush() {
 
 int buffio::Worker::flush_io_completed(unsigned int budget) {
 
+  unsigned int n = 0;
   while (budget--) {
   
     std::optional<buffio::OpState *> workd = state.io.completed.dequeue();
     if (!workd)
       break;
-
+    
+    //todo check dor abort and set op error to abort
     buffio::CoroutineHandle handle = (*workd)->task;
+  
     if (!state.task_queue.enqueue(handle)) {
       return -1;
-    }
+    };
 
-    state.io.pending -= 1;
+    n += 1;
   };
+
+  state.io.pending -= n;
+  state.completion_lock.post(n);
   return 0;
 };
 
@@ -308,9 +319,8 @@ int buffio::Worker::flush_io_requests(unsigned int budget) {
   };
 
   state.io.pending += pending;
-  state.locked.post(pending);
-  if(pending > 0)
-  std::cout<<"[total posted] "<<pending<<std::endl;
+  state.submit_lock.post(pending);
+
   return 0;
 };
 
@@ -334,29 +344,24 @@ static void sleep_ms(unsigned long int ms) {
   };
 };
 
-static void notify_abort_task(WorkQueue &queue, auto &task_queue) {
-  /* we will flush the completion queue first and notify tasks of abort */
-  do {
-
-    std::optional<buffio::OpState *> entry = queue.dequeue();
-    if (!entry)
-      break;
-
-    (*entry)->op_done = 0; // present error abort;
-    (*entry)->task.resume();
-
-  } while (!queue.empty());
-};
-
-static void notify_workers_and_wait_abort(buffio::WorkerState &state) {
-
-  unsigned int tries = 100;
-};
-
 void buffio::Worker::abort_loop() {
 
   /* updating status to abort in contorl field of state */
   state.control.store(buffio::LoopStatusCode::abort, std::memory_order_release);
+  state.submit_lock.post(state.worker_count);
+
+  flush_io_completed(-1);
+
+  WorkerParameters *param = static_cast<WorkerParameters*>(state.workers);
+  int workern = state.worker_count;
+  
+  for(int i = 0; i < workern;i++)
+      param[i].thread.join();
+
+  flush_io_completed(-1);
+  flush_timers();
+  run_tasks(-1); // runnning tasks to notify tasks of the error
+
 };
 
 void buffio::Worker::flush_timers() {

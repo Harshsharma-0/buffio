@@ -28,7 +28,7 @@ buffio::task<size_t> helloWorld(int id) {
   iovec.MakeEntry(1,buffer,sizeof(buffer));
 
   auto res = co_await file.Readv(iovec);
-  std::cout<<"[total read] "<<id<<std::endl;
+  std::cout<<"[total read] "<<res<<std::endl;
 
   for(int i = 0 ; i < res ; i++){
      std::cout<<buffer[i];
@@ -46,12 +46,11 @@ int main() {
    // std::cout<<"[initlisation failed] "<<val<<std::endl;
   };
 
-  for(int i = 0; i < 100; i ++)
+  for(int i = 0; i < 1; i ++)
     helloWorld(i).schedule(instance);
 
   
  std::cout<<instance.run()<<std::endl; 
- 
   /*
   buffio::Worker worker;
   worker.init(4);
