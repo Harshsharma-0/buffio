@@ -11,6 +11,7 @@
 #include "buffio/lfcore.hpp"
 #include "buffio/macro.hpp"
 #include "buffio/thread.hpp"
+#include <iostream>
 #include <optional>
 #include <concepts>
 #include <utility>
@@ -73,13 +74,8 @@ public:
   };
 
   int lfstart(size_t _order) requires(lfmode == buffio::lfMemMode::stack){
-    constexpr size_t queueSize = buffio::lfSpec::getSize<orderT>();
-     if(elock.create(queueSize) < 0) return -1;
-     if(dlock.create(queueSize) < 0){
-      elock.destroy();
-      return -1;
-    }
-    return 0;
+     constexpr size_t queueSize = buffio::lfSpec::getSize<orderT>();
+      return 0;
   };
 
   int lfstart(size_t _order)
@@ -90,15 +86,9 @@ public:
     if (data != nullptr) return 1;
     if(_order > buffioatomix_max_order || _order < BUFFIO_RING_MIN) return -1;
     
-
     size_t queueSize = 1 << _order;
     buffioatomix *acptr = nullptr;
 
-    if(elock.create(queueSize) < 0) return -1;
-    if(dlock.create(queueSize) < 0){
-      elock.destroy();
-      return -1;
-    }
 
     if ((data = new (std::nothrow) T[queueSize]) == nullptr)
       return -1;
@@ -137,7 +127,6 @@ public:
   }
 
   bool enqueue(T data_) {
-    elock.wait();
 
     size_t idx = lfCore::lfdequeue(&freeQueue, queueOrder);
     if (idx == BUFFIO_EMPTY)
@@ -153,8 +142,7 @@ public:
 
     lfCore::lfenqueue(&acQueue, queueOrder, idx);
     
-    entry_count.fetch_add(1,std::memory_order_acq_rel);
-    elock.post();
+    entry_count.fetch_add(1,std::memory_order_release);
     return true;
   };
 
@@ -163,13 +151,11 @@ public:
   }
 
   std::optional<T> dequeue() {
-    dlock.wait();
     size_t idx = lfCore::lfdequeue(&acQueue, queueOrder);
     T tmp;
 
     if (idx == BUFFIO_EMPTY){
-      dlock.post();
-      return std::nullopt;
+         return std::nullopt;
     };
 
     if constexpr (lfmode == buffio::lfMemMode::dynamic) {
@@ -179,8 +165,7 @@ public:
       tmp = data[idx];
     }
     lfCore::lfenqueue(&freeQueue, queueOrder, idx);
-    entry_count.fetch_add(1,std::memory_order_acq_rel);
-    dlock.post();
+    entry_count.fetch_add(-1,std::memory_order_release);
     return tmp;
   };
    
@@ -202,8 +187,6 @@ private:
   qStorage aqQueue;
   buffioatomix entry_count;
   size_t queueOrder;
-  buffio::semaphore elock;
-  buffio::semaphore dlock;
   struct queueconf acQueue;
   struct queueconf freeQueue;
 };

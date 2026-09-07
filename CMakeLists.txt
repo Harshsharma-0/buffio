@@ -44,47 +44,50 @@ check_cxx_symbol_exists(__linux__ "" HAVE_LINUX_MACRO)
 check_cxx_symbol_exists(_MSC_VER "" HAVE_MSC_VER)
 check_cxx_symbol_exists(_WIN32 "" HAVE_WIN)
 
-if(HAVE_LINUX_MACRO)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 
-  option(BUFFIO_OS_LINUX "platfrom is set to linux" ON)
+    option(BUFFIO_OS_LINUX "Platform is Linux" ON)
 
-  if(BUFFIO_WORKER_IOURING)
+    if(BUFFIO_WORKER_IOURING)
+        set(BUFFIO_BACKEND_NAME "worker/iouring.hpp")
+        set(BUFFIO_BACKEND_SRC
+            "src/backend/worker/iouring.cpp"
+            "src/backend/fs/linux.cpp"
+            "src/backend/core/linux.cpp"
+        )
 
-    set(BUFFIO_BACKEND_NAME "worker/iouring.hpp")
-    set(BACKEND_SRC "src/backend/worker/iouring.cpp")
-    set(BUFFIO_LINK_LIBRARY pthread uring)
+        set(BUFFIO_LINK_LIBRARY pthread uring)
 
-  else()
-    set(BUFFIO_BACKEND_NAME "worker/epoll.hpp")
-    set(BACKEND_SRC "src/backend/worker/epoll.cpp")
-    set(BUFFIO_LINK_LIBRARY pthread)
+    else()
+        set(BUFFIO_BACKEND_NAME "worker/epoll.hpp")
+        set(BUFFIO_BACKEND_SRC
+            "src/backend/worker/epoll.cpp"
+            "src/backend/fs/linux.cpp"
+            "src/backend/core/linux.cpp"
+        )
 
-  endif()
+        set(BUFFIO_LINK_LIBRARY pthread)
+    endif()
 
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows" OR CMAKE_SYSTEM_NAME STREQUAL "MSYS")
 
-   set(BUFFIO_BACKEND_SRC
-      ${BACKEND_SRC}
-      "src/backend/fs/linux.cpp"
-      "src/backend/core/linux.cpp"
+    option(BUFFIO_OS_WINDOWS "Platform is Windows" ON)
+
+    set(BUFFIO_BACKEND_NAME "worker/iocp.hpp")
+    set(BUFFIO_OS_WIN 1)
+    set(BUFFIO_BACKEND_SRC
+        "src/backend/worker/iocp.cpp"
+        "src/backend/fs/windows.cpp"
+        "src/backend/core/windows.cpp"
     )
 
-elseif(HAVE_MSC_VER || HAVE_WIN)
-
-  option(BUFFIO_OS_WINDOWS "platfrom is set to linux" ON)
-  set(BUFFIO_LINK_LIBRARY )
-
-  set(BUFFIO_BACKEND_NAME "worker/iocp.hpp")
-  set(BUFFIO_BACKEND_SRC 
-      "src/backend/worker/iocp.cpp"
-      "src/backend/fs/windows.cpp"
-      "src/backend/core/windows.cpp"
-      )
-
-
 else()
-  message(FATAL_ERROR "UNSUPPORTED PLATFORM , supported platform are [linux]")
-endif()
 
+    message(FATAL_ERROR
+        "UNSUPPORTED PLATFORM: ${CMAKE_SYSTEM_NAME}"
+    )
+
+endif()
 
   configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/include/config/config.hpp.in

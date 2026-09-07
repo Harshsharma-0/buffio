@@ -1,3 +1,4 @@
+#include "buffio/config.hpp"
 #include "buffio/thread.hpp"
 
 #define BUFFIO_THREAD_RETURN BUFFIO_OS_INSERT(void *, void *, DWORD WINAPI)
@@ -33,9 +34,9 @@ int buffio::thread::run(buffio::threadFuncSig start, void *args) {
 
   pthread_attr_destroy(&attribute);
 
-#elif defined(BUFFIO_OS_WINDOW)
+#elif defined(BUFFIO_OS_WINDOWS)
   LPVOID pArgs = static_cast<LPVOID>(this);
-  HANDLE threadHandle = createThread(NULL, stackSize, buffioWorkerFunc, pArgs,
+  HANDLE threadHandle = CreateThread(NULL, stackSize, threadMainRoutine, pArgs,
                                      STACK_SIZE_PARAM_IS_A_RESERVATION, NULL);
 
   if (threadHandle != NULL) {
