@@ -38,7 +38,7 @@ namespace buffio{
 
       BUFFIO_WIN_INSERT( 
        LONG lmaxCount = static_cast<LONG>(initialValue);
-       HANDLE semHandle = createSemaphoreA(NULL,lmaxCount,lmaxCount,NULL);
+       HANDLE semHandle = CreateSemaphoreA(NULL,lmaxCount,lmaxCount,NULL);
        lsem = semHandle;
        if(semHandle != NULL) return 0;
      )
@@ -48,19 +48,25 @@ namespace buffio{
 
     };
     int post(){
-     BUFFIO_LIN_INSERT(sem_post(&lsem);)
-     BUFFIO_WIN_INSERT(ReleaseSemaphore(lsem,1));
+     BUFFIO_LIN_INSERT(sem_post(&lsem));
+     BUFFIO_WIN_INSERT(
+      LONG val = 0;
+      ReleaseSemaphore(lsem,1,&val);
+    )
      return 0;
     };
 
     int wait(){
      BUFFIO_LIN_INSERT(sem_wait(&lsem);)
-     BUFFIO_WIN_INSERT(waitForSingleObject(lsem,-1));
+     BUFFIO_WIN_INSERT(
+      LONG val = 0;
+      WaitForSingleObject(lsem,-1);
+    )
      return 0;
     };
     void destroy(){
       BUFFIO_LIN_INSERT(sem_destroy(&lsem);)
-      BUFFIO_WIN_INSERT(closeHandle(lsem);)
+      BUFFIO_WIN_INSERT(CloseHandle(lsem);)
     }; 
   private:
     BUFFIO_OS_INSERT(sem_t,sem_t,HANDLE) lsem;

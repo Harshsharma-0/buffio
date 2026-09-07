@@ -22,8 +22,8 @@ struct AwaitableFileBase{
    size_t size;
    uint64_t *offset;
   }state;
-
-  BUFFIO_OS_INSERT(OpState op_state, OpState op_state, OVERLAPPED op_state);
+  OpState op_state;
+  //BUFFIO_OS_INSERT(OpState op_state, OpState op_state, OVERLAPPED op_state);
 };
 
 struct OpenFileAwaiter {
@@ -41,8 +41,8 @@ struct OpenFileAwaiter {
   int flags;
   int mode;
   void *rval;
-
-  BUFFIO_OS_INSERT(OpState op_state, OpState op_state, OVERLAPPED op_state);
+  OpState op_state;
+  //BUFFIO_OS_INSERT(OpState op_state, OpState op_state, OVERLAPPED op_state);
 };
 
 
@@ -97,8 +97,8 @@ struct FsMkDirAwaitable {
 
   char *path;
   bool async;
-
-  BUFFIO_OS_INSERT(OpState op_state, OpState op_state, OVERLAPPED op_state);
+  OpState op_state;
+  //BUFFIO_OS_INSERT(OpState op_state, OpState op_state, OVERLAPPED op_state);
 };
 
 
