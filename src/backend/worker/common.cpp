@@ -212,6 +212,33 @@ int buffio::Worker::init(int numWorker) {
   return this->init(numWorker, (1U << BUFFIO_WORKER_QUEUE_ORDER));
 };
 
+int buffio::Worker::init(int numWorker, unsigned int queueSize) {
+
+  /* evaluating the maximum worker thread that can concurrently access the
+   * queue*/
+  auto [maxWorker, order] = buffio::utility::get_pow2(queueSize);
+
+  /* checking it the maxWorker exceeds the maximun supported worker */
+  maxWorker = maxWorker < BUFFIO_MAX_WORKER ? maxWorker : BUFFIO_MAX_WORKER;
+
+  /* checking numWorker for negative value */
+  numWorker = numWorker <= 0 ? 4 : numWorker;
+
+  /* if numWorker exceed maxWorker set it to max worker */
+  numWorker = numWorker > maxWorker ? maxWorker : numWorker;
+  state.completion_lock.post(maxWorker);
+  
+  if (init_task_queues(order) != 0)
+    return -1;
+  /* on windows initlize the IOCP*/
+  if (init_poller(order) != 0)
+    return -2;
+  if (init_worker_threads(numWorker) != 0)
+    return -3;
+
+  return 0;
+};
+
 void buffio::Worker::flush_timers() {
 
 };
