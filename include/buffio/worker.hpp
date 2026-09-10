@@ -3,79 +3,31 @@
 
 #include "buffio/config.hpp"
 #include "buffio/queue.hpp"
+#include "buffio/lfqueue.hpp"
+#include "buffio/thread.hpp"
+
 #include <atomic>
 #include <cstring>
-#include <latch>
+
+#include <version>
 
 #if defined(BUFFIO_BACKEND_EPOLL)
-#include "buffio/lfqueue.hpp"
-#include "buffio/queue.hpp"
-#include "buffio/thread.hpp"
 #include <linux/futex.h>
 #include <sys/syscall.h>
 #include <unistd.h>
-#include <iostream>
+
+#elif defined(BUFFIO_BACKEND_IOURING)
+#include<liburing.h>
+
+#elif defined(BUFFIO_BACKEND_IOCP)
+#include <synchapi.h>
+
+#else 
+  #error include/buffio/worker.hpp: macro error
+#endif
+
+
 using WorkQueue = buffio::lfQueue<buffio::OpState *>;
-
-class WorkerSignal{
-  private:
-  std::atomic<uint32_t> work_count = 0;
-  std::atomic<uint32_t> sleeping_count = 0;
-  
-  static inline int futex_wait(std::atomic<uint32_t>* addr, uint32_t expected){
-   return syscall(SYS_futex,(uint32_t*)addr,FUTEX_WAIT_PRIVATE,expected,NULL,NULL,0);
-  };
-  static inline int futex_wake(std::atomic<uint32_t>* addr, uint32_t num_threads){
-    return syscall(SYS_futex,(uint32_t*)addr,FUTEX_WAKE_PRIVATE,num_threads);
-  };
-  public:
-
-  void post(uint32_t n){
-    work_count.fetch_add(n,std::memory_order_release);
-    uint32_t inactive = sleeping_count.load(std::memory_order_acquire);
-    int minWake = inactive > n ? n : inactive;
-    WorkerSignal::futex_wake(&work_count,(uint32_t)minWake);
-  };
-
-  void wait(){
-
-    for(;;){
-     uint32_t w_cnt = work_count.load(std::memory_order_acquire);
-
-     /* try acquiring a slot in the work */
-     while(w_cnt > 0){
-       if(work_count.compare_exchange_weak(
-                 w_cnt,w_cnt - 1,
-                 std::memory_order_acquire,
-                 std::memory_order_acquire)){
-         return;
-       }
-     };
-     
-     /* announce that we are going to be sleeping */
-     sleeping_count.fetch_add(1,std::memory_order_relaxed);
-     
-     // checking for work once more
-     w_cnt = work_count.load(std::memory_order_acquire);
-
-     
-     if(w_cnt != 0){
-         sleeping_count.fetch_sub(1,std::memory_order_relaxed);
-         continue;
-     };
-        
-       WorkerSignal::futex_wait(&work_count,0);
-        /* code to wait */
-       sleeping_count.fetch_sub(1,std::memory_order_relaxed);
-    };
-  };
-};
-
-#endif
-
-#if defined(BUFFIO_BACKEND_IOURING)
- #include <liburing.h>
-#endif
 
 namespace buffio {
 
@@ -88,15 +40,27 @@ enum class LoopStatusCode : uint32_t {
 };
 
 
+struct WorkerArgs{
+  buffio_fd event_fd;
+  std::atomic<buffio::LoopStatusCode> *pcontrol;
+  buffio::Latch *psync;
+  WorkQueue *pwork_queue;
+  WorkQueue *pcompletion_queue;
+  WorkerSignal *pwork_lock;
+  WorkerSignal *psubmit_lock;  
+};
+
+struct WorkerThreadState {
+  WorkerArgs args;
+  buffio::thread thread;
+};
+
 struct EventState {
 #if defined(BUFFIO_BACKEND_IOURING)
 
-#elif defined(BUFFIO_BACKEND_EPOLL)
-
-  int epoll_fd = -1;
-  int event_fd = -1;
-
-#elif defined(BUFFIO_BACKEND_IOCP)
+#elif defined(BUFFIO_BACKEND_EPOLL) || defined(BUFFIO_BACKEND_IOCP)
+  buffio_fd evfd = BUFFIO_FD_INVALID;
+  buffio_fd sigfd = BUFFIO_FD_INVALID; 
 
 #else
 #error Unsupported backend
@@ -111,14 +75,12 @@ struct IoState {
   unsigned int ring_size = -1;
   size_t pending = 0;
 
-#elif defined(BUFFIO_BACKEND_EPOLL)
+#elif defined(BUFFIO_BACKEND_EPOLL) || defined(BUFFIO_BACKEND_IOCP)
 
   size_t pending = 0;
   WorkQueue completed;
   WorkQueue submit_queue;
   buffio::Queue<buffio::OpState *> pending_queue;
-
-#elif defined(BUFFIO_BACKEND_IOCP)
 
 #else
 #error Unsupported backend
@@ -129,7 +91,7 @@ struct WorkerState {
 
 #if defined(BUFFIO_BACKEND_IOURING)
 
-#elif defined(BUFFIO_BACKEND_EPOLL)
+#elif defined(BUFFIO_BACKEND_EPOLL) || defined(BUFFIO_BACKEND_IOCP)
 
   int worker_count = 0;
   uint32_t pending_commit = 0;
@@ -138,9 +100,7 @@ struct WorkerState {
   WorkerSignal submit_lock;
   WorkerSignal completion_lock;
 
-  void *workers = nullptr;
-
-#elif defined(BUFFIO_BACKEND_IOCP)
+  WorkerThreadState *workers = nullptr;
 
 #else
 #error Unsupported backend
@@ -150,6 +110,8 @@ struct WorkerState {
   IoState io;
   buffio::Queue<buffio::CoroutineHandle> task_queue;
 };
+
+
 
 class Worker {
 
@@ -188,6 +150,8 @@ private:
 
   bool flush();
 
+  static void WorkerThreadFunc(void *args);
+  static void signalLoop(buffio_fd fd,LoopStatusCode code);
   WorkerState state;
 };
 

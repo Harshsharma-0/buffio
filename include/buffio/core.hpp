@@ -39,6 +39,7 @@ struct OpState {
     bool (*action)(std::pair<void *, void *>);
   };
   union {
+    BUFFIO_WIN_INSERT(OVERLAPPED overlapped);
     void *data;
     ssize_t op_done;
     size_t nread;
@@ -46,23 +47,32 @@ struct OpState {
     ssize_t s_nread;
     ssize_t s_nwrite;
     intptr_t pfd;
-    int fd;
+    buffio_fd fd;
   };
 };
 
+#if defined(BUFFIO_OS_WINDOWS)
+
+struct Bufferiov{
+ char *buffer;
+size_t size;
+};
+
+#elif defined(BUFFIO_OS_LINUX)
+using Buffioiov = struct iovec;
+#endif
+
 class BuffervState {
-  using BuffervStateType = BUFFIO_OS_INSERT(struct iovec *, void *,
-                                            FILE_SEGMENT_ELEMENT *);
 
 public:
-  std::pair<BuffervStateType, size_t> get() const { return {io_vecs, size}; };
+  std::pair<Bufferiov*, size_t> get() const { return {io_vecs, size}; };
 
   bool CreateVec(int num);
   bool MakeEntry(int idx, char *buffer, size_t bufSize);
   BuffervState() = default;
 
 private:
-  BuffervStateType io_vecs = nullptr;
+  Bufferiov *io_vecs = nullptr;
   size_t size = 0;
   size_t size_max = 0;
   bool iown = false;

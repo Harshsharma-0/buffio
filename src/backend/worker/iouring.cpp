@@ -76,6 +76,13 @@ int buffio::Worker::flush_io_completed(unsigned int budget) {
     assert(state.io.pending > 0);
     assert(obj);
 
+    if(obj->op_code == buffio::OpCode::open){
+      int fd = static_cast<int>(res);
+      obj->fd = res >= 0 ? fd : BUFFIO_FD_INVALID;
+      state.io.pending -= 1;
+      continue;
+    };
+
     obj->op_done = res;
     state.io.pending -= 1;
 

@@ -8,11 +8,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-if(DEFINED BUFFIO_BUILD_TYPE)
-elseif()
-  message(FATAL_ERROR "NO BUILD TYPE SPECIFIED, please specify one [Debug,Release]")
-endif()
-
 set(CMAKE_BUILD_TYPE Debug)
 
 set(BUFFIO_WORKER_QUEUE_ORDER 4 CACHE STRING
@@ -80,7 +75,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows" OR CMAKE_SYSTEM_NAME STREQUAL "MSYS"
         "src/backend/fs/windows.cpp"
         "src/backend/core/windows.cpp"
     )
-
+    set(BUFFIO_LINK_LIBRARY Synchronization)
 else()
 
     message(FATAL_ERROR
@@ -99,6 +94,9 @@ endif()
 add_library(buffio
   src/core/task.cpp
   src/core/promise.cpp
+  src/core/bufferv.cpp
+  src/backend/fs/common.cpp
+  src/backend/worker/common.cpp
   ${BUFFIO_BACKEND_SRC}
   src/lfcore.cpp
   src/thread.cpp
@@ -112,7 +110,7 @@ target_include_directories(buffio PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utility>
 )
 
-target_link_libraries(buffio PRIVATE ${BUFFIO_LINK_LIBRARY})
+target_link_libraries(buffio PUBLIC ${BUFFIO_LINK_LIBRARY})
 #enable_testing()
 
 
