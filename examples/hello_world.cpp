@@ -15,7 +15,7 @@ char buffer[1024];
 
 buffio::task<size_t> helloWorld(int id) {
   buffio::File file;
-  
+  std::cout<<"[hello world] "<<std::endl;  
   int isOpen = co_await file.Open("./test.txt",B_RDWR | B_CREAT | B_APPEND,0644);
   std::cout<<"[file] "<<isOpen<<std::endl;
 

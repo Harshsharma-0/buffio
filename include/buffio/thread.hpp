@@ -8,6 +8,9 @@
 #if defined(BUFFIO_OS_LINUX) || defined(BUFFIO_OS_BSD)
 #include <pthread.h>
 #include <semaphore.h>
+#include <unistd.h>
+#include <syscall.h>
+#include <linux/futex.h>
 #elif defined(BUFFIO_OS_WINDOWS)
  #pragma comment(lib, "Synchronization.lib")
  

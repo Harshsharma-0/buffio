@@ -8,7 +8,7 @@ buffio::Worker::~Worker() {
 
   if (state.event.evfd >= 0)
     close(state.event.evfd);
-  if (state.event.event_fd >= 0)
+  if (state.event.sigfd >= 0)
     close(state.event.sigfd);
   if (!state.workers)
     return;
@@ -174,11 +174,15 @@ int buffio::Worker::init_worker_threads(int num) {
   buffio::Latch sync{num};
   int nWorker = num;
   
-  /*
-  wparam = {state.event.evfd,   &state.control,      &sync,
-            &state.io.submit_queue, &state.io.completed, &state.submit_lock ,
-            &state.completion_lock};
-            */
+  wparam.sigfd = state.event.sigfd;
+  wparam.pcontrol = &state.control;
+  wparam.psync = &sync;
+  wparam.pwork_queue = &state.io.submit_queue;
+  wparam.pwork_lock = &state.submit_lock;
+  wparam.pcompletion_queue = &state.io.completed;
+  wparam.pcompletion_lock = &state.completion_lock;
+
+
    
   for (int i = 0; i < num; i++) {
     winfo[i].args = wparam;
@@ -232,17 +236,19 @@ void buffio::Worker::WorkerThreadFunc(void *args) {
       // Broken queue/signal invariant.
       continue;
     }
+    std::cout<<"[work arrived]"<<std::endl;
 
     auto *action = *op;
     action->action({nullptr, action->data});
     
-    state.psubmit_lock->wait();
+    state.pcompletion_lock->wait();
     state.pcompletion_queue->enqueue(action);
 
     status = state.pcontrol->load(std::memory_order_acquire);
 
-    if (status == buffio::LoopStatusCode::inactive) 
-      Worker::signalLoop(state.event_fd,LoopStatusCode::event_wake);
+    if (status == buffio::LoopStatusCode::inactive){
+      Worker::signalLoop(state.sigfd,LoopStatusCode::event_wake); 
+    }
     
   }
   std::cout<<"exiting "<<std::endl;
