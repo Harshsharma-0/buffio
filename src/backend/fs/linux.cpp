@@ -16,20 +16,9 @@ bool buffio::File::OpenStdOut(){
   return true;
 };
 
-int buffio::OpenFileAwaiter::await_resume(){ 
-  if(op_state.op_done < 0) return -1;
 
-  buffio::File *file = 
-       static_cast<buffio::File*>(rval); 
-
-  file->fd = op_state.op_done;
-  file->loffset = 0;
-
-  return 0;
-};
 
 #ifdef BUFFIO_BACKEND_IOURING
-
 
 bool buffio::OpenFileAwaiter::action(std::pair<void*,void*> info){
 
@@ -109,7 +98,13 @@ bool buffio::OpenFileAwaiter::action(std::pair<void*,void*> info){
            static_cast<buffio::OpenFileAwaiter *>(p_self);
 
   int fd = open(obj->path,obj->flags,(mode_t)obj->mode); 
-  obj->op_state.op_done = fd;
+  if(fd < 0){
+    obj->op_state.fd = BUFFIO_FD_INVALID;
+    return true;
+  };
+
+  obj->op_state.fd = fd;
+  
   return true;
 };
 
