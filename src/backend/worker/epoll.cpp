@@ -60,16 +60,16 @@ int buffio::Worker::init_poller(unsigned int order) {
     return -1;
   };
 
-  state.event.epoll_fd = epfd;
-  state.event.event_fd = evntfd;
+  state.event.evfd = epfd;
+  state.event.sigfd = evntfd;
   return 0;
 };
 
 
 int buffio::Worker::wait_event() {
 
-  int epoll_fd = state.event.epoll_fd;
-  int event_fd = state.event.event_fd;
+  int evfd = state.event.evfd;
+  int sigfd = state.event.sigfd;
   constexpr int event_size = 1024;
   struct epoll_event events[1024];
 
@@ -77,7 +77,7 @@ int buffio::Worker::wait_event() {
   if (timeout < 0)
     state.control.store(buffio::LoopStatusCode::inactive,
                         std::memory_order_release);
-  int count = epoll_wait(epoll_fd, events, event_size, timeout);
+  int count = epoll_wait(evfd, events, event_size, timeout);
   if (timeout < 0)
     state.control.store(buffio::LoopStatusCode::active,
                         std::memory_order_release);
@@ -89,13 +89,12 @@ int buffio::Worker::wait_event() {
   for (int i = 0; i < count; i++) {
     evnt = (events + i);
 
-    if (evnt->data.fd == event_fd) {
+    if (evnt->data.fd == sigfd) {
       uint64_t value;
 
-      while (read(event_fd, &value, sizeof(value)) == sizeof(value)) {
+      while (read(sigfd, &value, sizeof(value)) == sizeof(value)) {
         // Drain/coalesce notifications.
       }
-
       flush_io_completed(64);
 
       continue;

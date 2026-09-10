@@ -41,13 +41,13 @@ enum class LoopStatusCode : uint32_t {
 
 
 struct WorkerArgs{
-  buffio_fd event_fd;
+  buffio_fd sigfd;
   std::atomic<buffio::LoopStatusCode> *pcontrol;
   buffio::Latch *psync;
   WorkQueue *pwork_queue;
   WorkQueue *pcompletion_queue;
   WorkerSignal *pwork_lock;
-  WorkerSignal *psubmit_lock;  
+  WorkerSignal *pcompletion_lock;  
 };
 
 struct WorkerThreadState {

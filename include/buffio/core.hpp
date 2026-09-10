@@ -59,7 +59,7 @@ size_t size;
 };
 
 #elif defined(BUFFIO_OS_LINUX)
-using Buffioiov = struct iovec;
+using Bufferiov = struct iovec;
 #endif
 
 class BuffervState {
