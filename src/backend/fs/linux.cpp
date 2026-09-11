@@ -1,6 +1,7 @@
 #include "buffio/config.hpp"
 #include "buffio/fs.hpp"
 #include "buffio/worker.hpp"
+#include "buffio/ecode.hpp"
 #include <unistd.h>
 #include <fcntl.h>
 
@@ -126,10 +127,13 @@ bool buffio::AwaitableFileBase::action(std::pair<void*,void*> info){
   case OpCode::pWrite: rval = pwrite(fd,buffer,size,offset); break;
   case OpCode::pReadv: rval = preadv(fd,(struct iovec*)buffer,size,offset); break;
   case OpCode::pWritev: rval = pwritev(fd,(struct iovec*)buffer,size,offset); break;
-  default: rval = -1; break;
+  default: rval = buffio::B_EUNKNOWN; break;
  };
-  
- obj->op_state.op_done = rval;
+ 
+ if(rval < 0)
+   rval = (ssize_t)buffio::error_from_os(static_cast<int>(rval));
+
+  obj->op_state.op_done = rval;
 
   return true;
 };

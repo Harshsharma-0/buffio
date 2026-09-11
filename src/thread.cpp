@@ -39,7 +39,7 @@ int buffio::thread::run(buffio::threadFuncSig start, void *args) {
   HANDLE threadHandle = CreateThread(NULL, stackSize, threadMainRoutine, pArgs,
                                      STACK_SIZE_PARAM_IS_A_RESERVATION, NULL);
 
-  if (threadHandle != NULL) {
+  if (threadHandle == INVALID_HANDLE_VALUE) {
     /* return BENOMEM from here */
     if (ERROR_NOT_ENOUGH_MEMORY == GetLastError()) {
       return -1;
