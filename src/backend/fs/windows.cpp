@@ -36,7 +36,9 @@ bool buffio::OpenFileAwaiter::action(std::pair<void *, void *> info)
 
   DWORD desiredAccess = 0;
   DWORD dispositionFlag = 0;
-
+  
+  //TODO: map modes to windows specific api
+  
   if (rwflags & B_RDONLY)
     desiredAccess |= GENERIC_READ;
 
@@ -78,6 +80,7 @@ bool buffio::OpenFileAwaiter::action(std::pair<void *, void *> info)
 
   if (fd == INVALID_HANDLE_VALUE)
   {
+    obj->op_state.error = buffio::error_from_os(GetLastError());
     obj->op_state.fd = BUFFIO_FD_INVALID;
     return true;
   };
@@ -96,9 +99,10 @@ bool buffio::AwaitableFileBase::action(std::pair<void *, void *> info)
   auto [fd, buffer, size, offset] = obj->state;
 
   WINBOOL rval = false;
-
   ssize_t bytesNum = 0;
   DWORD bytesDone = 0; // platform typed data to store bytes read/write;
+  obj->op_state.error = 0;
+
 
   switch (obj->op_state.op_code)
   {
@@ -249,10 +253,7 @@ bool buffio::AwaitableFileBase::action(std::pair<void *, void *> info)
   };
 
   if (!rval)
-  {
-    obj->op_state.op_done = buffio::error_from_os(GetLastError());
-    return true;
-  };
+    obj->op_state.error = buffio::error_from_os(GetLastError());
 
   obj->op_state.op_done = static_cast<ssize_t>(bytesNum);
   return true;

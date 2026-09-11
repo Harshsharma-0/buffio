@@ -12,7 +12,7 @@
 namespace buffio {
 
 namespace utility{
-inline std::pair<unsigned int,int> get_pow2(unsigned int size){
+constexpr inline std::pair<unsigned int,int> get_pow2(unsigned int size){
   
   /* check if the number is power of 2 or not it, then returns the order */
   if(size > 0 && (size & (size - 1)) == 0)
@@ -66,11 +66,12 @@ public:
    }while(ptr != nullptr);
   
  }
+  // returns nullptr if no mem available
   poolT *operator()() noexcept { return pull_optimal(); };
   void operator[](poolT *ptr) { pushToFreeChunk(ptr); };
 
 private:
-
+ 
   poolT *pull_optimal() {
 
     if (freeCount > 0) {

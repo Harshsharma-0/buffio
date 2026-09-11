@@ -3,11 +3,10 @@
 #include "buffio/config.hpp"
 #include "buffio/core.hpp"
 #include "buffio/memory.hpp"
+#include "buffio/ecode.hpp"
 #include <cassert>
-#include <cstring>
-#include <iostream>
 #include <optional>
-#include <bitset>
+
 namespace buffio {
 
 template <typename QueueT> class Queue {
@@ -27,47 +26,17 @@ public:
   BUFFIO_CLASS_PROTECT(Queue)
   Queue() {};
 
-  bool init() {
+  int init() {
 
     assert(sp_head == nullptr);
 
     sp_head = allocator();
     sp_tail = sp_head;
-    return sp_head == nullptr ? false : true;
+
+    return sp_head == nullptr ? B_ENOMEM : 0;
   }
-  /*
-   bool enqueue(QueueT entry) {
-     assert(sp_head != nullptr);
-     QueueT *data = &sp_tail->data[0];
 
-
-
-     /* case : if difference positive then cycle not same.
-      * case : if negative tail is wraps around in cycle with head;
-      * case : if 0 queue is empty
-
-
-
-       if(sp_tail->state.tail == queue_internal_max){
-
-        struct queue_internal *tmp = nullptr;
-        if((tmp = allocator()) == nullptr) assert(false);
-
-        sp_tail->state.next = tmp;
-        sp_tail = tmp;
-
-        std::memset((void *)tmp,'\0',sizeof(struct queue_internal));
-
-        data = &sp_tail->data[0];
-       };
-
-     data[sp_tail->state.tail++] = entry;
-
-     count_ += 1;
-     return true;
-   };
-  */
-  bool enqueue(QueueT entry) {
+  int enqueue(QueueT entry) {
     assert(sp_head != nullptr);
 
     QueueT *data = &sp_tail->data[0];
@@ -86,7 +55,7 @@ public:
     if (head == tail && cycle > 0) {
 
       struct queue_internal *tmp = nullptr;
-      if ((tmp = allocator()) == nullptr) return false;
+      if ((tmp = allocator()) == nullptr) return B_ENOMEM;
       sp_tail->state.next = tmp;
       sp_tail = tmp;
       
@@ -146,34 +115,7 @@ public:
 
     return dtmp;
   };
-  /*
-  std::optional<QueueT> dequeue() {
 
-    assert(sp_head != nullptr);
-    QueueT *data = &sp_head->data[0];
-
-     * case : if difference positive then cycle not same.
-     * case : if negative tail is wraps around in cycle with head;
-     * case : if 0 queue is empty
-
-
-    if (sp_head->state.tail == sp_head->state.head) {
-      if (sp_head->state.next == nullptr)
-        return std::nullopt;
-
-      auto tmp = sp_head;
-      sp_head = sp_head->state.next;
-      allocator[tmp];
-      data = &sp_head->data[0];
-    };
-
-    QueueT dtmp = data[sp_head->state.head++];
-
-    assert(count_ != 0);
-    count_ -= 1;
-    return dtmp;
-  };
-  */
   bool empty() const { return (count_ <= 0); };
   size_t count() const { return count_; };
 

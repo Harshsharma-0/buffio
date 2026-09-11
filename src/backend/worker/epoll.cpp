@@ -17,12 +17,12 @@ int buffio::Worker::init_poller(unsigned int order) {
 
   int epfd = epoll_create1(EPOLL_CLOEXEC);
   if (epfd < 0)
-    return -1;
+    return buffio::error_from_os(errno);
 
   int evntfd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
   if (evntfd < 0) {
     close(epfd);
-    return -1;
+    return buffio::error_from_os(errno);
   };
 
   struct epoll_event evnt;
@@ -32,7 +32,7 @@ int buffio::Worker::init_poller(unsigned int order) {
   if (epoll_ctl(epfd, EPOLL_CTL_ADD, evntfd, &evnt) < 0) {
     close(epfd);
     close(evntfd);
-    return -1;
+    return buffio::error_from_os(errno);
   };
 
   state.event.evfd = epfd;
@@ -58,7 +58,7 @@ int buffio::Worker::wait_event() {
                         std::memory_order_release);
 
   if (count < 0 && errno != EINTR)
-    return -1;
+    return buffio::error_from_os(errno);
 
   struct epoll_event *evnt = nullptr;
   for (int i = 0; i < count; i++) {

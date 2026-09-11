@@ -1,7 +1,7 @@
 #include "buffio/fs.hpp"
 
 int buffio::OpenFileAwaiter::await_resume(){ 
-  if(op_state.fd == BUFFIO_FD_INVALID) return -1;
+  if(op_state.fd == BUFFIO_FD_INVALID) return op_state.error;
 
   buffio::File *file = 
        static_cast<buffio::File*>(rval); 

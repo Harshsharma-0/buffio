@@ -8,8 +8,8 @@ namespace buffio{
 
 struct AwaitableFileBase{
  void await_suspend(CoroutineHandle task_);
-  ssize_t await_resume(){
-    return op_state.op_done;
+ std::pair<ssize_t,int> await_resume(){
+    return {op_state.op_done,op_state.error};
   };
  
   static bool action(std::pair<void *,void*> info);
@@ -82,47 +82,28 @@ struct WritevFileAwaiter: AwaitableFileBase {
 
 struct ReadOffsetFileAwaiter:AwaitableFileBase{
   bool await_ready(){
-   #ifdef BUFFIO_BACKEND_IOURING
-   op_state.op_code = OpCode::Read;
-   #else
     op_state.op_code = OpCode::pRead;
-  #endif
     return false;
   };
 };
 
 struct ReadvOffsetFileAwaiter:AwaitableFileBase{
   bool await_ready(){
-   #ifdef BUFFIO_BACKEND_IOURING
-   op_state.op_code = OpCode::Readv;
-   #else
     op_state.op_code = OpCode::pReadv;
-   #endif
    return false;
   };
 };
 
 struct WriteOffsetFileAwaiter:AwaitableFileBase{
   bool await_ready(){
-
-  #ifdef BUFFIO_BACKEND_IOURING
-   op_state.op_code = OpCode::Write;
-  #else
     op_state.op_code = OpCode::pWrite;
-  #endif
-
     return false;
   };
 };
 
 struct WritevOffsetAwaitable:AwaitableFileBase{
   bool await_ready(){
-   #ifdef BUFFIO_BACKEND_IOURING
-   op_state.op_code = OpCode::Writev;
-   #else
     op_state.op_code = OpCode::pWritev;
-  #endif
-
     return false;
   };
 };
@@ -145,7 +126,7 @@ struct FsMkDirAwaitable {
 };
 
 
-/* TODO 
+/* TODO: add fs ops like mkdir/createdir... etc. 
 struct AwaitableFsBase{
 
 };

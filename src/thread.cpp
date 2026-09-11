@@ -24,12 +24,16 @@ int buffio::thread::run(buffio::threadFuncSig start, void *args) {
   void *pArgs = static_cast<void *>(this);
   if (pthread_create(&this->handle, &attribute, threadMainRoutine, pArgs) !=
       0) {
+
     /* return BENOMEM from here */
     if (EAGAIN == errno) {
-      return -1;
+      return B_ETHREADNOMEM;
     };
+    if(EINVAL == errno)
+       return B_ETHREADARGS;
+
     /* return BEUNKNOWM from here */
-    return -1;
+    return B_ETHREAD;
   };
 
   pthread_attr_destroy(&attribute);
@@ -40,12 +44,14 @@ int buffio::thread::run(buffio::threadFuncSig start, void *args) {
                                      STACK_SIZE_PARAM_IS_A_RESERVATION, NULL);
 
   if (threadHandle == INVALID_HANDLE_VALUE) {
-    /* return BENOMEM from here */
-    if (ERROR_NOT_ENOUGH_MEMORY == GetLastError()) {
-      return -1;
+     DWORD error = GetLastError();
+    if (ERROR_NOT_ENOUGH_MEMORY == error) {
+      return B_ETHREADNOMEM;
     };
-    /* return BEUNKNOWM from here */
-    return -1;
+    if(ERROR_INVALID_PARAMETER == error){
+    return B_ETHREADARGS;
+    }
+    return B_ETHREAD;
   };
 
   this->handle = threadHandle;

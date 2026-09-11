@@ -39,4 +39,6 @@ constexpr int B_TRUNC = BUFFIO_OS_INSERT(O_TRUNC,O_TRUNC,(1U << 9));
 /* Create a unnamed tmp file, spedified at the directory given in path */
 constexpr int B_TMPFILE = BUFFIO_OS_INSERT(O_TMPFILE,O_TMPFILE,(1U << 10));
 
+
+//TODO: add mode_t/access mode defs to the flags for Open
 #endif

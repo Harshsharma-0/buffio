@@ -53,17 +53,52 @@ public:
 
 #if defined(BUFFIO_BACKEND_EPOLL) || defined(BUFFIO_BACKEND_IOCP)
 
+ /*========================================================
+  *
+  * function defination/overload for read operation 
+  *
+  *=========================================================
+  */
+
   inline ReadFileAwaiter Read(char *buffer, size_t size) const {
     return ReadFileAwaiter{this->fd, buffer, size};
   };
-
-  inline WriteFileAwaiter Write(char *buffer, size_t size) const {
-    return WriteFileAwaiter{this->fd, buffer, size};
-  };
-
+ 
   inline ReadvFileAwaiter Readv(BuffervState &iovec) const {
     auto [buffer, size] = iovec.get();
     return ReadvFileAwaiter{this->fd, (char *)buffer, size};
+  };
+
+  inline ReadvFileAwaiter Readv(Bufferiov &vec,int count) const {
+    return ReadvFileAwaiter{this->fd, (char *)&vec, static_cast<size_t>(count)};
+  };
+
+  inline ReadvOffsetFileAwaiter ReadvAt(Bufferiov &vec,int count,
+                                         uint64_t off) const {
+    return ReadvOffsetFileAwaiter{this->fd, (char *)&vec, static_cast<size_t>(count), off};
+  };
+
+  inline ReadvOffsetFileAwaiter ReadvAt(BuffervState &iovec,
+                                         uint64_t off) const {
+    auto[buffer,size] = iovec.get();
+    return ReadvOffsetFileAwaiter{this->fd,(char*)buffer, size, off};
+  };
+
+  inline ReadOffsetFileAwaiter ReadAt(char *buffer, size_t size,
+                                       uint64_t off) const {
+    return ReadOffsetFileAwaiter{this->fd, buffer, size, off};
+  };
+
+
+/*=========================================================
+ *
+ * function defination/overload for write operation 
+ *
+ *=========================================================
+ */
+
+  inline WriteFileAwaiter Write(char *buffer, size_t size) const {
+    return WriteFileAwaiter{this->fd, buffer, size};
   };
 
   inline WritevFileAwaiter Writev(BuffervState &iovec) const {
@@ -71,35 +106,8 @@ public:
     return WritevFileAwaiter{this->fd, (char *)buffer, size};
   };
 
-#elifdef BUFFIO_BACKEND_IOURING
-
-  inline ReadFileAwaiter Read(char *buffer, size_t size){
-    return ReadFileAwaiter{this->fd, buffer, size, roffset,
-                           &roffset};
-  };
-
-  inline WriteFileAwaiter Write(char *buffer, size_t size){
-    return WriteFileAwaiter{this->fd, buffer, size, woffset,
-                            &woffset};
-  };
-
-  inline ReadvFileAwaiter Readv(BuffervState &iovec){
-    auto [buffer, size] = iovec.get();
-    return ReadvFileAwaiter{this->fd, (char *)buffer, size, roffset,
-                            &roffset};
-  };
-
-  inline WritevFileAwaiter Writev(BuffervState &iovec){
-    auto [buffer, size] = iovec.get();
-    return WritevFileAwaiter{this->fd, (char *)buffer, size, woffset,
-                             &woffset};
-  };
-
-#endif
-
-  inline ReadOffsetFileAwaiter ReadAt(char *buffer, size_t size,
-                                       uint64_t off) const {
-    return ReadOffsetFileAwaiter{this->fd, buffer, size, off};
+  inline WritevFileAwaiter Writev(Bufferiov &vec,int count) const {
+    return WritevFileAwaiter{this->fd, (char *)&vec, static_cast<size_t>(count)};
   };
 
   inline WriteOffsetFileAwaiter WriteAt(char *buffer, size_t size,
@@ -107,16 +115,97 @@ public:
     return WriteOffsetFileAwaiter{this->fd, buffer, size, off};
   };
 
-  inline ReadvOffsetFileAwaiter ReadvAt(BuffervState &iovec,
+ 
+  inline WritevOffsetAwaitable WritevAt(Bufferiov &vec,int count,
                                          uint64_t off) const {
-    auto [buffer, size] = iovec.get();
-    return ReadvOffsetFileAwaiter{this->fd, (char *)buffer, size, off};
+    return WritevOffsetAwaitable{this->fd, (char *)&vec,static_cast<size_t>(count), off};
   };
+
   inline WritevOffsetAwaitable WritevAt(BuffervState &iovec,
                                          uint64_t off) const {
-    auto [buffer, size] = iovec.get();
-    return WritevOffsetAwaitable{this->fd, (char *)buffer, size, off};
+    auto[buffer,size] = iovec.get();
+    return WritevOffsetAwaitable{this->fd, (char *)buffer,size, off};
   };
+
+#elifdef BUFFIO_BACKEND_IOURING
+
+/*=========================================================
+ *
+ * function defination/overload for read operation 
+ *
+ *=========================================================
+ */
+
+  inline ReadFileAwaiter Read(char *buffer, size_t size)  {
+    return ReadFileAwaiter{this->fd, buffer, size,roffset,&roffset};
+  };
+ 
+  inline ReadvFileAwaiter Readv(BuffervState &iovec)  {
+    auto [buffer, size] = iovec.get();
+    return ReadvFileAwaiter{this->fd, (char *)buffer, size,roffset,&roffset};
+  };
+
+  inline ReadvFileAwaiter Readv(Bufferiov &vec,int count)  {
+    return ReadvFileAwaiter{this->fd, (char *)&vec, static_cast<size_t>(count),roffset,&roffset};
+  };
+
+  inline ReadvOffsetFileAwaiter ReadvAt(Bufferiov &vec,int count,
+                                         uint64_t off)  {
+    return ReadvOffsetFileAwaiter{this->fd, (char *)&vec, static_cast<size_t>(count), off,nullptr};
+  };
+
+  inline ReadvOffsetFileAwaiter ReadvAt(BuffervState &iovec,
+                                         uint64_t off)  {
+    auto[buffer,size] = iovec.get();
+    return ReadvOffsetFileAwaiter{this->fd,(char*)buffer, size, off,nullptr};
+  };
+
+  inline ReadOffsetFileAwaiter ReadAt(char *buffer, size_t size,
+                                       uint64_t off)  {
+    return ReadOffsetFileAwaiter{this->fd, buffer, size, off,nullptr};
+  };
+
+
+/*=========================================================
+ *
+ * function defination/overload for write operation 
+ *
+ *=========================================================
+ */
+
+  inline WriteFileAwaiter Write(char *buffer, size_t size)  {
+    return WriteFileAwaiter{this->fd, buffer, size,woffset,&woffset};
+  };
+
+  inline WritevFileAwaiter Writev(BuffervState &iovec)  {
+    auto [buffer, size] = iovec.get();
+    return WritevFileAwaiter{this->fd, (char *)buffer, size,woffset,&woffset};
+  };
+
+  inline WritevFileAwaiter Writev(Bufferiov &vec,int count)  {
+    return WritevFileAwaiter{this->fd, (char *)&vec, static_cast<size_t>(count),woffset,&woffset};
+  };
+
+  inline WriteOffsetFileAwaiter WriteAt(char *buffer, size_t size,
+                                         uint64_t off)  {
+    return WriteOffsetFileAwaiter{this->fd, buffer, size, off,nullptr};
+  };
+
+ 
+  inline WritevOffsetAwaitable WritevAt(Bufferiov &vec,int count,
+                                         uint64_t off)  {
+    return WritevOffsetAwaitable{this->fd, (char *)&vec, static_cast<size_t>(count), off,nullptr};
+  };
+
+  inline WritevOffsetAwaitable WritevAt(BuffervState &iovec,
+                                         uint64_t off)  {
+    auto[buffer,size] = iovec.get();
+    return WritevOffsetAwaitable{this->fd, (char *)buffer,size, off,nullptr};
+  };
+
+
+#endif
+
 
   friend struct OpenFileAwaiter;
 

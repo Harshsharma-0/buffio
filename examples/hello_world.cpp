@@ -7,35 +7,45 @@
 #include <iostream>
 
 
-
-
-
-std::filesystem::path path = "";
-const char data[] = "Hello harsh shama \n";
+const char data[] = "Hello World\n";
 char buffer[1024];
+buffio::BuffervState iov;
 
 buffio::task<size_t> helloWorld(int id) {
+
   buffio::File file;
-  std::cout<<"[hello world] "<<std::endl;  
-  int isOpen = co_await file.Open(BUFFIO_WIDEN("./hello.txt"),B_RDWR | B_CREAT | B_APPEND,0644);
-  std::cout<<"[file] "<<isOpen<<std::endl;
+  std::cout<<"[running] "<<std::endl;
 
-  auto reas = co_await file.Write((char *)data,(uint32_t)sizeof(data));
-  if(reas < 0)
-     buffio::strerror(reas); 
-  //assert(reas == sizeof(data));
- // assert(reas == sizeof(data));
-  std::cout<<"[total writen] "<<reas<<" "<<sizeof(data)<<std::endl;
+  int isOpen = co_await file.Open(BUFFIO_WIDEN("./hello.txt"),
+                              B_RDWR | B_CREAT | B_APPEND,0644);
  
-  buffio::BuffervState iovec;
-  iovec.CreateVec(1);
-  iovec.MakeEntry(1,buffer,sizeof(buffer));
+ if(isOpen < 0){
+     std::cout<<"[error opening reason]"<<buffio::strerror(isOpen)<<std::endl; 
+     co_return -1;
+  }
+  auto[bytesWritten,error] = co_await file.Write((char *)data,
+                                            (uint32_t)sizeof(data));
 
-  
-  auto res = co_await file.Read(buffer,(uint32_t)sizeof(buffer));
-  std::cout<<"[total read] "<<res<<std::endl;
-  
-  for(int i = 0 ; i < res ; i++){
+ if(error < 0){
+     std::cout<<"[error writing reason]"<<buffio::strerror(error)<<std::endl; 
+     co_return -1;
+  }
+  iov.CreateVec(1);
+  iov.MakeEntry(1,buffer,1024);
+
+  std::cout<<"[total writen] "<<bytesWritten<<" "<<sizeof(data)<<std::endl;
+ 
+  // using readAt, as reading soon after writing result's in EOF 
+  auto [bytesRead,rerror] = co_await file.ReadvAt(iov,0);
+  if(rerror < 0){
+     std::cout<<"[error reading reason]"<<buffio::strerror(rerror)<<std::endl; 
+     co_return -1;
+  }
+
+
+  std::cout<<"[total read] "<<bytesRead<<std::endl;
+    
+  for(int i = 0 ; i < bytesRead ; i++){
      std::cout<<buffer[i];
    };
    
@@ -49,18 +59,13 @@ int main() {
   buffio::Instance instance;
   int val = instance.init(4,1024);
   if(val < 0){
-   // std::cout<<"[initlisation failed] "<<val<<std::endl;
-  };
-
+      std::cout<<"[error init queue] "<<buffio::strerror(val)<<std::endl;
+      return -1;
+  }
   for(int i = 0; i < 1; i ++)
     helloWorld(i).schedule(instance);
 
   
- std::cout<<instance.run()<<std::endl; 
-  /*
-  buffio::Worker worker;
-  worker.init(4);
- */
- // std::cout<<sizeof(std::optional<std::variant<long int>>)<<std::endl;
+  instance.run();
   return 0;
 }; 

@@ -1,20 +1,21 @@
 #include "buffio/worker.hpp"
 
-//TODO : add signal works
+//DONE : add signal works
 void buffio::Worker::signalLoop(buffio_fd fd,LoopStatusCode code){
   PostQueuedCompletionStatus(fd,0,(ULONG_PTR)code,NULL);
 };
 
-//TODO : add init code for IOCP
+//DONE : add init code for IOCP
 int buffio::Worker::init_poller(unsigned int order) { 
     HANDLE iocph = CreateIoCompletionPort(INVALID_HANDLE_VALUE,NULL,0,0);
-    if(iocph == INVALID_HANDLE_VALUE) return -1;
+    if(iocph == INVALID_HANDLE_VALUE) 
+      return buffio::error_from_os(GetLastError());
     state.event.evfd = iocph;
     state.event.sigfd = iocph;
     return 0;
 };
 
-//TODO : add wait event loop code
+//DONE : add wait event loop code
 int buffio::Worker::wait_event() {
    HANDLE iocph = state.event.evfd;
    OVERLAPPED_ENTRY events[1024];
