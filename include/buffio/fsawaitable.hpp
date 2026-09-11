@@ -38,8 +38,12 @@ struct OpenFileAwaiter {
   int await_resume();
 
   static bool action(std::pair<void *, void *> info);
-
+ 
+  #if defined(BUFFIO_OS_LINUX)
   char *path;
+  #elif defined(BUFFIO_OS_WINDOWS)
+  std::wstring path;
+  #endif
   int flags;
   int mode;
   void *rval;
@@ -102,9 +106,9 @@ struct WriteOffsetFileAwaiter:AwaitableFileBase{
   bool await_ready(){
 
   #ifdef BUFFIO_BACKEND_IOURING
-   op_state.op_code = OpCode::Writev;
+   op_state.op_code = OpCode::Write;
   #else
-    op_state.op_code = OpCode::pWritev;
+    op_state.op_code = OpCode::pWrite;
   #endif
 
     return false;

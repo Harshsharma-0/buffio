@@ -11,6 +11,13 @@
 #include <variant>
 
 using BF_PATH_PREFIX = std::filesystem::path;
+#if defined(BUFFIO_OS_WINDOWS)
+#define BUFFIO_WIDEN_HELPER(str) L##str
+#else
+#define BUFFIO_WIDEN_HELPER(str) str
+#endif
+
+#define BUFFIO_WIDEN(name) BUFFIO_WIDEN_HELPER(name)
 
 namespace buffio {
 
