@@ -2,7 +2,7 @@
 #include "buffio/core.hpp"
 #include "buffio/fs.hpp"
 #include "buffio/worker.hpp"
-#include <iostream>
+#include "buffio/ecode.hpp"
 
 buffio::Worker::~Worker() { io_uring_queue_exit(&state.io.ring); };
 
@@ -14,21 +14,19 @@ int buffio::Worker::init(int numWorker, unsigned int queuesize) {
 
   /* round queue size to nearest power of 2, it queueSize is not pow2*/
   auto [size, order] = buffio::utility::get_pow2(queuesize);
-  if (order == -1)
-    return -1;
 
   /* initlise the task_queue */
   if (init_task_queues(order) != 0)
-    return -1;
+    return B_EINITTSKQUE;
 
   if (init_poller(size) != 0)
-    return -1;
+    return B_EINITPOLLER;
 
   return 0;
 };
 
 int buffio::Worker::init_task_queues(unsigned int order) {
-  return !state.task_queue.init() ? -1 : 0;
+  return state.task_queue.init();
 };
 
 int buffio::Worker::init_poller(unsigned int size) {
@@ -70,22 +68,34 @@ inline int handle_io_done(buffio::OpState &state, int32_t res) {
   switch (state.op_code) {
   case buffio::OpCode::Open: {
     int fd = static_cast<int>(res);
-    state.fd = res >= 0 ? fd : BUFFIO_FD_INVALID;
+    if(res < 0)
+       state.error = buffio::error_from_os(-res);
+
+    state.fd = fd;
   } break;
 
   case buffio::OpCode::Read:
   case buffio::OpCode::Write:
   case buffio::OpCode::Readv:
   case buffio::OpCode::Writev:
+   if (res < 0){
+        state.error = buffio::error_from_os(-res);
+        break;
+   };
+    state.op_done = static_cast<ssize_t>(res);
+    *(base->state.poffset) += static_cast<uint64_t>(res);
+
+  break;
   case buffio::OpCode::pRead:
   case buffio::OpCode::pWrite:
   case buffio::OpCode::pReadv:
   case buffio::OpCode::pWritev:
-   state.op_done = static_cast<ssize_t>(res);
-   if (res > 0)
-    *(base->state.poffset) += static_cast<uint64_t>(res);
+   if (res < 0){
+        state.error = buffio::error_from_os(-res);
+        break;
+   };
+    state.op_done = static_cast<ssize_t>(res);
   break;
-
   default:
     return 0;
   break;
@@ -104,9 +114,9 @@ int buffio::Worker::flush_io_completed(unsigned int budget) {
       break;
     if (cqe == NULL)
       break;
+
     buffio::OpState *obj = (buffio::OpState *)cqe->user_data;
     int32_t res = static_cast<int32_t>(cqe->res);
-
     assert(state.io.pending > 0);
     assert(obj);
 
@@ -127,7 +137,6 @@ int buffio::Worker::wait_event() {
   int count_done = io_uring_submit_and_wait(ring, timeout);
 
   if (count_done < 0 && errno != -EINTR) {
-    std::cout << "[io uring error] " << strerror(-errno) << std::endl;
     return -1;
   };
 
@@ -146,6 +155,7 @@ int buffio::Worker::run_tasks(unsigned int budget) {
     }
     task->resume();
   };
+  
   return 0;
 };
 
@@ -159,9 +169,20 @@ int buffio::Worker::run() {
     run_tasks(task_exec_cycle);
     flush_io_requests(64);
   };
-
+  abort_loop();
   return 0;
 };
+
+/* TODO: add abort loop on iouring */
+void buffio::Worker::abort_loop(){};
+/* TODO: add abort_io_completed on iouring */
+void buffio::Worker::abort_io_completed(){};
+/* TODO: add abort_io_requests on iouring */
+void buffio::Worker::abort_io_requests(){};
+/* TODO: add kill task on abort on iouring */
+void buffio::Worker::kill_task_on_abort(){};
+/* TODO: add abort_timers on iouring */
+void buffio::Worker::abort_timers(){};
 
 bool buffio::Worker::should_exit() {
   return state.task_queue.empty() && (state.io.pending == 0) ? true : false;

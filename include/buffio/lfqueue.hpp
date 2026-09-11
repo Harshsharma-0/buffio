@@ -23,9 +23,9 @@ enum lfMemMode {
   stack,
 };
 
-namespace lfSpec {
+namespace lfutility {
 
-template <size_t _order> constexpr size_t getSize() {
+template <size_t _order> constexpr size_t get_size() {
   if constexpr (_order > BUFFIO_RING_MAX || _order < BUFFIO_RING_MIN) {
     static_assert(false, BUFFIO_ARGS_STRINGFY(
                              order must be within range of[BUFFIO_RING_MIN] <=
@@ -35,22 +35,11 @@ template <size_t _order> constexpr size_t getSize() {
   return (1 << _order);
 };
 
-inline size_t get_size(size_t _order) {
-  if (_order > BUFFIO_RING_MAX || _order < BUFFIO_RING_MIN) {
-      return 0; // just to supress other errors
-  };
-  return (1 << _order);
-};
-
-template <size_t _rorder> constexpr size_t getInQueSize() {
-  constexpr size_t size = buffio::lfSpec::getSize<_rorder>();
-  return (size << 1);
-};
 }; // namespace lfSpec
 
 
 template <typename T, buffio::lfMemMode lfmode = buffio::lfMemMode::dynamic,
-          size_t orderT = 4>
+          size_t lforder =  64>
 class lfQueue {
 public:
   BUFFIO_CLASS_PROTECT(lfQueue)
@@ -66,16 +55,20 @@ public:
   lfQueue()
     requires(lfmode == buffio::lfMemMode::stack)
   {
-    queueOrder = orderT;
+
+    
+    /* only to validate the order */
+    constexpr size_t validate_order = buffio::lfutility::get_size<lforder>();
+
+    queueOrder = lforder;
     acQueue.data = aqQueue;
     freeQueue.data = fqQueue;
     lfCore::initempty(&acQueue, queueOrder);
     lfCore::initfull(&freeQueue, queueOrder);
   };
 
-  int lfstart(size_t _order) requires(lfmode == buffio::lfMemMode::stack){
-     constexpr size_t queueSize = buffio::lfSpec::getSize<orderT>();
-      return 0;
+  int lfstart(size_t _order) requires(lfmode == buffio::lfMemMode::stack){ 
+    return 0;
   };
 
   int lfstart(size_t _order)
@@ -83,20 +76,21 @@ public:
   {
 
 
-    if (data != nullptr) return 1;
-    if(_order > buffioatomix_max_order || _order < BUFFIO_RING_MIN) return -1;
+    if (data != nullptr) return B_EALREADY;
+    if(_order > buffioatomix_max_order || _order < BUFFIO_RING_MIN)
+      return B_ELFORDER;
     
     size_t queueSize = 1 << _order;
     buffioatomix *acptr = nullptr;
 
 
     if ((data = new (std::nothrow) T[queueSize]) == nullptr)
-      return -1;
+      return B_ENOMEM;
 
     if ((acptr = new (std::nothrow) buffioatomix[queueSize << 2]) == nullptr) {
       delete[] static_cast<T *>(data);
       data = nullptr;
-      return -1;
+      return B_ENOMEM;
     };
 
     acQueue.data = acptr;
@@ -175,11 +169,13 @@ private:
   struct empty {};
 
   using dataType = std::conditional_t<
-      lfmode == buffio::lfMemMode::stack, T[buffio::lfSpec::getSize<orderT>()],
+      lfmode == buffio::lfMemMode::stack, 
+      T[buffio::lfutility::get_size<lforder>()],
       std::conditional_t<lfmode == buffio::lfMemMode::dynamic, void *, void>>;
+
   using qStorage =
       std::conditional_t<lfmode == buffio::lfMemMode::stack,
-                         buffioatomix[buffio::lfSpec::getInQueSize<orderT>()],
+                         buffioatomix[buffio::lfutility::get_size<lforder>()],
                          struct empty>;
 
   dataType data;

@@ -5,10 +5,10 @@
 #include "buffio/queue.hpp"
 #include "buffio/lfqueue.hpp"
 #include "buffio/thread.hpp"
+#include "buffio/ecode.hpp"
 
 #include <atomic>
 #include <cstring>
-
 #include <version>
 
 #if defined(BUFFIO_BACKEND_EPOLL)
@@ -88,10 +88,7 @@ struct IoState {
 };
 
 struct WorkerState {
-
-#if defined(BUFFIO_BACKEND_IOURING)
-
-#elif defined(BUFFIO_BACKEND_EPOLL) || defined(BUFFIO_BACKEND_IOCP)
+#if defined(BUFFIO_BACKEND_EPOLL) || defined(BUFFIO_BACKEND_IOCP)
 
   int worker_count = 0;
   uint32_t pending_commit = 0;
@@ -102,8 +99,6 @@ struct WorkerState {
 
   WorkerThreadState *workers = nullptr;
 
-#else
-#error Unsupported backend
 #endif
 
   EventState event;
@@ -144,6 +139,11 @@ private:
   /* for epoll backend only */
   void abort_loop();
   int wait_event();
+  
+  void abort_io_completed();
+  void abort_io_requests();
+  void kill_task_on_abort();
+  void abort_timers();
 
   void flush_timers();
   bool should_exit();

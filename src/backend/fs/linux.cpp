@@ -6,13 +6,15 @@
 #include <fcntl.h>
 
 bool buffio::File::OpenStdIn(){
-  assert(fd <= BUFFIO_FD_INVALID);
+  //check if we are not trying to open on fd that is pre occupied
+  assert(fd == BUFFIO_FD_INVALID);
   fd = STDIN_FILENO;
   return true; 
 };
 
 bool buffio::File::OpenStdOut(){ 
-  assert(fd <= BUFFIO_FD_INVALID);
+  //check if we are not trying to open on fd that is pre occupied
+  assert(fd == BUFFIO_FD_INVALID);
   fd = STDOUT_FILENO;
   return true;
 };
@@ -69,8 +71,21 @@ bool buffio::AwaitableFileBase::action(std::pair<void*,void*> info){
     case OpCode::Writev:
       op = IORING_OP_WRITEV;
     break;
-    default: 
-      return false;
+    case OpCode::pRead:
+      op = IORING_OP_READ;
+    break;
+    case OpCode::pWrite:
+      op = IORING_OP_WRITE;
+    break;
+    case OpCode::pReadv:
+      op = IORING_OP_READV;
+    break;
+    case OpCode::pWritev:
+      op = IORING_OP_WRITEV;
+    break;
+    default:
+     //error no suitable op found
+     assert(false);
     break;
   };
  
@@ -82,7 +97,7 @@ bool buffio::AwaitableFileBase::action(std::pair<void*,void*> info){
   sqe->addr = buffer64;
 
   sqe->off = offset;
-  sqe->len = static_cast<uint32_t>(size);
+  sqe->len = len;
   sqe->user_data = reinterpret_cast<uint64_t>(&obj->op_state);
 
 
@@ -100,6 +115,7 @@ bool buffio::OpenFileAwaiter::action(std::pair<void*,void*> info){
 
   int fd = open(obj->path,obj->flags,(mode_t)obj->mode); 
   if(fd < 0){
+    obj->op_state.error = buffio::error_from_os(errno);
     obj->op_state.fd = BUFFIO_FD_INVALID;
     return true;
   };
@@ -116,6 +132,7 @@ bool buffio::AwaitableFileBase::action(std::pair<void*,void*> info){
                static_cast<buffio::AwaitableFileBase *>(p_self);
 
  auto[fd,buffer,size,offset] = obj->state;
+ obj->op_state.error = 0;
  ssize_t rval = 0;
 
  switch(obj->op_state.op_code){
@@ -130,8 +147,9 @@ bool buffio::AwaitableFileBase::action(std::pair<void*,void*> info){
   default: rval = buffio::B_EUNKNOWN; break;
  };
  
- if(rval < 0)
-   rval = (ssize_t)buffio::error_from_os(static_cast<int>(rval));
+ if(rval < 0){
+   obj->op_state.error = buffio::error_from_os(static_cast<int>(errno));
+ };
 
   obj->op_state.op_done = rval;
 

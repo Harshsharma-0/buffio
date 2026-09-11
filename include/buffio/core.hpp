@@ -55,6 +55,7 @@ struct OpState {
   union {
     bool (*action)(std::pair<void *, void *>);
   };
+  int error;
   union {
     void *data;
     ssize_t op_done;
@@ -65,12 +66,27 @@ struct OpState {
 #if defined(BUFFIO_OS_WINDOWS)
 
 struct Bufferiov{
- char *buffer;
-size_t size;
+ void operator=(char *data){
+   iov_base = static_cast<void*>(data);
+ };
+ void operator=(size_t len){
+  iov_len = len;
+ };
+ void *iov_base;
+ size_t iov_len;
 };
 
 #elif defined(BUFFIO_OS_LINUX)
-using Bufferiov = struct iovec;
+using BufferiovBase = struct iovec;
+struct Bufferiov: public BufferiovBase{
+ void operator=(char *data){
+   iov_base = static_cast<void*>(data);
+ };
+ void operator=(size_t len){
+  iov_len = len;
+ };
+
+};
 #endif
 
 class BuffervState {

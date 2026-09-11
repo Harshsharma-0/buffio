@@ -2,7 +2,6 @@
 #include <iostream>
 
 buffio::Worker::~Worker() {
- 
 
  #if defined(BUFFIO_OS_LINUX)
 
@@ -24,18 +23,56 @@ buffio::Worker::~Worker() {
   delete[] state.workers;
 };
 
+int buffio::Worker::init(int numWorker) {
+  return this->init(numWorker, (1U << BUFFIO_WORKER_QUEUE_ORDER));
+};
+
+int buffio::Worker::init(int numWorker, unsigned int queueSize) {
+
+  /* evaluating the maximum worker thread that can concurrently access the
+   * queue*/
+  auto [maxWorker, order] = buffio::utility::get_pow2(queueSize);
+
+  /* checking it the maxWorker exceeds the maximun supported worker */
+  maxWorker = maxWorker < BUFFIO_MAX_WORKER ? maxWorker : BUFFIO_MAX_WORKER;
+
+  /* checking numWorker for negative value */
+  numWorker = numWorker <= 0 ? 4 : numWorker;
+
+  /* if numWorker exceed maxWorker set it to max worker */
+  numWorker = numWorker > maxWorker ? maxWorker : numWorker;
+  state.completion_lock.post(maxWorker);
+
+   
+  if (init_task_queues(order) != 0)
+    return B_EINITTSKQUE;
+
+  /* on windows initlize the IOCP*/
+  if (init_poller(order) != 0)
+    return B_EINITPOLLER;
+
+  if (init_worker_threads(numWorker) != 0)
+    return B_EINITWRKTHR;
+
+  return 0;
+};
+
 int buffio::Worker::init_task_queues(unsigned int order) {
   /* initlising the sleeping Queue */
   
-
-  if (!state.task_queue.init())
+  /* we ignore the return error value of the functions,
+   * as it can increase the depth of errors 
+   * 
+   * in init funcion we only indicate which part failed, not why it failed
+   */
+  if (state.task_queue.init() != 0)
     return -1;
-  if (!state.io.pending_queue.init())
-    return -2;
+  if (state.io.pending_queue.init() != 0)
+    return -1;
   if (state.io.submit_queue.lfstart(order) != 0)
-    return -3;
+    return -1;
   if (state.io.completed.lfstart(order) != 0) {
-    return -4;
+    return -1;
   }
 
   return 0;
@@ -51,7 +88,7 @@ int buffio::Worker::run() {
     flush();
   };
 
-   // TODO notify tasks in the task queue
+   //DONE: notify tasks in the task queue
     abort_loop();
 
   return 0;
@@ -95,8 +132,7 @@ int buffio::Worker::flush_io_completed(unsigned int budget) {
     if (!workd)
       break;
     
-    //todo check dor abort and set op error to abort
-    buffio::CoroutineHandle handle = (*workd)->task;
+     buffio::CoroutineHandle handle = (*workd)->task;
   
     if (!state.task_queue.enqueue(handle)) {
       return -1;
@@ -139,23 +175,93 @@ bool buffio::Worker::push(buffio::OpState &vec) {
   return true;
 };
 
+void buffio::Worker::abort_io_completed(){
+  unsigned int n = 0;
+  while (1) {
+  
+    std::optional<buffio::OpState *> workd = state.io.completed.dequeue();
+    if (!workd)
+      break;
+
+     (*workd)->error = B_EABORT;
+     /* run the task to notify, if good task will return soon */
+     (*workd)->task.resume(); 
+  
+    n += 1;
+  };
+
+  state.io.pending -= n;
+  /* waking any thread waiting for completion_lock, 
+   * we assume that the size of queue is always smaller than of the worker number,
+   * and it's also ensured in the init function, via checks.
+   */
+  state.completion_lock.post(n);
+  return 0;
+
+};
+void buffio::Worker::abort_io_requests(){
+  while (1) {
+
+    std::optional<buffio::OpState *> workd = state.io.pending_queue.dequeue();
+    if (!workd)
+      break;
+
+    (*workd)->error = B_EABORT;
+    /* run the task to notify, if good task will return soon */
+    (*workd)->task.resume();
+  };
+
+};
+void buffio::Worker::kill_task_on_abort(){
+  while (1) {
+
+    std::optional<buffio::OpState *> workd = state.io.pending_queue.dequeue();
+    if (!workd)
+      break;
+
+    (*workd)->task.destroy();
+  };
+
+};
+void buffio::Worker::abort_timers(){
+  //TODO: add timer abort loop
+};
+
 void buffio::Worker::abort_loop() {
 
   /* updating status to abort in contorl field of state */
   state.control.store(buffio::LoopStatusCode::abort, std::memory_order_release);
+
+  /*waking all thread so they can proceed to abort*/
   state.submit_lock.post(state.worker_count);
 
-  flush_io_completed(-1);
+  /* flushing all completed request and it's wakes thread waiting on lock */
+  abort_io_completed();
+  
 
   WorkerThreadState *param = state.workers;
   int workern = state.worker_count;
-  
-  for(int i = 0; i < workern;i++)
+ 
+  /* waiting for the thread to join */
+  for(int i = 0; i < workern;i++){
       param[i].thread.join();
+  }
+  
+  /* flushing the queue after thread exits */
+  abort_io_completed();
 
-  flush_io_completed(-1);
-  flush_timers();
-  run_tasks(-1); // runnning tasks to notify tasks of the error
+  /* aborting the io request made and notifying the task */
+  abort_io_requests();
+
+  /* aborting all the timers and notifying the tasks */
+  abort_timers();
+
+  /* runnning tasks to notify tasks of the error */
+  run_tasks(-1); 
+  
+  /* if any task requests I/O after the abort will get killed */
+  kill_task_on_abort();
+  return 0;
 
 };
 
@@ -208,36 +314,6 @@ int buffio::Worker::init_worker_threads(int num) {
   return 0;
 };
 
-int buffio::Worker::init(int numWorker) {
-  return this->init(numWorker, (1U << BUFFIO_WORKER_QUEUE_ORDER));
-};
-
-int buffio::Worker::init(int numWorker, unsigned int queueSize) {
-
-  /* evaluating the maximum worker thread that can concurrently access the
-   * queue*/
-  auto [maxWorker, order] = buffio::utility::get_pow2(queueSize);
-
-  /* checking it the maxWorker exceeds the maximun supported worker */
-  maxWorker = maxWorker < BUFFIO_MAX_WORKER ? maxWorker : BUFFIO_MAX_WORKER;
-
-  /* checking numWorker for negative value */
-  numWorker = numWorker <= 0 ? 4 : numWorker;
-
-  /* if numWorker exceed maxWorker set it to max worker */
-  numWorker = numWorker > maxWorker ? maxWorker : numWorker;
-  state.completion_lock.post(maxWorker);
-  
-  if (init_task_queues(order) != 0)
-    return -1;
-  /* on windows initlize the IOCP*/
-  if (init_poller(order) != 0)
-    return -2;
-  if (init_worker_threads(numWorker) != 0)
-    return -3;
-
-  return 0;
-};
 
 void buffio::Worker::flush_timers() {
 
@@ -277,5 +353,4 @@ void buffio::Worker::WorkerThreadFunc(void *args) {
     }
     
   }
-  std::cout<<"exiting "<<std::endl;
-};
+ };

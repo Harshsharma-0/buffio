@@ -26,7 +26,10 @@ bool buffio::BuffervState::MakeEntry(int idx, char *buffer,
   buffio::Bufferiov *iov = io_vecs;
    
   iov = (iov + (idx - 1));
+  *iov = buffer;
+  *iov = bufSize;
 
+  /*
   #if defined(BUFFIO_OS_LINUX)
    iov->iov_base = static_cast<void*>(buffer);
    iov->iov_len = bufSize;
@@ -34,6 +37,7 @@ bool buffio::BuffervState::MakeEntry(int idx, char *buffer,
    iov->buffer = buffer;
    iov->size = bufSize;
   #endif
+  */
 
   size += 1;
   
