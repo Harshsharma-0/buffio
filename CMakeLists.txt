@@ -59,6 +59,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
             "src/backend/worker/epoll.cpp"
             "src/backend/fs/linux.cpp"
             "src/backend/core/linux.cpp"
+            "src/backend/worker/common.cpp"
         )
 
         set(BUFFIO_LINK_LIBRARY pthread)
@@ -74,7 +75,9 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows" OR CMAKE_SYSTEM_NAME STREQUAL "MSYS"
         "src/backend/worker/iocp.cpp"
         "src/backend/fs/windows.cpp"
         "src/backend/core/windows.cpp"
+        "src/backend/worker/common.cpp"
     )
+
     set(BUFFIO_LINK_LIBRARY Synchronization)
 else()
 
@@ -96,7 +99,6 @@ add_library(buffio
   src/core/promise.cpp
   src/core/bufferv.cpp
   src/backend/fs/common.cpp
-  src/backend/worker/common.cpp
   ${BUFFIO_BACKEND_SRC}
   src/lfcore.cpp
   src/thread.cpp

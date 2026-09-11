@@ -8,9 +8,7 @@ namespace buffio{
 
 struct AwaitableFileBase{
  void await_suspend(CoroutineHandle task_);
-  ssize_t await_resume() {
-    if (op_state.op_done > 0)
-      *state.offset += op_state.op_done;
+  ssize_t await_resume(){
     return op_state.op_done;
   };
  
@@ -20,14 +18,18 @@ struct AwaitableFileBase{
    buffio_fd fd;
    char *buffer;
    size_t size;
-   uint64_t *offset;
+   uint64_t offset;
+  #ifdef BUFFIO_BACKEND_IOURING
+   uint64_t *poffset;
+   #endif
   }state;
+
   OpState op_state;
-  //BUFFIO_OS_INSERT(OpState op_state, OpState op_state, OVERLAPPED op_state);
 };
 
 struct OpenFileAwaiter {
   bool await_ready() {
+    op_state.op_code = OpCode::Open;
     op_state.action = OpenFileAwaiter::action;
     op_state.data = static_cast<void *>(this);
     return false; 
@@ -42,14 +44,11 @@ struct OpenFileAwaiter {
   int mode;
   void *rval;
   OpState op_state;
-  //BUFFIO_OS_INSERT(OpState op_state, OpState op_state, OVERLAPPED op_state);
 };
 
 
 struct ReadFileAwaiter : AwaitableFileBase{
-  bool await_ready() { 
-    op_state.action = AwaitableFileBase::action;
-    op_state.data = static_cast<void *>(this);
+  bool await_ready() {
     op_state.op_code = OpCode::Read;
     return false;
   };
@@ -58,8 +57,6 @@ struct ReadFileAwaiter : AwaitableFileBase{
 
 struct WriteFileAwaiter : AwaitableFileBase{
   bool await_ready() {
-    op_state.action = AwaitableFileBase::action;
-    op_state.data = static_cast<void *>(this);
     op_state.op_code = OpCode::Write;
     return false;
   };
@@ -67,20 +64,63 @@ struct WriteFileAwaiter : AwaitableFileBase{
 
 struct ReadvFileAwaiter: AwaitableFileBase {
   bool await_ready() {
-    op_state.action = AwaitableFileBase::action;
     op_state.op_code = OpCode::Readv;
-    op_state.data = static_cast<void *>(this);
     return false; 
   };
 };
 
 struct WritevFileAwaiter: AwaitableFileBase {
   bool await_ready() {
-    op_state.action = AwaitableFileBase::action;
     op_state.op_code = OpCode::Writev;
-    op_state.data = static_cast<void *>(this);
     return false;
   }
+};
+
+struct ReadOffsetFileAwaiter:AwaitableFileBase{
+  bool await_ready(){
+   #ifdef BUFFIO_BACKEND_IOURING
+   op_state.op_code = OpCode::Read;
+   #else
+    op_state.op_code = OpCode::pRead;
+  #endif
+    return false;
+  };
+};
+
+struct ReadvOffsetFileAwaiter:AwaitableFileBase{
+  bool await_ready(){
+   #ifdef BUFFIO_BACKEND_IOURING
+   op_state.op_code = OpCode::Readv;
+   #else
+    op_state.op_code = OpCode::pReadv;
+   #endif
+   return false;
+  };
+};
+
+struct WriteOffsetFileAwaiter:AwaitableFileBase{
+  bool await_ready(){
+
+  #ifdef BUFFIO_BACKEND_IOURING
+   op_state.op_code = OpCode::Writev;
+  #else
+    op_state.op_code = OpCode::pWritev;
+  #endif
+
+    return false;
+  };
+};
+
+struct WritevOffsetAwaitable:AwaitableFileBase{
+  bool await_ready(){
+   #ifdef BUFFIO_BACKEND_IOURING
+   op_state.op_code = OpCode::Writev;
+   #else
+    op_state.op_code = OpCode::pWritev;
+  #endif
+
+    return false;
+  };
 };
 
 struct FsMkDirAwaitable {
@@ -98,7 +138,6 @@ struct FsMkDirAwaitable {
   char *path;
   bool async;
   OpState op_state;
-  //BUFFIO_OS_INSERT(OpState op_state, OpState op_state, OVERLAPPED op_state);
 };
 
 

@@ -30,7 +30,17 @@ struct NoOp {
   void action(void *) {}
 };
 
-enum class OpCode : int { Read = 1, Write, Readv, Writev };
+enum class OpCode : int {
+  Open = 1,
+  Read,
+  Write,
+  Readv, 
+  Writev,
+  pRead,
+  pWrite,
+  pReadv,
+  pWritev,
+};
 
 struct OpState {
   CoroutineHandle task;
@@ -39,14 +49,8 @@ struct OpState {
     bool (*action)(std::pair<void *, void *>);
   };
   union {
-    BUFFIO_WIN_INSERT(OVERLAPPED overlapped);
     void *data;
     ssize_t op_done;
-    size_t nread;
-    size_t nwrite;
-    ssize_t s_nread;
-    ssize_t s_nwrite;
-    intptr_t pfd;
     buffio_fd fd;
   };
 };

@@ -49,7 +49,7 @@ bool buffio::AwaitableFileBase::action(std::pair<void*,void*> info){
  struct io_uring_sqe *sqe = 
        static_cast<struct io_uring_sqe *>(p_sqe);
  
-  auto[fd,buffer,size,offset] = obj->state;
+  auto[fd,buffer,size,offset,poffset] = obj->state;
 
   uint8_t op = 0;
   uint64_t buffer64 = reinterpret_cast<uint64_t>(buffer);
@@ -80,7 +80,7 @@ bool buffio::AwaitableFileBase::action(std::pair<void*,void*> info){
   sqe->fd = fd;
   sqe->addr = buffer64;
 
-  sqe->off = *offset;
+  sqe->off = offset;
   sqe->len = static_cast<uint32_t>(size);
   sqe->user_data = reinterpret_cast<uint64_t>(&obj->op_state);
 
@@ -118,13 +118,19 @@ bool buffio::AwaitableFileBase::action(std::pair<void*,void*> info){
  ssize_t rval = 0;
 
  switch(obj->op_state.op_code){
-  case OpCode::Read:  rval = pread(fd,buffer,size,*offset); break;
-  case OpCode::Write: rval = pwrite(fd,buffer,size,*offset); break;
-  case OpCode::Readv: rval = preadv(fd,(struct iovec*)buffer,size,*offset); break;
-  case OpCode::Writev: rval = pwritev(fd,(struct iovec*)buffer,size,*offset); break;
+  case OpCode::Read:  rval = read(fd,buffer,size); break;
+  case OpCode::Write: rval = write(fd,buffer,size); break;
+  case OpCode::Readv: rval = readv(fd,(struct iovec*)buffer,size); break;
+  case OpCode::Writev: rval = writev(fd,(struct iovec*)buffer,size); break;
+  case OpCode::pRead: rval = pread(fd,buffer,size,offset); break;
+  case OpCode::pWrite: rval = pwrite(fd,buffer,size,offset); break;
+  case OpCode::pReadv: rval = preadv(fd,(struct iovec*)buffer,size,offset); break;
+  case OpCode::pWritev: rval = pwritev(fd,(struct iovec*)buffer,size,offset); break;
   default: rval = -1; break;
  };
-  obj->op_state.op_done = rval;
+  
+ obj->op_state.op_done = rval;
+
   return true;
 };
 

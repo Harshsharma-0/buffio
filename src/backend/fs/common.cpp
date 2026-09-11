@@ -7,7 +7,6 @@ int buffio::OpenFileAwaiter::await_resume(){
        static_cast<buffio::File*>(rval); 
 
   file->fd = op_state.fd;
-  file->loffset = 0;
-
+  file->flags = 0;
   return 0;
 };

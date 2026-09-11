@@ -9,6 +9,8 @@ void buffio::AwaitableFileBase::await_suspend(buffio::CoroutineHandle task_){
       .promise().state.worker;
 
   op_state.task = task_;
+  op_state.action = buffio::AwaitableFileBase::action;
+  op_state.data = static_cast<void*>(this);
   worker_->push(op_state);
 
 };

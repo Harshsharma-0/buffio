@@ -20,6 +20,7 @@ buffio::task<size_t> helloWorld(int id) {
   std::cout<<"[file] "<<isOpen<<std::endl;
 
   auto reas = co_await file.Write((char *)data,(uint32_t)sizeof(data));
+ 
   assert(reas == sizeof(data));
   std::cout<<"[total writen] "<<reas<<" "<<sizeof(data)<<std::endl;
  

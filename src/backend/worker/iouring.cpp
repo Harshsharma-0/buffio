@@ -49,10 +49,11 @@ int buffio::Worker::flush_io_requests(unsigned int budget) {
 
   unsigned int unsubmitted = io_uring_sq_ready(ring);
 
-  if (unsubmitted <= 0) return 0;
+  if (unsubmitted <= 0)
+    return 0;
 
-   int cnt = io_uring_submit(ring);
-   state.io.pending += cnt;
+  int cnt = io_uring_submit(ring);
+  state.io.pending += cnt;
 
   return 0;
 };
@@ -62,33 +63,57 @@ bool buffio::Worker::flush() {
   return true;
 };
 
+inline int handle_io_done(buffio::OpState &state, int32_t res) {
+
+  buffio::AwaitableFileBase *base = (buffio::AwaitableFileBase *)state.data;
+
+  switch (state.op_code) {
+  case buffio::OpCode::Open: {
+    int fd = static_cast<int>(res);
+    state.fd = res >= 0 ? fd : BUFFIO_FD_INVALID;
+  } break;
+
+  case buffio::OpCode::Read:
+  case buffio::OpCode::Write:
+  case buffio::OpCode::Readv:
+  case buffio::OpCode::Writev:
+  case buffio::OpCode::pRead:
+  case buffio::OpCode::pWrite:
+  case buffio::OpCode::pReadv:
+  case buffio::OpCode::pWritev:
+   state.op_done = static_cast<ssize_t>(res);
+   if (res > 0)
+    *(base->state.poffset) += static_cast<uint64_t>(res);
+  break;
+
+  default:
+    return 0;
+  break;
+  };
+
+  return 1;
+};
+
 int buffio::Worker::flush_io_completed(unsigned int budget) {
   struct io_uring_cqe *cqe = nullptr;
   struct io_uring *ring = &state.io.ring;
 
-  while(budget--) {
-    
-    if(io_uring_peek_cqe(ring,&cqe) < 0) break;
-    if(cqe == NULL) break;
+  while (budget--) {
+
+    if (io_uring_peek_cqe(ring, &cqe) < 0)
+      break;
+    if (cqe == NULL)
+      break;
     buffio::OpState *obj = (buffio::OpState *)cqe->user_data;
     int32_t res = static_cast<int32_t>(cqe->res);
 
     assert(state.io.pending > 0);
     assert(obj);
 
-    if(obj->op_code == buffio::OpCode::open){
-      int fd = static_cast<int>(res);
-      obj->fd = res >= 0 ? fd : BUFFIO_FD_INVALID;
-      state.io.pending -= 1;
-      continue;
-    };
-
-    obj->op_done = res;
-    state.io.pending -= 1;
+    state.io.pending -= handle_io_done(*obj, res);
 
     io_uring_cqe_seen(&state.io.ring, cqe);
     state.task_queue.enqueue(obj->task);
-
   };
 
   return 0;
@@ -97,9 +122,10 @@ int buffio::Worker::flush_io_completed(unsigned int budget) {
 int buffio::Worker::wait_event() {
 
   struct io_uring *ring = &state.io.ring;
-  unsigned int timeout = state.task_queue.empty() && state.io.pending != 0 ? 1 : 0;
+  unsigned int timeout =
+      state.task_queue.empty() && state.io.pending != 0 ? 1 : 0;
   int count_done = io_uring_submit_and_wait(ring, timeout);
-  
+
   if (count_done < 0 && errno != -EINTR) {
     std::cout << "[io uring error] " << strerror(-errno) << std::endl;
     return -1;
@@ -151,15 +177,13 @@ bool buffio::Worker::push(buffio::OpState &vec) {
     flush();
     sqe = io_uring_get_sqe(ring);
   };
-  
+
   vec.action({static_cast<void *>(sqe), static_cast<void *>(vec.data)});
   return true;
 };
 
+/* for epoll backend only */
+int buffio::Worker::init_worker_threads(int num) { return 0; };
 
 /* for epoll backend only */
-int buffio::Worker::init_worker_threads(int num){ return 0;};
-
-/* for epoll backend only */
-void buffio::Worker::wakeup_sleeping_workers(){};
-
+void buffio::Worker::wakeup_sleeping_workers() {};
