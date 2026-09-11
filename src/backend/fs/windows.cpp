@@ -27,7 +27,7 @@ bool buffio::OpenFileAwaiter::action(std::pair<void*,void*> info){
   buffio::OpenFileAwaiter *obj =
            static_cast<buffio::OpenFileAwaiter *>(p_self);
   
-           /*
+  /*
   int fd = open(obj->path,obj->flags,(mode_t)obj->mode); 
   if(fd < 0){
     obj->op_state.fd = BUFFIO_FD_INVALID;

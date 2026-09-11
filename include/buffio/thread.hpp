@@ -68,11 +68,7 @@ namespace buffio
       Signal::Signal_wake<uint32_t>(&work_count, (uint32_t)minWake);
 
 #elif defined(BUFFIO_OS_WINDOWS)
-      while (minWake != 0)
-      {
-        Signal::Signal_wake<uint32_t>(&work_count, 0);
-        --minWake;
-      };
+        Signal::Signal_wake<uint32_t>(&work_count, minWake);
 #endif
     };
 
@@ -117,9 +113,7 @@ namespace buffio
   using WorkerSignal = buffio::Signal;
 
 #ifdef __cpp_lib_latch
-  class Latch : public std::latch
-  {
-  };
+  class Latch : public std::latch{};
 #else
 
   class Latch
