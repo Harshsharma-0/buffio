@@ -191,7 +191,7 @@ int buffio::Worker::init_worker_threads(int num) {
 
     nWorker -= 1;
   };
-
+  
   /* checking if createThread loop failed completely*/
   if (nWorker == num) {
     delete[] winfo;
@@ -247,7 +247,7 @@ void buffio::Worker::WorkerThreadFunc(void *args) {
   struct WorkerArgs state = *static_cast<struct WorkerArgs *>(args);
 
   state.psync->count_down();
-
+  
   for (;;) {
 
     state.pwork_lock->wait();
@@ -263,8 +263,7 @@ void buffio::Worker::WorkerThreadFunc(void *args) {
       // Broken queue/signal invariant.
       continue;
     }
-    std::cout<<"[work arrived]"<<std::endl;
-
+    
     auto *action = *op;
     action->action({nullptr, action->data});
     
