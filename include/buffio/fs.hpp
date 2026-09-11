@@ -24,15 +24,35 @@ public:
   bool OpenStdIn();
   bool OpenStdOut();
 
+#if defined(BUFFIO_OS_WINDOWS)
+  inline OpenFileAwaiter Open(const wchar_t *path, int flags, int mode) {
+    OpenFileAwaiter awaiter;
+    awaiter.path = path;
+    awaiter.flags = flags;
+    awaiter.mode = mode;
+    awaiter.rval = (void *)this;
+    return awaiter;
+  };
+  
+  inline OpenFileAwaiter Open(BF_PATH_PREFIX &path, int flags, int mode) const {
+    return OpenFileAwaiter{path.wstring(), flags, mode, (void *)this};
+  };
+
+#elif defined(BUFFIO_OS_LINUX)
+
+
   inline OpenFileAwaiter Open(const char *path, int flags, int mode) const {
     return OpenFileAwaiter{(char *)path, flags, mode, (void *)this};
   };
-
+  
   inline OpenFileAwaiter Open(BF_PATH_PREFIX &path, int flags, int mode) const {
     return OpenFileAwaiter{(char *)path.c_str(), flags, mode, (void *)this};
   };
 
-#ifdef BUFFIO_BACKEND_EPOLL
+#endif
+
+#if defined(BUFFIO_BACKEND_EPOLL) || defined(BUFFIO_BACKEND_IOCP)
+
   inline ReadFileAwaiter Read(char *buffer, size_t size) const {
     return ReadFileAwaiter{this->fd, buffer, size};
   };
@@ -77,22 +97,22 @@ public:
 
 #endif
 
-  inline ReadOffsetFileAwaiter ReadOff(char *buffer, size_t size,
+  inline ReadOffsetFileAwaiter ReadAt(char *buffer, size_t size,
                                        uint64_t off) const {
     return ReadOffsetFileAwaiter{this->fd, buffer, size, off};
   };
 
-  inline WriteOffsetFileAwaiter WriteOff(char *buffer, size_t size,
+  inline WriteOffsetFileAwaiter WriteAt(char *buffer, size_t size,
                                          uint64_t off) const {
     return WriteOffsetFileAwaiter{this->fd, buffer, size, off};
   };
 
-  inline ReadvOffsetFileAwaiter ReadvOff(BuffervState &iovec,
+  inline ReadvOffsetFileAwaiter ReadvAt(BuffervState &iovec,
                                          uint64_t off) const {
     auto [buffer, size] = iovec.get();
     return ReadvOffsetFileAwaiter{this->fd, (char *)buffer, size, off};
   };
-  inline WritevOffsetAwaitable WritevOff(BuffervState &iovec,
+  inline WritevOffsetAwaitable WritevAt(BuffervState &iovec,
                                          uint64_t off) const {
     auto [buffer, size] = iovec.get();
     return WritevOffsetAwaitable{this->fd, (char *)buffer, size, off};
