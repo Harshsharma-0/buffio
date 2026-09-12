@@ -1,8 +1,12 @@
 #include "buffio/config.hpp"
+
+#ifdef BUFFIO_BACKEND_IOURING
+
 #include "buffio/core.hpp"
 #include "buffio/fs.hpp"
 #include "buffio/worker.hpp"
 #include "buffio/ecode.hpp"
+
 
 buffio::Worker::~Worker() { io_uring_queue_exit(&state.io.ring); };
 
@@ -208,3 +212,5 @@ int buffio::Worker::init_worker_threads(int num) { return 0; };
 
 /* for epoll backend only */
 void buffio::Worker::wakeup_sleeping_workers() {};
+
+#endif

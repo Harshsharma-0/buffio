@@ -1,7 +1,7 @@
 #include "buffio/fs.hpp"
 #include "buffio/task.hpp"
 #include "buffio/worker.hpp"
-
+#include "buffio/opcode.hpp"
 
 void buffio::AwaitableFileBase::await_suspend(buffio::CoroutineHandle task_){
  buffio::Worker *worker_ = 

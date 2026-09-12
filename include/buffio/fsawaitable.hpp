@@ -1,28 +1,29 @@
 #ifndef BUFFIO_FS_AWAITABLE_HPP
 #define BUFFIO_FS_AWAITABLE_HPP
 
+#include "buffio/bufferv.hpp"
 #include "buffio/core.hpp"
+#include "buffio/opcode.hpp"
 
-namespace buffio{
+namespace buffio {
 
-
-struct AwaitableFileBase{
- void await_suspend(CoroutineHandle task_);
- std::pair<ssize_t,int> await_resume(){
-    return {op_state.op_done,op_state.error};
+struct AwaitableFileBase {
+  void await_suspend(CoroutineHandle task_);
+  std::pair<ssize_t, int> await_resume() {
+    return {op_state.op_done, op_state.error};
   };
- 
-  static bool action(std::pair<void *,void*> info);
- 
-  struct{
-   buffio_fd fd;
-   char *buffer;
-   size_t size;
-   uint64_t offset;
-  #ifdef BUFFIO_BACKEND_IOURING
-   uint64_t *poffset;
-   #endif
-  }state;
+
+  static bool action(std::pair<void *, void *> info);
+
+  struct {
+    buffio_fd fd;
+    char *buffer;
+    size_t size;
+    uint64_t offset;
+#ifdef BUFFIO_BACKEND_IOURING
+    uint64_t *poffset;
+#endif
+  } state;
 
   OpState op_state;
 };
@@ -32,109 +33,101 @@ struct OpenFileAwaiter {
     op_state.op_code = OpCode::Open;
     op_state.action = OpenFileAwaiter::action;
     op_state.data = static_cast<void *>(this);
-    return false; 
+    return false;
   };
   void await_suspend(CoroutineHandle task_);
   int await_resume();
 
   static bool action(std::pair<void *, void *> info);
- 
-  #if defined(BUFFIO_OS_LINUX)
+
+#if defined(BUFFIO_OS_LINUX)
   char *path;
-  #elif defined(BUFFIO_OS_WINDOWS)
+#elif defined(BUFFIO_OS_WINDOWS)
   std::wstring path;
-  #endif
+#endif
   int flags;
   int mode;
   void *rval;
   OpState op_state;
 };
 
-
-struct ReadFileAwaiter : AwaitableFileBase{
+struct ReadFileAwaiter : AwaitableFileBase {
   bool await_ready() {
     op_state.op_code = OpCode::Read;
     return false;
   };
 };
 
-
-struct WriteFileAwaiter : AwaitableFileBase{
+struct WriteFileAwaiter : AwaitableFileBase {
   bool await_ready() {
     op_state.op_code = OpCode::Write;
     return false;
   };
 };
 
-struct ReadvFileAwaiter: AwaitableFileBase {
+struct ReadvFileAwaiter : AwaitableFileBase {
   bool await_ready() {
     op_state.op_code = OpCode::Readv;
-    return false; 
+    return false;
   };
 };
 
-struct WritevFileAwaiter: AwaitableFileBase {
+struct WritevFileAwaiter : AwaitableFileBase {
   bool await_ready() {
     op_state.op_code = OpCode::Writev;
     return false;
   }
 };
 
-struct ReadOffsetFileAwaiter:AwaitableFileBase{
-  bool await_ready(){
+struct ReadOffsetFileAwaiter : AwaitableFileBase {
+  bool await_ready() {
     op_state.op_code = OpCode::pRead;
     return false;
   };
 };
 
-struct ReadvOffsetFileAwaiter:AwaitableFileBase{
-  bool await_ready(){
+struct ReadvOffsetFileAwaiter : AwaitableFileBase {
+  bool await_ready() {
     op_state.op_code = OpCode::pReadv;
-   return false;
+    return false;
   };
 };
 
-struct WriteOffsetFileAwaiter:AwaitableFileBase{
-  bool await_ready(){
+struct WriteOffsetFileAwaiter : AwaitableFileBase {
+  bool await_ready() {
     op_state.op_code = OpCode::pWrite;
     return false;
   };
 };
 
-struct WritevOffsetAwaitable:AwaitableFileBase{
-  bool await_ready(){
+struct WritevOffsetAwaitable : AwaitableFileBase {
+  bool await_ready() {
     op_state.op_code = OpCode::pWritev;
     return false;
   };
 };
 
-struct FsMkDirAwaitable {
+/* INPROGRESS: add fs ops like mkdir/createdir... etc. */
+struct AwaitableFsBase {
+  bool await_ready() { return false; }
+  void await_suspend(CoroutineHandle task_) {};
+  int await_resume() const { return op_state.error; };
 
-  bool await_ready() { 
-    if(!async)
-      FsMkDirAwaitable::action({nullptr,this});
-    return !async;
-  }
-  void await_suspend(CoroutineHandle task_);
-  ssize_t await_resume() const { return op_state.op_done; };
+  OpState op_state;
+};
+
+struct FsMkDirAwaitable : AwaitableFsBase {
 
   static bool action(std::pair<void *, void *> info);
 
   char *path;
   bool async;
-  OpState op_state;
 };
 
-
-/* TODO: add fs ops like mkdir/createdir... etc. 
-struct AwaitableFsBase{
-
-};
-
-struct FsLinkAwaitable{
-  bool await_ready() { 
-    if(!async)
-      FsLinkAwaitable::action({nullptr,this});
+struct FsLinkAwaitable {
+  bool await_ready() {
+    if (!async)
+      FsLinkAwaitable::action({nullptr, this});
     return !async;
   };
 
@@ -147,30 +140,11 @@ struct FsLinkAwaitable{
   bool async;
 
   BUFFIO_OS_INSERT(OpState op_state, OpState op_state, OVERLAPPED op_state);
-
 };
-struct FsUnlinkAwaitable{
-  bool await_ready() { 
-    if(!async)
-      FsUnlinkAwaitable::action({nullptr,this});
-    return !async;
-  }
-  void await_suspend(CoroutineHandle task_);
-  ssize_t await_resume() const { return op_state.op_done; };
-
-  static bool action(std::pair<void *, void *> info);
-
-  char *path;
-  bool async;
-
-  BUFFIO_OS_INSERT(OpState op_state, OpState op_state, OVERLAPPED op_state);
-
-};
-struct FsRenameAwaitable{
-
-  bool await_ready() { 
-    if(!async)
-      FsRenameAwaitable::action({nullptr,this});
+struct FsUnlinkAwaitable {
+  bool await_ready() {
+    if (!async)
+      FsUnlinkAwaitable::action({nullptr, this});
     return !async;
   }
   void await_suspend(CoroutineHandle task_);
@@ -183,6 +157,23 @@ struct FsRenameAwaitable{
 
   BUFFIO_OS_INSERT(OpState op_state, OpState op_state, OVERLAPPED op_state);
 };
-*/
+struct FsRenameAwaitable {
+
+  bool await_ready() {
+    if (!async)
+      FsRenameAwaitable::action({nullptr, this});
+    return !async;
+  }
+  void await_suspend(CoroutineHandle task_);
+  ssize_t await_resume() const { return op_state.op_done; };
+
+  static bool action(std::pair<void *, void *> info);
+
+  char *path;
+  bool async;
+
+  BUFFIO_OS_INSERT(OpState op_state, OpState op_state, OVERLAPPED op_state);
 };
+
+}; // namespace buffio
 #endif

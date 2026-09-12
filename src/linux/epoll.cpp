@@ -1,3 +1,6 @@
+#include "buffio/config.hpp"
+
+#ifdef BUFFIO_BACKEND_EPOLL
 #include "buffio/worker.hpp"
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
@@ -83,15 +86,4 @@ int buffio::Worker::wait_event() {
   return 0;
 };
 
-static void sleep_ms(unsigned long int ms) {
-
-  struct timespec ts;
-  struct timespec rem;
-  ts.tv_sec = ms / 1000;
-  ts.tv_nsec = (ms % 1000) * 1000000L;
-
-  if (nanosleep(&ts, &rem) < 0) {
-    if (errno == EINTR)
-      nanosleep(&rem, &ts);
-  };
-};
+#endif

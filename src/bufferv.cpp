@@ -1,4 +1,5 @@
-#include "buffio/core.hpp"
+#include "buffio/bufferv.hpp"
+#include <new>
 #include <cstring>
 
 bool buffio::BuffervState::CreateVec(int num){
@@ -29,15 +30,6 @@ bool buffio::BuffervState::MakeEntry(int idx, char *buffer,
   *iov = buffer;
   *iov = bufSize;
 
-  /*
-  #if defined(BUFFIO_OS_LINUX)
-   iov->iov_base = static_cast<void*>(buffer);
-   iov->iov_len = bufSize;
-  #else
-   iov->buffer = buffer;
-   iov->size = bufSize;
-  #endif
-  */
 
   size += 1;
   

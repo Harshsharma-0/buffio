@@ -3,6 +3,15 @@
 
 #include "buffio/fsawaitable.hpp"
 
+
+#if defined(BUFFIO_OS_WINDOWS)
+#define BUFFIO_WIDEN_HELPER(str) L##str
+#else
+#define BUFFIO_WIDEN_HELPER(str) str
+#endif
+
+#define BUFFIO_WIDEN(name) BUFFIO_WIDEN_HELPER(name)
+
 namespace buffio {
 
 /*
@@ -19,6 +28,9 @@ public:
 
 };
 */
+
+class Path:public std::filesystem::path{};
+
 class File {
 public:
   bool OpenStdIn();
@@ -34,7 +46,7 @@ public:
     return awaiter;
   };
   
-  inline OpenFileAwaiter Open(BF_PATH_PREFIX &path, int flags, int mode) const {
+  inline OpenFileAwaiter Open(buffioPath &path, int flags, int mode) const {
     return OpenFileAwaiter{path.wstring(), flags, mode, (void *)this};
   };
 
@@ -45,7 +57,7 @@ public:
     return OpenFileAwaiter{(char *)path, flags, mode, (void *)this};
   };
   
-  inline OpenFileAwaiter Open(BF_PATH_PREFIX &path, int flags, int mode) const {
+  inline OpenFileAwaiter Open(buffio::Path &path, int flags, int mode) const {
     return OpenFileAwaiter{(char *)path.c_str(), flags, mode, (void *)this};
   };
 

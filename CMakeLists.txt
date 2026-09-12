@@ -44,41 +44,21 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     option(BUFFIO_OS_LINUX "Platform is Linux" ON)
 
     if(BUFFIO_WORKER_IOURING)
-        set(BUFFIO_BACKEND_NAME "worker/iouring.hpp")
-        set(BUFFIO_BACKEND_SRC
-            "src/backend/worker/iouring.cpp"
-            "src/backend/fs/linux.cpp"
-            "src/backend/core/linux.cpp"
-        )
-
         set(BUFFIO_LINK_LIBRARY pthread uring)
-
     else()
-        set(BUFFIO_BACKEND_NAME "worker/epoll.hpp")
-        set(BUFFIO_BACKEND_SRC
-            "src/backend/worker/epoll.cpp"
-            "src/backend/fs/linux.cpp"
-            "src/backend/core/linux.cpp"
-            "src/backend/worker/common.cpp"
-        )
-
         set(BUFFIO_LINK_LIBRARY pthread)
     endif()
+
+    file(GLOB BUFFIO_BACKEND_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/linux/*.cpp")
 
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows" OR CMAKE_SYSTEM_NAME STREQUAL "MSYS")
 
     option(BUFFIO_OS_WINDOWS "Platform is Windows" ON)
 
-    set(BUFFIO_BACKEND_NAME "worker/iocp.hpp")
-    set(BUFFIO_OS_WIN 1)
-    set(BUFFIO_BACKEND_SRC
-        "src/backend/worker/iocp.cpp"
-        "src/backend/fs/windows.cpp"
-        "src/backend/core/windows.cpp"
-        "src/backend/worker/common.cpp"
-    )
-
+    set(BUFFIO_OS_WIN "Platform is windows" ON)
     set(BUFFIO_LINK_LIBRARY Synchronization)
+    file(GLOB BUFFIO_BACKEND_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/windows/*.cpp")
+
 else()
 
     message(FATAL_ERROR
@@ -87,21 +67,22 @@ else()
 
 endif()
 
-  configure_file(
+configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/include/config/config.hpp.in
     ${CMAKE_CURRENT_BINARY_DIR}/include/buffio/config.hpp
-   )
+)
+
 
 
 # Library target
 add_library(buffio
-  src/core/task.cpp
-  src/core/promise.cpp
-  src/core/bufferv.cpp
-  src/backend/fs/common.cpp
+  src/task.cpp
+  src/promise.cpp
+  src/bufferv.cpp
+  src/worker_common.cpp
+  src/thread_common.cpp
   ${BUFFIO_BACKEND_SRC}
   src/lfcore.cpp
-  src/thread.cpp
   src/fs.cpp
 )
 
