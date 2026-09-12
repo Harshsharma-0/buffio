@@ -46,7 +46,7 @@ public:
     return awaiter;
   };
   
-  inline OpenFileAwaiter Open(buffioPath &path, int flags, int mode) const {
+  inline OpenFileAwaiter Open(buffio::Path &path, int flags, int mode) const {
     return OpenFileAwaiter{path.wstring(), flags, mode, (void *)this};
   };
 

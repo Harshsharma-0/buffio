@@ -149,8 +149,8 @@ bool buffio::AwaitableFileBase::action(std::pair<void *, void *> info)
     {
       rval = ReadFile(
           fd,
-          static_cast<LPVOID>(buf[i].buffer),
-          static_cast<DWORD>(buf[i].size),
+          static_cast<LPVOID>(buf[i].iov_base),
+          static_cast<DWORD>(buf[i].iov_len),
           &bytesDone,
           NULL);
       if (!rval)
@@ -166,8 +166,8 @@ bool buffio::AwaitableFileBase::action(std::pair<void *, void *> info)
     {
       rval = WriteFile(
           fd,
-          static_cast<LPVOID>(buf[i].buffer),
-          static_cast<DWORD>(buf[i].size),
+          static_cast<LPVOID>(buf[i].iov_base),
+          static_cast<DWORD>(buf[i].iov_len),
           &bytesDone,
           NULL);
       if (!rval)
@@ -221,8 +221,8 @@ bool buffio::AwaitableFileBase::action(std::pair<void *, void *> info)
 
       rval = ReadFile(
           fd,
-          static_cast<LPVOID>(buf[i].buffer),
-          static_cast<DWORD>(buf[i].size),
+          static_cast<LPVOID>(buf[i].iov_base),
+          static_cast<DWORD>(buf[i].iov_len),
           &bytesDone,
           &ov);
       if (!rval)
@@ -244,8 +244,8 @@ bool buffio::AwaitableFileBase::action(std::pair<void *, void *> info)
       ov.OffsetHigh = static_cast<DWORD>(offset >> 32);
       rval = WriteFile(
           fd,
-          static_cast<LPVOID>(buf[i].buffer),
-          static_cast<DWORD>(buf[i].size),
+          static_cast<LPVOID>(buf[i].iov_base),
+          static_cast<DWORD>(buf[i].iov_len),
           &bytesDone,
           &ov);
       if (!rval)
