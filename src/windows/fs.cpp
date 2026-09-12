@@ -5,6 +5,16 @@
 #include "buffio/ecode.hpp"
 #include <windows.h>
 
+int buffio::OpenFileAwaiter::await_resume(){ 
+  if(op_state.fd == BUFFIO_FD_INVALID) return op_state.error;
+
+  buffio::File *file = 
+       static_cast<buffio::File*>(rval); 
+
+  file->fd = op_state.fd;
+  file->flags = 0;
+  return 0;
+};
 bool buffio::File::OpenStdIn()
 {
   assert(fd == BUFFIO_FD_INVALID);

@@ -6,7 +6,7 @@
 #include "buffio/lfqueue.hpp"
 #include "buffio/thread.hpp"
 #include "buffio/ecode.hpp"
-
+#include "buffio/opcode.hpp"
 #include <atomic>
 #include <cstring>
 #include <version>

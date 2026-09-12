@@ -1,3 +1,6 @@
+#include "buffio/config.hpp"
+
+#if defined(BUFFIO_BACKEND_EPOLL) || defined(BUFFIO_BACKEND_IOCP)
 #include "buffio/worker.hpp"
 #include <iostream>
 
@@ -196,7 +199,6 @@ void buffio::Worker::abort_io_completed(){
    * and it's also ensured in the init function, via checks.
    */
   state.completion_lock.post(n);
-  return 0;
 
 };
 void buffio::Worker::abort_io_requests(){
@@ -221,7 +223,7 @@ void buffio::Worker::kill_task_on_abort(){
 
     (*workd)->task.destroy();
   };
-
+  return;
 };
 void buffio::Worker::abort_timers(){
   //TODO: add timer abort loop
@@ -261,7 +263,7 @@ void buffio::Worker::abort_loop() {
   
   /* if any task requests I/O after the abort will get killed */
   kill_task_on_abort();
-  return 0;
+  return;
 
 };
 
@@ -354,3 +356,5 @@ void buffio::Worker::WorkerThreadFunc(void *args) {
     
   }
  };
+
+#endif

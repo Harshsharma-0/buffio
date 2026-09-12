@@ -39,7 +39,7 @@ template <size_t _order> constexpr size_t get_size() {
 
 
 template <typename T, buffio::lfMemMode lfmode = buffio::lfMemMode::dynamic,
-          size_t lforder =  64>
+          size_t lforder =  8>
 class lfQueue {
 public:
   BUFFIO_CLASS_PROTECT(lfQueue)
