@@ -2,6 +2,7 @@
 #define BUFFIO_BUFFERV
 
 #include "buffio/config.hpp"
+#include <cassert>
 #include <utility>
 
 #if defined(BUFFIO_OS_WINDOWS)

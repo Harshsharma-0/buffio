@@ -14,7 +14,7 @@ static inline int Signal_wake(std::atomic<AtomicTypeW> *addr,
                               AtomicTypeW num_threads, bool all = false) {
   if (all) {
     WakeByAddressAll(addr);
-    return;
+    return 0;
   };
 
   while (num_threads > 0) {

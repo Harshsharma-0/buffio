@@ -109,70 +109,28 @@ struct WritevOffsetAwaitable : AwaitableFileBase {
 
 /* INPROGRESS: add fs ops like mkdir/createdir... etc. */
 struct AwaitableFsBase {
-  bool await_ready() { return false; }
   void await_suspend(CoroutineHandle task_) {};
   int await_resume() const { return op_state.error; };
+  static bool action(std::pair<void *, void *> info);
 
   OpState op_state;
 };
 
 struct FsMkDirAwaitable : AwaitableFsBase {
+  bool await_ready() { return false; }
 
-  static bool action(std::pair<void *, void *> info);
-
-  char *path;
-  bool async;
 };
 
-struct FsLinkAwaitable {
-  bool await_ready() {
-    if (!async)
-      FsLinkAwaitable::action({nullptr, this});
-    return !async;
-  };
-
-  void await_suspend(CoroutineHandle task_);
-  ssize_t await_resume() const { return op_state.op_done; };
-
-  static bool action(std::pair<void *, void *> info);
-
-  char *path;
-  bool async;
-
-  BUFFIO_OS_INSERT(OpState op_state, OpState op_state, OVERLAPPED op_state);
+struct FsLinkAwaitable:AwaitableFsBase {
+  bool await_ready() { return false; }
 };
-struct FsUnlinkAwaitable {
-  bool await_ready() {
-    if (!async)
-      FsUnlinkAwaitable::action({nullptr, this});
-    return !async;
-  }
-  void await_suspend(CoroutineHandle task_);
-  ssize_t await_resume() const { return op_state.op_done; };
 
-  static bool action(std::pair<void *, void *> info);
+struct FsUnlinkAwaitable:AwaitableFsBase {
+  bool await_ready() { return false; }
 
-  char *path;
-  bool async;
-
-  BUFFIO_OS_INSERT(OpState op_state, OpState op_state, OVERLAPPED op_state);
 };
-struct FsRenameAwaitable {
-
-  bool await_ready() {
-    if (!async)
-      FsRenameAwaitable::action({nullptr, this});
-    return !async;
-  }
-  void await_suspend(CoroutineHandle task_);
-  ssize_t await_resume() const { return op_state.op_done; };
-
-  static bool action(std::pair<void *, void *> info);
-
-  char *path;
-  bool async;
-
-  BUFFIO_OS_INSERT(OpState op_state, OpState op_state, OVERLAPPED op_state);
+struct FsRenameAwaitable:AwaitableFsBase {
+  bool await_ready() { return false; }
 };
 
 }; // namespace buffio
