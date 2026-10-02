@@ -13,43 +13,19 @@ buffio::BuffervState iov;
 
 buffio::task<size_t> helloWorld(int id) {
 
-  buffio::File file;
-  std::cout<<"[running] "<<std::endl;
+  buffio::Path dirPath;
+  buffio::Path newPath;
+  dirPath = "./hell";
+  newPath = "./name";
 
-  int isOpen = co_await file.Open(BUFFIO_WIDEN("./hello.txt"),
-                              B_RDWR | B_CREAT | B_APPEND,0644);
- 
- if(isOpen < 0){
-     std::cout<<"[error opening reason]"<<buffio::strerror(isOpen)<<std::endl; 
-     co_return -1;
-  }
-  auto[bytesWritten,error] = co_await file.Write((char *)data,
-                                            (uint32_t)sizeof(data));
+  //int err = co_await buffio::Fs::MkDir(dirPath,0777);
+ // std::cout<<"FILE CREATION OK "<<buffio::strerror(err)<<std::endl;
 
- if(error < 0){
-     std::cout<<"[error writing reason]"<<buffio::strerror(error)<<std::endl; 
-     co_return -1;
-  }
-  iov.CreateVec(1);
-  iov.MakeEntry(1,buffer,1024);
+  int err = co_await buffio::Fs::Rename(dirPath,newPath);
+  std::cout<<"FILE CREATION OK "<<buffio::strerror(err)<<std::endl;
 
-  std::cout<<"[total writen] "<<bytesWritten<<" "<<sizeof(data)<<std::endl;
- 
-  // using readAt, as reading soon after writing result's in EOF 
-  auto [bytesRead,rerror] = co_await file.ReadvAt(iov,0);
-  if(rerror < 0){
-     std::cout<<"[error reading reason]"<<buffio::strerror(rerror)<<std::endl; 
-     co_return -1;
-  }
-
-
-  std::cout<<"[total read] "<<bytesRead<<std::endl;
-    
-  for(int i = 0 ; i < bytesRead ; i++){
-     std::cout<<buffer[i];
-   };
    
-
+  
   co_return 0;
 };
 

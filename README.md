@@ -1,4 +1,7 @@
 # BUFFIO 
+
+## ABANDONED PROJECT NO FURTHER UPDATE WILL BE PUSHED
+
 ## Async I/O library with c++ coroutine.
 Buffio is a personal project to understand async I/O and how it's done. The implementation may contain bugs, critical flaws,  and any type of correction is accepted.
 Buffio features:-

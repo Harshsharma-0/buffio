@@ -6,45 +6,39 @@
 #include "buffio/opcode.hpp"
 
 namespace buffio {
+using Path =  std::filesystem::path;
 
 struct AwaitableFileBase {
   void await_suspend(CoroutineHandle task_);
+  
   std::pair<ssize_t, int> await_resume() {
     return {op_state.op_done, op_state.error};
   };
 
-  static bool action(std::pair<void *, void *> info);
+  static bool action(buffio::OpState *state);
 
   struct {
     buffio_fd fd;
     char *buffer;
     size_t size;
     uint64_t offset;
-#ifdef BUFFIO_BACKEND_IOURING
     uint64_t *poffset;
-#endif
   } state;
 
   OpState op_state;
 };
 
 struct OpenFileAwaiter {
-  bool await_ready() {
-    op_state.op_code = OpCode::Open;
-    op_state.action = OpenFileAwaiter::action;
-    op_state.data = static_cast<void *>(this);
-    return false;
-  };
+
+  bool await_ready() { return false; };
   void await_suspend(CoroutineHandle task_);
   int await_resume();
+  
+  /* function that actually does the work */
+  static bool action(buffio::OpState *state);
 
-  static bool action(std::pair<void *, void *> info);
+  buffio::Path &path;
 
-#if defined(BUFFIO_OS_LINUX)
-  char *path;
-#elif defined(BUFFIO_OS_WINDOWS)
-  std::wstring path;
-#endif
   int flags;
   int mode;
   void *rval;
@@ -107,30 +101,48 @@ struct WritevOffsetAwaitable : AwaitableFileBase {
   };
 };
 
+
+
 /* INPROGRESS: add fs ops like mkdir/createdir... etc. */
 struct AwaitableFsBase {
-  void await_suspend(CoroutineHandle task_) {};
-  int await_resume() const { return op_state.error; };
-  static bool action(std::pair<void *, void *> info);
 
+  void await_suspend(CoroutineHandle task_);
+  int await_resume() const { return op_state.error; };
+  static bool action(buffio::OpState *state);
+
+
+  buffio::Path &path;
+  int mode_t;
+  buffio::Path &path_old;
   OpState op_state;
 };
 
 struct FsMkDirAwaitable : AwaitableFsBase {
-  bool await_ready() { return false; }
-
+  bool await_ready() { 
+    op_state.op_code = buffio::OpCode::MkDir;
+    return false; 
+  };
 };
 
 struct FsLinkAwaitable:AwaitableFsBase {
-  bool await_ready() { return false; }
+  bool await_ready() { 
+    op_state.op_code = buffio::OpCode::Link;
+    return false; 
+  };
 };
 
 struct FsUnlinkAwaitable:AwaitableFsBase {
-  bool await_ready() { return false; }
-
+  bool await_ready() { 
+    op_state.op_code = buffio::OpCode::UnLink;
+    return false; 
+  };
 };
+
 struct FsRenameAwaitable:AwaitableFsBase {
-  bool await_ready() { return false; }
+  bool await_ready() { 
+    op_state.op_code = buffio::OpCode::Rename;
+    return false; 
+  };
 };
 
 }; // namespace buffio

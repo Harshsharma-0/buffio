@@ -9,12 +9,14 @@
 #include <fcntl.h>
 
 
-bool buffio::OpenFileAwaiter::action(std::pair<void*,void*> info){
-  auto[p_sqe,p_self] = info;
+bool buffio::OpenFileAwaiter::action(buffio::OpState *state){
+  
   buffio::OpenFileAwaiter *obj =
-           static_cast<buffio::OpenFileAwaiter *>(p_self);
-
-  int fd = open(obj->path,obj->flags,(mode_t)obj->mode); 
+           static_cast<buffio::OpenFileAwaiter *>(state->data);
+  
+  int fd = open(obj->path.c_str(),
+                obj->flags,
+                (mode_t)obj->mode); 
   if(fd < 0){
     obj->op_state.error = buffio::error_from_os(errno);
     obj->op_state.fd = BUFFIO_FD_INVALID;
@@ -26,13 +28,13 @@ bool buffio::OpenFileAwaiter::action(std::pair<void*,void*> info){
   return true;
 };
 
-bool buffio::AwaitableFileBase::action(std::pair<void*,void*> info){
+bool buffio::AwaitableFileBase::action(buffio::OpState *state){
 
- auto[p_sqe,p_self] = info;
- buffio::AwaitableFileBase *obj =
-               static_cast<buffio::AwaitableFileBase *>(p_self);
+ buffio::AwaitableFileBase *obj = 
+             static_cast<buffio::AwaitableFileBase *>(state->data);
 
- auto[fd,buffer,size,offset] = obj->state;
+ auto[fd,buffer,size,offset,poffset] = obj->state;
+
  obj->op_state.error = 0;
  ssize_t rval = 0;
 
@@ -49,14 +51,33 @@ bool buffio::AwaitableFileBase::action(std::pair<void*,void*> info){
  };
  
  if(rval < 0){
-   obj->op_state.error = buffio::error_from_os(static_cast<int>(errno));
+    state->error = buffio::error_from_os(static_cast<int>(errno));
  };
 
-  obj->op_state.op_done = rval;
+  state->op_done = rval;
 
   return true;
 };
 
+bool buffio::AwaitableFsBase::action(buffio::OpState *state){
+  
+  int error = 0;
+  buffio::OpCode op = state->op_code;
+  buffio::AwaitableFsBase *obj = 
+                static_cast<buffio::AwaitableFsBase*>(state->data);
+
+  if(op == buffio::OpCode::MkDir)
+       error = mkdir(obj->path.c_str(),obj->mode_t);
+
+  if(op == buffio::OpCode::Rename)
+       error = rename(obj->path.c_str(),obj->path_old.c_str());
+
+  if(error < 0)
+      error = buffio::error_from_os(errno);
+
+  state->error = error;
+  return true;
+};
 #endif
 
 
