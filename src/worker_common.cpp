@@ -1,6 +1,8 @@
 #include "buffio/config.hpp"
+#include "buffio/fsawaitable.hpp"
 
 #if defined(BUFFIO_BACKEND_EPOLL) || defined(BUFFIO_BACKEND_IOCP)
+
 #include "buffio/worker.hpp"
 #include <iostream>
 
@@ -342,19 +344,31 @@ void buffio::Worker::WorkerThreadFunc(void *args) {
       continue;
     }
     
-    auto *action = *op;
-    action->action({nullptr, action->data});
+
+    switch((*op)->op_class){
+     case buffio::OpClass::OpenOp:
+        buffio::OpenFileAwaiter::action(*op);
+     break;
+     case buffio::OpClass::FileIo:
+        buffio::AwaitableFileBase::action(*op);
+     break;
+     case buffio::OpClass::FsOps:
+        buffio::AwaitableFsBase::action(*op);
+     break;
+
+     //TODO: handle unknown ops,
+    };
     
     state.pcompletion_lock->wait();
-    state.pcompletion_queue->enqueue(action);
+    state.pcompletion_queue->enqueue(*op);
 
     status = state.pcontrol->load(std::memory_order_acquire);
 
     if (status == buffio::LoopStatusCode::inactive){
       Worker::signalLoop(state.sigfd,LoopStatusCode::event_wake); 
-    }
+    };
     
-  }
+  };
  };
 
 #endif

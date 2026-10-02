@@ -134,6 +134,8 @@ BUFFIO_ERROR_TABLE(BUFFIO_DEFINE_ERROR)
 // ============================================================================
 
 constexpr const char *strerror(int error) noexcept {
+  if(error == 0) return "Success";
+
   switch (error) {
 
 #define BUFFIO_ERROR_STRING(name, number, description)                         \

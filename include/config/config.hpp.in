@@ -9,6 +9,8 @@
 #define BUFFIO_MAX_WORKER 16
 #cmakedefine BUFFIO_OS_WIN
 
+#define BUFFIO_IOURING_INSERT(want,actual) actual
+
 
 
 /*
@@ -61,6 +63,9 @@
    
    #ifdef BUFFIO_WORKER_IOURING
      #define BUFFIO_BACKEND_IOURING
+     #undef BUFFIO_IOURING_INSERT
+     #define BUFFIO_IOURING_INSERT(want,actual) want
+
    #else
      #define BUFFIO_BACKEND_EPOLL
   #endif

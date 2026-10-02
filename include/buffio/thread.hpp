@@ -17,12 +17,11 @@
 
 namespace buffio {
 
-#undef __cpp_lib_latch
 #ifdef __cpp_lib_latch
 using Latch = std::latch;
 #else
 
-// TODO : Define error codes
+// TODO : Define error codes latch
 class Latch {
 private:
   std::atomic<std::ptrdiff_t> count = 0;
@@ -57,7 +56,7 @@ using threadFuncSig = void (*)(void *);
 class thread {
 public:
   
-  /* TODO: add timeout while joining the thread */
+  /* DONE: add timeout while joining the thread */
   thread() : routine(nullptr), args(nullptr) {};
   int run(threadFuncSig start, void *args);
 
